@@ -1,0 +1,5 @@
+bin/  usr/
+etc/* etc/
+requirements.txt usr/share/auton
+setup.py usr/share/auton
+VERSION usr/share/auton
