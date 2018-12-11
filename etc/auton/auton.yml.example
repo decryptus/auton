@@ -23,10 +23,10 @@ modules:
     routes:
       run:
         handler:   'job_run'
-        regexp:    '^run/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9\-]{8,64})$'
+        regexp:    '^run/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
         safe_init: true
         op:        'POST'
       status:
         handler:   'job_status'
-        regexp:    '^status/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9\-]{8,64})$'
+        regexp:    '^status/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
         op:        'GET'

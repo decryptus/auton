@@ -1,3 +1,21 @@
+auton (0.1.15) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 10 Dec 2018 11:44:40 +0100
+
+auton (0.1.14) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 10 Dec 2018 11:26:32 +0100
+
+auton (0.1.13) unstable; urgency=medium
+
+  * Reviewed envname regex in module job.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 10 Dec 2018 05:14:53 +0100
+
 auton (0.1.12) unstable; urgency=medium
 
   * Reviewed method _build_params_dict in plugin subproc.
