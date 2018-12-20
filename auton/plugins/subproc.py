@@ -236,7 +236,7 @@ class AutonSubProcPlugin(AutonPlugBase):
             raise
         except Exception, e:
             raise AutonTargetFailed("error on target: %r. exception: %r"
-                                       % (self.target.name, e))
+                                    % (self.target.name, e))
         finally:
             texit.set()
 

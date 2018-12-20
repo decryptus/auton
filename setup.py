@@ -4,7 +4,7 @@
 import os
 from setuptools import find_packages, setup
 
-version                = '0.1.15'
+version                = '0.1.18'
 
 current_dir            = os.path.abspath(os.path.dirname(__file__))
 requirements           = [line.strip() for line in open(os.path.join(current_dir, 'requirements.txt'), 'r').readlines()]
@@ -29,7 +29,7 @@ setup(
     license                       = 'License GPL-2',
     url                           = 'https://github.com/decryptus/auton',
     scripts                       = ['bin/auton',
-                                     'bin/auton-client'],
+                                     'bin/autond'],
     packages                      = find_packages(),
     install_requires              = requirements,
     long_description              = long_desc,

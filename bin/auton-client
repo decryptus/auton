@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.15'
+__version__ = '0.1.16'
 
 import logging
 import os
@@ -174,12 +174,12 @@ class AutonClient(object):
                 req.close()
 
     def _show_results(self, data):
-        if data['code'] == 200 \
-           and 'stream' in data:
+        if data.get('stream'):
             for x in data['stream']:
                 print x
-        elif data['status'] == 'complete' \
-           and 'errors' in data:
+
+        if data['status'] == 'complete' \
+           and data.get('errors'):
             for x in data['errors']:
                 LOG.error(x)
 

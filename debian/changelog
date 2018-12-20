@@ -1,3 +1,21 @@
+auton (0.1.18) unstable; urgency=medium
+
+  * Fixed setup.py.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 17 Dec 2018 10:02:42 +0100
+
+auton (0.1.17) unstable; urgency=medium
+
+  * Renamed auton to autond and auton-client to auton.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 17 Dec 2018 06:58:02 +0100
+
+auton (0.1.16) unstable; urgency=medium
+
+  * Reviewed auton-client.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 12 Dec 2018 14:34:39 +0100
+
 auton (0.1.15) unstable; urgency=medium
 
   * Reviewed requirements.

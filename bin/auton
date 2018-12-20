@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-auton
+auton-client
 """
 
 __license__ = """
@@ -20,49 +20,28 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.15'
+__version__ = '0.1.18'
 
 import logging
-import grp
 import os
-import pwd
+import requests
+import sys
+import time
 
-from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
-from auton.modules import * # XXX
-from auton.plugins import * # XXX
-from dwho.modules import * # XXX
-from dwho.config import init_logger, make_piddir, make_logdir
-from httpdis.ext import httpdis_json
+from dotenv.main import dotenv_values
 from optparse import OptionParser
-from sonicprobe import helpers
-from sonicprobe.libs import daemonize
+from sonicprobe.libs import urisup
 
-
-SYSLOG_NAME       = "auton"
-LOG               = logging.getLogger(SYSLOG_NAME)
-
-DEFAULT_PIDFILE   = "/run/auton/auton.pid"
-DEFAULT_LOGFILE   = "/var/log/auton/daemon.log"
-
-try:
-    AUTON_USER  = pwd.getpwnam(os.environ.get('AUTON_USER') or 'auton').pw_name
-except KeyError:
-    AUTON_USER  = pwd.getpwuid(os.geteuid())[0]
-
-try:
-    AUTON_GROUP = grp.getgrnam(os.environ.get('AUTON_USER') or 'auton').gr_name
-except KeyError:
-    AUTON_GROUP = grp.getgrgid(os.getegid())[0]
-
-AUTON_PIDFILE = os.environ.get('AUTON_PIDFILE') or DEFAULT_PIDFILE
-AUTON_LOGFILE = os.environ.get('AUTON_LOGFILE') or DEFAULT_LOGFILE
+SYSLOG_NAME   = "auton-client"
+LOG           = logging.getLogger(SYSLOG_NAME)
+DEFAULT_DELAY = 0.5
 
 
 def argv_parse_check():
     """
     Parse (and check a little) command line parameters
     """
-    parser              = OptionParser(usage="usage: %prog [options]")
+    parser           = OptionParser(usage="usage: %prog [options]")
 
     parser.add_option("-l",
                       dest      = 'loglevel',
@@ -70,104 +49,176 @@ def argv_parse_check():
                       choices   = ('critical', 'error', 'warning', 'info', 'debug'),
                       help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
                                    "critical, error, warning, info, debug"))
-    parser.add_option("-d",
-                      action    = 'store_true',
-                      dest      = 'dontlauchmain',
-                      default   = False,
-                      help      = "Don't call the main function, for installation test purposes")
-    parser.add_option("-f",
-                      action    = 'store_true',
-                      dest      = 'foreground',
-                      default   = False,
-                      help      = "Foreground, don't daemonize")
-    parser.add_option("-c",
-                      dest      = 'conffile',
-                      default   = '/etc/auton/auton.yml',
-                      help      = "Use configuration file <conffile> instead of %default")
-    parser.add_option("-p",
-                      dest      = 'pidfile',
-                      default   = AUTON_PIDFILE,
-                      help      = "Use PID file <pidfile> instead of %default")
-    parser.add_option("-u",
-                      dest      = 'username',
-                      type      = 'string',
-                      default   = AUTON_USER,
-                      help      = "Use username for the process instead of %default")
-    parser.add_option("-g",
-                      dest      = 'groupname',
-                      type      = 'string',
-                      default   = AUTON_GROUP,
-                      help      = "Use groupname for the process instead of %default")
-    parser.add_option("--logfile",
-                      dest      = 'logfile',
-                      type      = 'string',
-                      default   = AUTON_LOGFILE,
-                      help      = "Use log file <logfile> instead of %default")
-    parser.add_option("--listen-addr",
-                      dest      = 'listen_addr',
-                      help      = "Listen on address <listen_addr>")
-    parser.add_option("--listen-port",
-                      dest      = 'listen_port',
-                      type      = 'int',
-                      help      = "Listen on port <listen_port>")
+    parser.add_option("--uri",
+                      dest      = 'uri',
+                      default   = os.environ.get('AUTON_URI'),
+                      help      = "Auton URI address")
+    parser.add_option("--uid",
+                      dest      = 'uid',
+                      default   = os.environ.get('AUTON_UID'),
+                      help      = "Auton uid")
+    parser.add_option("--endpoint",
+                      dest      = 'endpoint',
+                      default   = os.environ.get('AUTON_ENDPOINT'),
+                      help      = "Auton endpoint")
+    parser.add_option("--delay",
+                      dest      = 'delay',
+                      type      = 'float',
+                      default   = DEFAULT_DELAY,
+                      help      = "Delay between requests instead of %default")
+    parser.add_option("--mode",
+                      dest      = 'mode',
+                      default   = 'autorun',
+                      choices   = ('autorun', 'run', 'status'),
+                      help      = "Auton mode: autorun, run, status")
+    parser.add_option("-e",
+                      action    = 'append',
+                      dest      = 'envvars',
+                      default   = [],
+                      help      = "Passed environment variables")
+    parser.add_option("--envfile",
+                      action    = 'append',
+                      dest      = 'envfiles',
+                      default   = [],
+                      help      = "Passed envfile parameters")
+    parser.add_option("--load-envfile",
+                      action    = 'append',
+                      dest      = 'load_envfiles',
+                      default   = [],
+                      help      = "Load environment variables from file")
+    parser.add_option("-a",
+                      action    = 'append',
+                      dest      = 'args',
+                      default   = [],
+                      help      = "Passed arguments")
 
-    options, args       = parser.parse_args()
+    options, args    = parser.parse_args()
 
     if args:
         parser.error("no argument is allowed - use option --help to get an help screen")
 
-    options.loglevel    = getattr(logging, options.loglevel.upper(), logging.INFO)
+    options.loglevel = getattr(logging, options.loglevel.upper(), logging.INFO)
 
     return options
+
+class AutonClient(object):
+    def __init__(self, options):
+        self.options = options
+        self.envvars = {}
+
+        if not self.options.uri:
+            raise ValueError("missing variable AUTON_URI")
+
+        if not self.options.uid:
+            raise ValueError("missing variable AUTON_UID")
+
+        if not self.options.endpoint:
+            raise ValueError("missing variable AUTON_ENDPOINT")
+
+        self._load_envfiles()
+        self._parse_envvars()
+
+    def _load_envfiles(self):
+        for envfile in self.options.load_envfiles:
+            self.envvars.update(dotenv_values(envfile))
+
+    def _parse_envvars(self):
+        for envvar in self.options.envvars:
+            env = envvar.split('=', 1)
+            if not env[0]:
+                LOG.warning("invalid environment variable: %r", env)
+            elif len(env) == 1:
+                self.envvars[env[0]] = ''
+            else:
+                self.envvars[env[0]] = env[1]
+
+    def _build_uri(self, method):
+        r    = list(urisup.uri_help_split(self.options.uri))
+        r[2] = "/%s/%s/%s" % (method, self.options.endpoint, self.options.uid)
+
+        return urisup.uri_help_unsplit(r)
+
+    def _check_results(self, res):
+        if not res:
+            raise LookupError("unknown error")
+        elif res.get('message'):
+            raise LookupError("invalid request, message: %s" % res['message'])
+        elif res.get('code'):
+            return res
+        else:
+            raise LookupError("errors occurred: %r" % res)
+
+    def do_run(self):
+        req = None
+
+        try:
+            req = requests.post(self._build_uri('run'),
+                                json = {'args':     self.options.args,
+                                        'env':      self.envvars,
+                                        'envfiles': self.options.envfiles})
+
+            return self._check_results(req.json())
+        finally:
+            if req:
+                req.close()
+
+    def do_status(self):
+        req = None
+
+        try:
+            req = requests.get(self._build_uri('status'))
+
+            return self._check_results(req.json())
+        finally:
+            if req:
+                req.close()
+
+    def _show_results(self, data):
+        if data.get('stream'):
+            for x in data['stream']:
+                print x
+
+        if data['status'] == 'complete' \
+           and data.get('errors'):
+            for x in data['errors']:
+                LOG.error(x)
+
+    def do_autorun(self):
+        data = self.do_run()
+        while data['status'] != 'complete':
+            time.sleep(self.options.delay)
+            data = self.do_status()
+            self._show_results(data)
+
+        return int(data['code'] != 200)
 
 
 def main(options):
     """
-    Main function; start the server
+    Main function
     """
-    uid = pwd.getpwnam(options.username)[2]
-    gid = grp.getgrnam(options.groupname)[2]
 
-    make_piddir(options.pidfile, uid, gid)
-    make_logdir(options.logfile, uid, gid)
+    xformat = "%(levelname)s:%(asctime)-15s: %(message)s"
+    datefmt = '%Y-%m-%d %H:%M:%S'
+    logging.basicConfig(level   = options.loglevel,
+                        format  = xformat,
+                        datefmt = datefmt)
 
-    root_logger = init_logger(options.logfile, SYSLOG_NAME)
-    options     = load_conf(options.conffile, options)
-
-    setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
-    setattr(options, 'sys_version', '')
-
-    httpdis_json.init(options, False)
-    DWHO_THREADS.append(httpdis_json.stop)
-
-    if not options.foreground:
-        LOG.info("Transforming into a daemon from hell")
-        daemonize.daemonize()
-
-    LOG.info("locking PID")
-    daemonize.lock_pidfile_or_die(options.pidfile)
+    auton   = None
+    rc      = 0
 
     try:
-        LOG.info("pidfile ok")
-        root_logger.setLevel(options.loglevel)
-        os.chown(options.pidfile, uid, gid)
-        os.setgid(gid)
-        os.setuid(uid)
-        os.umask(022)
-
-        start_endpoints()
-        httpdis_json.run(options)
+        auton = AutonClient(options)
+        rc    = getattr(auton, "do_%s" % options.mode)()
     except (KeyboardInterrupt, SystemExit):
+        rc = 2
+    except Exception, e:
+        LOG.error(e)
+        rc = 1
         raise
-    except Exception:
-        LOG.exception("bad things happen")
     finally:
-        daemonize.unlock_pidfile(options.pidfile)
+        sys.exit(rc)
+
 
 if __name__ == '__main__':
-    def _start():
-        "entry point"
-        options = argv_parse_check()
-        if not options.dontlauchmain:
-            main(options)
-    _start()
+    main(argv_parse_check())
