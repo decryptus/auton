@@ -1,3 +1,9 @@
+auton (0.1.19) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 20 Dec 2018 11:17:10 +0100
+
 auton (0.1.18) unstable; urgency=medium
 
   * Fixed setup.py.
