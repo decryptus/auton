@@ -1,3 +1,9 @@
+auton (0.1.20) unstable; urgency=medium
+
+  * Fixed job results on error.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 20 Dec 2018 20:18:07 +0100
+
 auton (0.1.19) unstable; urgency=medium
 
   * Reviewed README.md.

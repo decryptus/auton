@@ -94,13 +94,12 @@ class JobModule(DWhoModuleBase):
              'uid':        obj.get_uid(),
              'status':     obj.get_status(),
              'started_at': obj.get_started_at(),
+             'stream':     obj.get_last_result(),
              'ended_at':   obj.get_ended_at()}
 
         if obj.has_error():
             r['code']   = 400
             r['errors'] = obj.get_errors()
-        else:
-            r['stream'] = obj.get_last_result()
 
         return r
 
