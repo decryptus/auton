@@ -1,3 +1,9 @@
+auton (0.1.21) unstable; urgency=medium
+
+  * Added default environment variables.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 21 Dec 2018 22:59:58 +0100
+
 auton (0.1.20) unstable; urgency=medium
 
   * Fixed job results on error.

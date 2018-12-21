@@ -96,6 +96,15 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         return r
 
+    def _set_default_env(self, env, ovars):
+        env.update({'AUTON':            'true',
+                    'AUTON_JOB_TIME':   ovars['_time_'],
+                    'AUTON_JOB_GMTIME': ovars['_gmtime_'],
+                    'AUTON_JOB_UID':    ovars['_uid_'],
+                    'AUTON_JOB_UUID':   ovars['_uuid_']})
+
+        return env
+
     def _load_envfile(self, envfiles):
         r = {}
 
@@ -197,7 +206,9 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         env     = self._mk_env(cfg.get('env'), fenv, penv, ovars)
         if not env:
-            env = None
+            env = {}
+
+        env     = self._set_default_env(env, ovars)
 
         bargs   = self._get_become(cfg.get('become'))
 

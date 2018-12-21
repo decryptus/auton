@@ -87,11 +87,11 @@ class AutonEPTObject(object):
         self.errors     = []
         self.started_at = None
         self.ended_at   = None
-        self.vars       = {'_env_': os.environ.copy(),
-                           '_time_': datetime.now(),
+        self.vars       = {'_env_':    os.environ.copy(),
+                           '_time_':   datetime.now(),
                            '_gmtime_': datetime.utcnow(),
-                           '_uid_': uid,
-                           '_uuid_': "%s" % uuid.uuid4()}
+                           '_uid_':    uid,
+                           '_uuid_':   "%s" % uuid.uuid4()}
 
     def get_uid(self):
         return self.uid
