@@ -31,7 +31,7 @@ import uuid
 
 from datetime import datetime
 from auton.classes.target import AutonTarget
-from auton.classes.exceptions import AutonTargetFailed, AutonTargetTimeout
+from auton.classes.exceptions import AutonTargetFailed, AutonTargetTimeout, AutonTargetUnauthorized
 from dwho.classes.plugins import DWhoPluginBase
 from dwho.config import load_credentials
 
@@ -181,6 +181,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
         self.daemon      = True
         self.name        = name
         self.credentials = None
+        self.users       = None
         self.target      = None
 
     @classmethod
@@ -288,13 +289,16 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
         return r
 
     def safe_init(self):
+        if self.config.get('users'):
+            self.users = self.config['users']
+
         if self.config.get('credentials'):
             self.credentials = load_credentials(self.config['credentials'],
                                                 config_dir = self.config['auton']['config_dir'])
 
         self.target = AutonTarget(**{'name':        self.name,
-                                        'config':      self.config['config'],
-                                        'credentials': self.credentials})
+                                     'config':      self.config['config'],
+                                     'credentials': self.credentials})
 
         EPTS_SYNC.register(AutonEPTSync(self.name))
 
@@ -308,6 +312,12 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
 
             try:
                 obj  = EPTS_SYNC[self.name].qget(True)
+
+                if self.users:
+                    user = obj.get_request()._SERVER.get('HTTP_AUTH_USER')
+                    if user is None or not self.users.get(user):
+                        raise AutonTargetUnauthorized("unauthorized user: %r" % user)
+
                 func = "do_%s" % obj.get_method()
                 if not hasattr(self, func):
                     LOG.warning("unknown method %r for endpoint %r", func, self.name)

@@ -38,3 +38,6 @@ class AutonTargetFailed(Exception):
 
 class AutonTargetTimeout(AutonTargetFailed):
     pass
+
+class AutonTargetUnauthorized(AutonTargetFailed):
+    pass

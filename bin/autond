@@ -1,0 +1,173 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+auton
+"""
+
+__license__ = """
+    Copyright (C) 2018  fjord-technologies
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+__version__ = '0.1.25'
+
+import logging
+import grp
+import os
+import pwd
+
+from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
+from auton.modules import * # XXX
+from auton.plugins import * # XXX
+from dwho.modules import * # XXX
+from dwho.config import init_logger, make_piddir, make_logdir
+from httpdis.ext import httpdis_json
+from optparse import OptionParser
+from sonicprobe import helpers
+from sonicprobe.libs import daemonize
+
+
+SYSLOG_NAME       = "auton"
+LOG               = logging.getLogger(SYSLOG_NAME)
+
+DEFAULT_PIDFILE   = "/run/auton/auton.pid"
+DEFAULT_LOGFILE   = "/var/log/auton/daemon.log"
+
+try:
+    AUTON_USER  = pwd.getpwnam(os.environ.get('AUTON_USER') or 'auton').pw_name
+except KeyError:
+    AUTON_USER  = pwd.getpwuid(os.geteuid())[0]
+
+try:
+    AUTON_GROUP = grp.getgrnam(os.environ.get('AUTON_USER') or 'auton').gr_name
+except KeyError:
+    AUTON_GROUP = grp.getgrgid(os.getegid())[0]
+
+AUTON_PIDFILE = os.environ.get('AUTON_PIDFILE') or DEFAULT_PIDFILE
+AUTON_LOGFILE = os.environ.get('AUTON_LOGFILE') or DEFAULT_LOGFILE
+
+
+def argv_parse_check():
+    """
+    Parse (and check a little) command line parameters
+    """
+    parser              = OptionParser(usage="usage: %prog [options]")
+
+    parser.add_option("-l",
+                      dest      = 'loglevel',
+                      default   = 'info',   # warning: see affectation under
+                      choices   = ('critical', 'error', 'warning', 'info', 'debug'),
+                      help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
+                                   "critical, error, warning, info, debug"))
+    parser.add_option("-d",
+                      action    = 'store_true',
+                      dest      = 'dontlauchmain',
+                      default   = False,
+                      help      = "Don't call the main function, for installation test purposes")
+    parser.add_option("-f",
+                      action    = 'store_true',
+                      dest      = 'foreground',
+                      default   = False,
+                      help      = "Foreground, don't daemonize")
+    parser.add_option("-c",
+                      dest      = 'conffile',
+                      default   = '/etc/auton/auton.yml',
+                      help      = "Use configuration file <conffile> instead of %default")
+    parser.add_option("-p",
+                      dest      = 'pidfile',
+                      default   = AUTON_PIDFILE,
+                      help      = "Use PID file <pidfile> instead of %default")
+    parser.add_option("-u",
+                      dest      = 'username',
+                      type      = 'string',
+                      default   = AUTON_USER,
+                      help      = "Use username for the process instead of %default")
+    parser.add_option("-g",
+                      dest      = 'groupname',
+                      type      = 'string',
+                      default   = AUTON_GROUP,
+                      help      = "Use groupname for the process instead of %default")
+    parser.add_option("--logfile",
+                      dest      = 'logfile',
+                      type      = 'string',
+                      default   = AUTON_LOGFILE,
+                      help      = "Use log file <logfile> instead of %default")
+    parser.add_option("--listen-addr",
+                      dest      = 'listen_addr',
+                      help      = "Listen on address <listen_addr>")
+    parser.add_option("--listen-port",
+                      dest      = 'listen_port',
+                      type      = 'int',
+                      help      = "Listen on port <listen_port>")
+
+    options, args       = parser.parse_args()
+
+    if args:
+        parser.error("no argument is allowed - use option --help to get an help screen")
+
+    options.loglevel    = getattr(logging, options.loglevel.upper(), logging.INFO)
+
+    return options
+
+
+def main(options):
+    """
+    Main function; start the server
+    """
+    uid = pwd.getpwnam(options.username)[2]
+    gid = grp.getgrnam(options.groupname)[2]
+
+    make_piddir(options.pidfile, uid, gid)
+    make_logdir(options.logfile, uid, gid)
+
+    root_logger = init_logger(options.logfile, SYSLOG_NAME)
+    options     = load_conf(options.conffile, options)
+
+    setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
+    setattr(options, 'sys_version', '')
+
+    httpdis_json.init(options, False)
+    DWHO_THREADS.append(httpdis_json.stop)
+
+    if not options.foreground:
+        LOG.info("Transforming into a daemon from hell")
+        daemonize.daemonize()
+
+    LOG.info("locking PID")
+    daemonize.lock_pidfile_or_die(options.pidfile)
+
+    try:
+        LOG.info("pidfile ok")
+        root_logger.setLevel(options.loglevel)
+        os.chown(options.pidfile, uid, gid)
+        os.setgid(gid)
+        os.setuid(uid)
+        os.umask(022)
+
+        start_endpoints()
+        httpdis_json.run(options)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        LOG.exception("bad things happen")
+    finally:
+        daemonize.unlock_pidfile(options.pidfile)
+
+if __name__ == '__main__':
+    def _start():
+        "entry point"
+        options = argv_parse_check()
+        if not options.dontlauchmain:
+            main(options)
+    _start()

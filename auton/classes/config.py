@@ -71,21 +71,22 @@ def load_conf(xfile, options = None):
 
     for name, ept_cfg in conf['endpoints'].iteritems():
         cfg     = {'general':  dict(conf['general']),
-                   'auton': {'endpoint_name': name,
-                                 'config_dir':    config_dir},
-                   'vars' :    {},
-                   'config':   {}}
+                   'auton':    {'endpoint_name': name,
+                                'config_dir':    config_dir},
+                   'config':   {},
+                   'users' :   {},
+                   'vars':     {}}
 
         if 'plugin' not in ept_cfg:
             raise AutonConfigurationError("Missing 'plugin' option in endpoint: %r" % name)
 
         if ept_cfg['plugin'] not in PLUGINS:
             raise AutonConfigurationError("Invalid plugin %r in endpoint: %r"
-                                             % (ept_cfg['plugin'],
-                                                name))
+                                          % (ept_cfg['plugin'],
+                                             name))
         cfg['auton']['plugin_name'] = ept_cfg['plugin']
 
-        for x in ('config', 'vars'):
+        for x in ('config', 'users', 'vars'):
             if ept_cfg.get("import_%s" % x):
                 cfg[x].update(import_file(ept_cfg["import_%s" % x], config_dir, cfg))
 

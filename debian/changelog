@@ -1,3 +1,27 @@
+auton (0.1.25) unstable; urgency=medium
+
+  * Added users authentication in auton.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 24 Jan 2019 11:53:14 +0100
+
+auton (0.1.24) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 23 Jan 2019 21:04:05 +0100
+
+auton (0.1.23) unstable; urgency=medium
+
+  * Added users authentication by endpoints. 
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 23 Jan 2019 20:48:30 +0100
+
+auton (0.1.22) unstable; urgency=medium
+
+  * Fixed environment variables.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sat, 22 Dec 2018 01:06:28 +0100
+
 auton (0.1.21) unstable; urgency=medium
 
   * Added default environment variables.
