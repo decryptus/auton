@@ -1,5 +1,5 @@
-dwho>=0.2.85
-httpdis>=0.5.12
+dwho>=0.2.89
+httpdis>=0.5.13
 pycurl
 python-dotenv
 pyyaml>=3.10
