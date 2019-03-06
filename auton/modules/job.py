@@ -36,7 +36,7 @@ from sonicprobe.libs import xys
 from sonicprobe.libs.moresynchro import RWLock
 
 LOG = logging.getLogger('auton.modules.job')
-xys.add_regex('job.envname', re.compile(r'^[a-zA-Z0-9_\-\.]{1,64}$').match)
+xys.add_regex('job.envname', re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]{0,63}$').match)
 
 
 class JobModule(DWhoModuleBase):

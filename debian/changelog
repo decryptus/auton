@@ -1,3 +1,9 @@
+auton (0.1.30) unstable; urgency=medium
+
+  * Fixed environment name regex.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 06 Mar 2019 18:47:56 +0100
+
 auton (0.1.29) unstable; urgency=medium
 
   * Reviewed requirements. 
