@@ -1,3 +1,39 @@
+auton (0.1.36) unstable; urgency=medium
+
+  * Added multi-args and multi-argsfiles arguments in auton.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 16:45:45 +0200
+
+auton (0.1.35) unstable; urgency=medium
+
+  * Renamed debian/autond.default to debian/autond.auton.default.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 11:58:12 +0200
+
+auton (0.1.34) unstable; urgency=medium
+
+  * Removed file debian/autond.pyinstall.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 11:26:31 +0200
+
+auton (0.1.33) unstable; urgency=medium
+
+  * Added argfiles argument in auton and separated packages auton and autond.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 11:18:47 +0200
+
+auton (0.1.32) unstable; urgency=medium
+
+  * Refactoring plugins class.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 07 Mar 2019 11:50:01 +0100
+
+auton (0.1.31) unstable; urgency=medium
+
+  * Cleaned codes.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 07 Mar 2019 10:21:57 +0100
+
 auton (0.1.30) unstable; urgency=medium
 
   * Fixed environment name regex.

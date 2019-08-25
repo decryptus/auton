@@ -9,6 +9,7 @@ export DH_OPTIONS=-v
 export PYBUILD_VERBOSE=1
 
 export PYBUILD_NAME=auton
+export PYBUILD_AFTER_INSTALL=rm -rf '{destdir}/usr/bin' '{destdir}/{install_dir}/auton-'*.egg-info
 
 %:
 	dh $@ --with python2 --buildsystem=pybuild
@@ -16,6 +17,9 @@ export PYBUILD_NAME=auton
 override_dh_auto_install:
 	dh_auto_install
 	$(shell echo "$(DEB_VERSION_UPSTREAM)" > $(CURDIR)/VERSION)
+
+override_dh_installinit:
+	dh_installinit -p autond --name=auton
 
 override_dh_auto_clean:
 	dh_auto_clean

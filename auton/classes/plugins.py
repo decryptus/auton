@@ -24,25 +24,26 @@ import abc
 import logging
 import os
 import Queue
-import re
 import threading
 import time
 import uuid
 
 from datetime import datetime
-from auton.classes.target import AutonTarget
-from auton.classes.exceptions import AutonTargetFailed, AutonTargetTimeout, AutonTargetUnauthorized
 from dwho.classes.plugins import DWhoPluginBase
 from dwho.config import load_credentials
 
-LOG                          = logging.getLogger('auton.plugins')
+from auton.classes.target import AutonTarget
+from auton.classes.exceptions import AutonTargetUnauthorized
 
-STATUS_NEW                   = 'new'
-STATUS_PROCESSING            = 'processing'
-STATUS_COMPLETE              = 'complete'
+LOG                   = logging.getLogger('auton.plugins')
 
-_RE_MATCH_OBJECT_FUNCS       = ('match', 'search')
-_PARAMS_DICT_MODIFIERS_MATCH = re.compile(r'^(?:(?P<modifiers>[\+\-~=%]+)\s)?(?P<key>.+)$').match
+DEFAULT_BECOME_METHOD = 'sudo'
+DEFAULT_BECOME_USER   = 'root'
+DEFAULT_BECOME_OPTS   = {'sudo': ['-H', '-E']}
+
+STATUS_NEW            = 'new'
+STATUS_PROCESSING     = 'processing'
+STATUS_COMPLETE       = 'complete'
 
 
 class AutonPlugins(dict):
@@ -74,24 +75,25 @@ EPTS_SYNC = AutonEPTsSync()
 
 class AutonEPTObject(object):
     def __init__(self, name, uid, endpoint, method, request, callback = None):
-        self.name       = name
-        self.uid        = uid
-        self.endpoint   = endpoint
-        self.method     = method
-        self.request    = request
-        self.result     = []
-        self.callback   = callback
-        self.status     = STATUS_NEW
-        self.prv_pos    = 0
-        self.cur_pos    = 0
-        self.errors     = []
-        self.started_at = None
-        self.ended_at   = None
-        self.vars       = {'_env_':    os.environ.copy(),
-                           '_time_':   datetime.now(),
-                           '_gmtime_': datetime.utcnow(),
-                           '_uid_':    uid,
-                           '_uuid_':   "%s" % uuid.uuid4()}
+        self.name        = name
+        self.uid         = uid
+        self.endpoint    = endpoint
+        self.method      = method
+        self.request     = request
+        self.result      = []
+        self.callback    = callback
+        self.status      = STATUS_NEW
+        self.return_code = None
+        self.prv_pos     = 0
+        self.cur_pos     = 0
+        self.errors      = []
+        self.started_at  = None
+        self.ended_at    = None
+        self.vars        = {'_env_':    os.environ.copy(),
+                            '_time_':   datetime.now(),
+                            '_gmtime_': datetime.utcnow(),
+                            '_uid_':    uid,
+                            '_uuid_':   "%s" % uuid.uuid4()}
 
     def get_uid(self):
         return self.uid
@@ -105,6 +107,13 @@ class AutonEPTObject(object):
 
     def get_errors(self):
         return self.errors
+
+    def set_return_code(self, rc):
+        self.return_code = rc
+        return self
+
+    def get_return_code(self):
+        return self.return_code
 
     def add_result(self, result):
         self.result.append(result)
@@ -154,7 +163,7 @@ class AutonEPTObject(object):
 
     def __call__(self):
         if self.callback:
-            return self.callback(self)
+            self.callback(self)
 
 
 class AutonEPTSync(object):
@@ -175,6 +184,10 @@ class AutonEPTSync(object):
 class AutonPlugBase(threading.Thread, DWhoPluginBase):
     __metaclass__ = abc.ABCMeta
 
+    @abc.abstractproperty
+    def PLUGIN_NAME(self):
+        return
+
     def __init__(self, name):
         threading.Thread.__init__(self)
         DWhoPluginBase.__init__(self)
@@ -183,110 +196,6 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
         self.credentials = None
         self.users       = None
         self.target      = None
-
-    @classmethod
-    def _parse_re_flags(cls, flags):
-        if isinstance(flags, int):
-            return flags
-        elif isinstance(flags, list):
-            r = 0
-            for x in flags:
-                r |= cls._parse_re_flags(x)
-            return r
-        elif isinstance(flags, basestring):
-            if flags.isdigit():
-                return int(flags)
-            return getattr(re, flags)
-
-        return 0
-
-    def _param_regex(self, args, value):
-        args         = args.copy()
-        func         = args.get('func') or 'sub'
-        rfunc        = args.get('return')
-        rargs        = args.get('return_args')
-        is_match_obj = func in _RE_MATCH_OBJECT_FUNCS
-
-        if is_match_obj and not rfunc:
-            rfunc = 'group'
-            rargs = [1]
-
-        if is_match_obj and not rargs:
-            rargs = [1]
-
-        for x in ('default', 'func', 'return', 'return_args'):
-            if x in args:
-                del args[x]
-
-        if 'pattern' in args:
-            flags = 0
-            if 'flags' in args:
-                flags = self._parse_re_flags(args.pop('flags'))
-            func = getattr(re.compile(pattern = args.pop('pattern'),
-                                      flags = flags),
-                           func)
-        else:
-            func = getattr(re, func)
-
-        args['string'] = value
-        ret            = func(**args)
-
-        if ret is None:
-            return ''
-
-        if not rfunc:
-            return ret
-
-        if rargs:
-            return getattr(ret, rfunc)(*rargs)
-
-        return getattr(ret, rfunc)()
-
-    def _build_params_dict(self, xtype, cfg, xdict, xvars = None, r = None):
-        if r is None:
-            r = {}
-
-        if not cfg or not isinstance(cfg, list):
-            return r
-
-        fkwargs        = {}
-        fkwargs[xtype] = xdict.copy()
-
-        if isinstance(xvars, dict):
-            fkwargs.update(xvars)
-
-        for elt in cfg:
-            ename = elt.keys()[0]
-            m = _PARAMS_DICT_MODIFIERS_MATCH(ename)
-            if m:
-                modifiers = m.group('modifiers') or '+'
-                key       = m.group('key')
-            else:
-                modifiers = '+'
-                key       = ename
-
-            if '+' in modifiers:
-                r[key] = elt[ename]
-            elif '-' in modifiers:
-                if key not in r:
-                    continue
-                elif elt[ename] in (None, r[key]):
-                    del r[key]
-            elif '~' in modifiers:
-                args = elt[ename]
-
-                if key not in r:
-                    r[key] = args.get('default') or ''
-                else:
-                    r[key] = self._param_regex(args, r[key])
-            elif '=' in modifiers:
-                if key in r:
-                    r[elt[ename]] = r[key]
-
-            if '%' in modifiers:
-                r[key] = r[key].format(**fkwargs)
-
-        return r
 
     def safe_init(self):
         if self.config.get('users'):
@@ -306,10 +215,34 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
         if self.name in EPTS_SYNC:
             self.start()
 
+    @staticmethod
+    def _set_default_env(env, xvars):
+        env.update({'AUTON':            'true',
+                    'AUTON_JOB_TIME':   "%s" % xvars['_time_'],
+                    'AUTON_JOB_GMTIME': "%s" % xvars['_gmtime_'],
+                    'AUTON_JOB_UID':    "%s" % xvars['_uid_'],
+                    'AUTON_JOB_UUID':   "%s" % xvars['_uuid_']})
+
+        return env
+
+    @staticmethod
+    def _get_become(cfg):
+        if not isinstance(cfg, dict) or not cfg.get('enabled'):
+            return []
+
+        method = cfg.get('method') or DEFAULT_BECOME_METHOD
+        become = [method]
+
+        if method in DEFAULT_BECOME_OPTS:
+            become += DEFAULT_BECOME_OPTS[method]
+
+        if method == 'sudo':
+            become += ['-u', cfg.get('user') or DEFAULT_BECOME_USER]
+
+        return become
+
     def run(self):
         while True:
-            r = None
-
             try:
                 obj  = EPTS_SYNC[self.name].qget(True)
 
@@ -326,13 +259,28 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 obj.set_started_at()
                 obj.set_status(STATUS_PROCESSING)
                 getattr(self, func)(obj)
+                obj.set_return_code(0)
             except Exception, e:
                 obj.add_error(str(e))
+                obj.set_return_code(getattr(e, 'code', None))
                 LOG.exception("%r", e)
             finally:
                 obj.set_status(STATUS_COMPLETE)
                 obj.set_ended_at()
                 obj()
+
+            self.terminate()
+
+    def terminate(self):
+        func = 'do_terminate'
+
+        if not hasattr(self, func):
+            return
+
+        try:
+            getattr(self, func)()
+        except Exception, e:
+            LOG.debug(e)
 
     def __call__(self):
         self.start()

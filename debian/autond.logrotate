@@ -1,0 +1,10 @@
+/var/log/autond/*.log {
+    daily
+    missingok
+    rotate 7
+    copytruncate
+    compress
+    delaycompress
+    notifempty
+    create 640 root adm
+}

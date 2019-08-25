@@ -18,6 +18,11 @@ endpoints:
     config:
       prog: terraform
       timeout: 3600
+  'curl':
+    plugin: subproc
+    config:
+      prog: curl
+      timeout: 3600
 modules:
   job:
     routes:

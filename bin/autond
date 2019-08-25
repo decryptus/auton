@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-auton
+autond
 """
 
 __license__ = """
-    Copyright (C) 2018  fjord-technologies
+    Copyright (C) 2018-2019  fjord-technologies
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -20,42 +20,45 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.30'
+__version__ = '0.1.36'
 
 import logging
 import grp
 import os
 import pwd
 
-from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
-from auton.modules import * # XXX
-from auton.plugins import * # XXX
+from optparse import OptionParser
+
 from dwho.modules import * # XXX
 from dwho.config import init_logger, make_piddir, make_logdir
 from httpdis.ext import httpdis_json
-from optparse import OptionParser
-from sonicprobe import helpers
 from sonicprobe.libs import daemonize
 
+from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
+from auton.modules import * # XXX
+from auton.plugins import * # XXX
 
-SYSLOG_NAME       = "auton"
+
+SYSLOG_NAME       = "autond"
 LOG               = logging.getLogger(SYSLOG_NAME)
 
-DEFAULT_PIDFILE   = "/run/auton/auton.pid"
-DEFAULT_LOGFILE   = "/var/log/auton/daemon.log"
+DEFAULT_PIDFILE   = "/run/auton/autond.pid"
+DEFAULT_LOGFILE   = "/var/log/autond/daemon.log"
+DEFAULT_USER      = "auton"
+DEFAULT_GROUP     = "auton"
 
 try:
-    AUTON_USER  = pwd.getpwnam(os.environ.get('AUTON_USER') or 'auton').pw_name
+    AUTON_USER  = pwd.getpwnam(os.environ.get('AUTON_USER') or DEFAULT_GROUP).pw_name
 except KeyError:
     AUTON_USER  = pwd.getpwuid(os.geteuid())[0]
 
 try:
-    AUTON_GROUP = grp.getgrnam(os.environ.get('AUTON_USER') or 'auton').gr_name
+    AUTON_GROUP = grp.getgrnam(os.environ.get('AUTON_GROUP') or DEFAULT_GROUP).gr_name
 except KeyError:
     AUTON_GROUP = grp.getgrgid(os.getegid())[0]
 
-AUTON_PIDFILE = os.environ.get('AUTON_PIDFILE') or DEFAULT_PIDFILE
-AUTON_LOGFILE = os.environ.get('AUTON_LOGFILE') or DEFAULT_LOGFILE
+AUTOND_PIDFILE = os.environ.get('AUTOND_PIDFILE') or DEFAULT_PIDFILE
+AUTOND_LOGFILE = os.environ.get('AUTOND_LOGFILE') or DEFAULT_LOGFILE
 
 
 def argv_parse_check():
@@ -86,7 +89,7 @@ def argv_parse_check():
                       help      = "Use configuration file <conffile> instead of %default")
     parser.add_option("-p",
                       dest      = 'pidfile',
-                      default   = AUTON_PIDFILE,
+                      default   = AUTOND_PIDFILE,
                       help      = "Use PID file <pidfile> instead of %default")
     parser.add_option("-u",
                       dest      = 'username',
@@ -101,7 +104,7 @@ def argv_parse_check():
     parser.add_option("--logfile",
                       dest      = 'logfile',
                       type      = 'string',
-                      default   = AUTON_LOGFILE,
+                      default   = AUTOND_LOGFILE,
                       help      = "Use log file <logfile> instead of %default")
     parser.add_option("--listen-addr",
                       dest      = 'listen_addr',
@@ -132,7 +135,7 @@ def main(options):
     make_logdir(options.logfile, uid, gid)
 
     root_logger = init_logger(options.logfile, SYSLOG_NAME)
-    options     = load_conf(options.conffile, options)
+    options     = load_conf(options.conffile, options, envvar = 'AUTOND_CONFIG')
 
     setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
     setattr(options, 'sys_version', '')

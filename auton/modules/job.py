@@ -22,18 +22,17 @@ __license__ = """
 import copy
 import logging
 import re
-import time
-import uuid
 
 from dwho.classes.modules import DWhoModuleBase, MODULES
-from auton.classes.plugins import (AutonEPTObject,
-                                       EPTS_SYNC,
-                                       STATUS_NEW,
-                                       STATUS_PROCESSING,
-                                       STATUS_COMPLETE)
 from httpdis.ext.httpdis_json import HttpReqErrJson
 from sonicprobe.libs import xys
 from sonicprobe.libs.moresynchro import RWLock
+
+from auton.classes.plugins import (AutonEPTObject,
+                                   EPTS_SYNC,
+                                   STATUS_NEW,
+                                   STATUS_PROCESSING,
+                                   STATUS_COMPLETE)
 
 LOG = logging.getLogger('auton.modules.job')
 xys.add_regex('job.envname', re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]{0,63}$').match)
@@ -48,17 +47,18 @@ class JobModule(DWhoModuleBase):
         self.objs         = {}
         self.lock_timeout = self.config['general']['lock_timeout']
 
-    def _get_ept_sync(self, endpoint, xid):
+    @staticmethod
+    def _get_ept_sync(endpoint):
         if endpoint not in EPTS_SYNC:
             raise HttpReqErrJson(404, "unable to find endpoint: %r" % endpoint)
 
         return EPTS_SYNC[endpoint]
 
-    def _get_uid(self, endpoint, xid):
+    @staticmethod
+    def _get_uid(endpoint, xid):
         return "%s:%s" % (endpoint, xid)
 
     def _get_obj(self, endpoint, xid):
-        ept_sync = self._get_ept_sync(endpoint, xid)
         uid      = self._get_uid(endpoint, xid)
 
         if uid not in self.objs:
@@ -73,29 +73,31 @@ class JobModule(DWhoModuleBase):
             del self.objs[uid]
 
     def _push_epts_sync(self, endpoint, xid, method, request):
-        ept_sync = self._get_ept_sync(endpoint, xid)
+        ept_sync = self._get_ept_sync(endpoint)
         uid      = self._get_uid(endpoint, xid)
 
         if uid in self.objs:
             raise HttpReqErrJson(415, "uid already exists: %r" % uid)
 
         obj      = AutonEPTObject(ept_sync.name,
-                                     uid,
-                                     endpoint,
-                                     method,
-                                     request)
+                                  uid,
+                                  endpoint,
+                                  method,
+                                  request)
         self.objs[uid] = obj
         ept_sync.qput(obj)
 
         return obj
 
-    def _build_result(self, obj):
-        r = {'code':       200,
-             'uid':        obj.get_uid(),
-             'status':     obj.get_status(),
-             'started_at': obj.get_started_at(),
-             'stream':     obj.get_last_result(),
-             'ended_at':   obj.get_ended_at()}
+    @staticmethod
+    def _build_result(obj):
+        r = {'code':        200,
+             'uid':         obj.get_uid(),
+             'status':      obj.get_status(),
+             'return_code': obj.get_return_code(),
+             'started_at':  obj.get_started_at(),
+             'stream':      obj.get_last_result(),
+             'ended_at':    obj.get_ended_at()}
 
         if obj.has_error():
             r['code']   = 400
@@ -113,6 +115,10 @@ class JobModule(DWhoModuleBase):
       !~~regex? (0,64) job.envname: !!str
     envfiles*: !~~seqlen(0,64) [ !!str ]
     args*: !~~seqlen(0,64) [ !!str ]
+    argfiles*: !~~seqlen(0,64)
+      - arg: !!str
+        content: !!str
+        filename: !!str
     """)
 
     def job_run(self, request):

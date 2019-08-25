@@ -50,16 +50,16 @@ class AutonTarget(object):
 
     @property
     def config(self):
-        return copy.copy(self._AutonTarget__config)
+        return copy.copy(self._AutonTarget__config) # pylint: disable=no-member
 
     @config.setter
-    def config(self, config):
+    def config(self, config): # pylint: disable=unused-argument
         return self
 
     @property
     def credentials(self):
-        return copy.copy(self._AutonTarget__credentials)
+        return copy.copy(self._AutonTarget__credentials) # pylint: disable=no-member
 
     @credentials.setter
-    def credentials(self, credentials):
+    def credentials(self, credentials): # pylint: disable=unused-argument
         return self

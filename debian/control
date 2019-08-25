@@ -11,6 +11,20 @@ Homepage: https://www.commandersact.com
 Package: auton
 Architecture: all
 Homepage: https://www.commandersact.com
-Depends: ${misc:Depends}, python-pycurl, python (>= 2.7~), python (<< 2.8)
+Depends: ${misc:Depends}, python (>= 2.7~), python (<< 2.8)
+Pre-Depends: python-dev (>= 2.7), python-pip, python-setuptools
+Description: Fjord Technologies auton client package
+
+Package: autond
+Architecture: all
+Homepage: https://www.commandersact.com
+Depends: ${misc:Depends}, python-pycurl, python (>= 2.7~), python (<< 2.8), python-auton
 Pre-Depends: adduser, lsb-release, python-dev (>= 2.7), python-pip, python-setuptools
-Description: Fjord Technologies auton package
+Description: Fjord Technologies auton daemon package
+
+Package: python-auton
+Architecture: all
+Homepage: https://www.commandersact.com
+Depends: ${misc:Depends}, python-pycurl, python (>= 2.7~), python (<< 2.8)
+Pre-Depends: python-dev (>= 2.7), python-pip, python-setuptools
+Description: Fjord Technologies auton python bindings

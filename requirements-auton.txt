@@ -1,0 +1,4 @@
+python-dotenv
+sonicprobe>=0.2.76
+requests>=2.0
+six>=1.4.0

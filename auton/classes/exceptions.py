@@ -30,11 +30,13 @@ class AutonConfigurationError(Exception):
 
 
 class AutonTargetFailed(Exception):
-    def __init__(self, message = None, args = None):
+    def __init__(self, message = None, args = None, code = None):
         if isinstance(message, Exception):
             Exception.__init__(self, message.message, message.args)
         else:
             Exception.__init__(self, message, args)
+
+        self.code = code
 
 class AutonTargetTimeout(AutonTargetFailed):
     pass

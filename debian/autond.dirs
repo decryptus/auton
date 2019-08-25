@@ -1,0 +1,4 @@
+usr/share/autond
+var/lib/auton
+var/log/autond
+var/run/auton

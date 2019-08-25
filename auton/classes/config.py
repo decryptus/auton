@@ -27,11 +27,12 @@ import signal
 from dwho.config import parse_conf, stop, DWHO_THREADS
 from dwho.classes.libloader import DwhoLibLoader
 from dwho.classes.modules import MODULES
-from auton.classes.exceptions import AutonConfigurationError
-from auton.classes.plugins import ENDPOINTS, PLUGINS
 from httpdis.httpdis import get_default_options
 from mako.template import Template
 from sonicprobe.helpers import load_yaml
+
+from auton.classes.exceptions import AutonConfigurationError
+from auton.classes.plugins import ENDPOINTS, PLUGINS
 
 _TPL_IMPORTS = ('from os import environ as ENV',)
 LOG          = logging.getLogger('auton.config')

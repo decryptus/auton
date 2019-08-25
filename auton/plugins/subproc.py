@@ -23,31 +23,45 @@ __license__ = """
 import copy
 import logging
 import os
+import shutil
 import subprocess
 import threading
 import time
-import uuid
+import tempfile
 
-from datetime import datetime
 from dotenv.main import dotenv_values
-from auton.classes.exceptions import AutonConfigurationError
-from auton.classes.plugins import AutonPlugBase, AutonTargetFailed, AutonTargetTimeout, PLUGINS
+
+from sonicprobe import helpers
+from auton.classes.exceptions import (AutonConfigurationError,
+                                      AutonTargetFailed,
+                                      AutonTargetTimeout)
+from auton.classes.plugins import AutonPlugBase, PLUGINS
+
+try:
+    from StringIO import CStringIO as StringIO
+except ImportError:
+    from six import StringIO
 
 LOG = logging.getLogger('auton.plugins.subproc')
-
-DEFAULT_BECOME_METHOD = 'sudo'
-DEFAULT_BECOME_USER   = 'root'
-DEFAULT_BECOME_OPTS   = {'sudo': ['-H', '-E']}
 
 
 class AutonSubProcPlugin(AutonPlugBase):
     PLUGIN_NAME = 'subproc'
 
+    def __init__(self, name):
+        AutonPlugBase.__init__(self, name)
+        self._dirs_to_delete = []
+        self._killed = False
+
+    def at_stop(self):
+        self._killed = True
+
     def _proc_stdout(self, obj, proc, texit):
-        while True:
+        stopped = False
+        while not self._killed and not stopped:
             try:
                 for x in iter(proc.stdout.readline, b''):
-                    if x is not "":
+                    if x != '':
                         obj.add_result(x.rstrip())
             except Exception, e:
                 obj.add_error(repr(e))
@@ -55,13 +69,14 @@ class AutonSubProcPlugin(AutonPlugBase):
                 break
             finally:
                 if texit.is_set():
-                    break
+                    stopped = True
 
     def _proc_stderr(self, obj, proc, texit):
-        while True:
+        stopped = False
+        while not self._killed and not stopped:
             try:
                 for x in iter(proc.stderr.readline, b''):
-                    if x is not "":
+                    if x != '':
                         obj.add_error(x.rstrip())
             except Exception, e:
                 obj.add_error(repr(e))
@@ -69,26 +84,26 @@ class AutonSubProcPlugin(AutonPlugBase):
                 break
             finally:
                 if texit.is_set():
-                    break
+                    stopped = True
 
-    def _mk_args(self, prog, cargs, pargs, ovars):
-        r = [prog]
-
-        if cargs and not isinstance(cargs, list):
-            LOG.error("invalid configuration args for target: %r", self.target.name)
-            return
-
-        if pargs and not isinstance(pargs, list):
-            LOG.error("invalid payload args for target: %r", self.target.name)
-            return
+    def _mk_args(self, args, cargs, pargs, ovars):
+        r = copy.copy(args)
 
         if cargs:
+            if not isinstance(cargs, list):
+                LOG.error("invalid configuration args for target: %r", self.target.name)
+                return None
+
             for x in cargs:
                 if isinstance(x, basestring) and '%' in x:
                     x.format(**ovars)
                 r.append(x)
 
         if pargs:
+            if not isinstance(pargs, list):
+                LOG.error("invalid payload args for target: %r", self.target.name)
+                return None
+
             for x in pargs:
                 if isinstance(x, basestring) and '%' in x:
                     x.format(**ovars)
@@ -96,14 +111,69 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         return r
 
-    def _set_default_env(self, env, ovars):
-        env.update({'AUTON':            'true',
-                    'AUTON_JOB_TIME':   "%s" % ovars['_time_'],
-                    'AUTON_JOB_GMTIME': "%s" % ovars['_gmtime_'],
-                    'AUTON_JOB_UID':    "%s" % ovars['_uid_'],
-                    'AUTON_JOB_UUID':   "%s" % ovars['_uuid_']})
+    def _mk_argfiles(self, args, cargfiles, pargfiles):
+        r = copy.copy(args)
 
-        return env
+        if cargfiles:
+            if not isinstance(cargfiles, list):
+                LOG.error("invalid configuration argfiles for target: %r", self.target.name)
+                return None
+
+            for cargfile in cargfiles:
+                if not isinstance(cargfile, dict):
+                    LOG.error("invalid type in configuration argfiles for target: %r", self.target.name)
+                    return None
+
+                if not cargfile.get('arg'):
+                    LOG.error("missing arg in configuration argfiles for target: %r", self.target.name)
+                    return None
+
+                if not cargfile.get('filepath'):
+                    LOG.error("missing filepath in configuration argfiles for target: %r", self.target.name)
+                    return None
+
+                if not os.path.isfile(cargfile['filepath']):
+                    LOG.error("invalid filepath in configuration argfiles for target: %r", self.target.name)
+                    return None
+
+                if cargfile['arg'].startswith('@'):
+                    if len(cargfile['arg']) == 1:
+                        LOG.error("invalid arg %r in configuration argfiles for target: %r",
+                                  cargfile['arg'],
+                                  self.target.name)
+                        return None
+                    r.extend([cargfile['arg'][1:], "@%s" % cargfile['filepath']])
+                else:
+                    r.extend([cargfile['arg'], cargfile['filepath']])
+
+        if pargfiles:
+            if not isinstance(pargfiles, list):
+                LOG.error("invalid payload argfiles for target: %r", self.target.name)
+                return None
+
+            tmpdir = tempfile.mkdtemp(prefix = '.auton.')
+            self._dirs_to_delete.append(tmpdir)
+
+            for pargfile in pargfiles:
+                if pargfile['filename'] == '':
+                    with tempfile.NamedTemporaryFile(dir = tmpdir, delete = False) as tmpfile:
+                        tmpfile.close()
+                    filepath = tmpfile.name
+                else:
+                    filepath = os.path.join(tmpdir, pargfile['filename'])
+                helpers.base64_decode_file(StringIO(pargfile['content']),
+                                           filepath)
+                if pargfile['arg'].startswith('@'):
+                    if len(pargfile['arg']) == 1:
+                        LOG.error("invalid arg %r in payload argfiles for target: %r",
+                                  pargfile['arg'],
+                                  self.target.name)
+                        return None
+                    r.extend([pargfile['arg'][1:], "@%s" % filepath])
+                else:
+                    r.extend([pargfile['arg'], filepath])
+
+        return r
 
     def _load_envfile(self, envfiles):
         r = {}
@@ -153,21 +223,6 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         return r
 
-    def _get_become(self, cfg):
-        if not isinstance(cfg, dict) or not cfg.get('enabled'):
-            return []
-
-        method = cfg.get('method') or DEFAULT_BECOME_METHOD
-        become = [method]
-
-        if method in DEFAULT_BECOME_OPTS:
-            become += DEFAULT_BECOME_OPTS[method]
-
-        if method == 'sudo':
-            become += ['-u', cfg.get('user') or DEFAULT_BECOME_USER]
-
-        return become
-
     def safe_init(self):
         AutonPlugBase.safe_init(self)
 
@@ -175,12 +230,14 @@ class AutonSubProcPlugin(AutonPlugBase):
             raise AutonConfigurationError("missing prog option in target: %r" % self.target.name)
 
     def do_run(self, obj):
-        cfg     = self.target.config
-        payload = obj.get_request().payload_params()
-        ovars   = obj.get_vars()
-        pargs   = None
-        fenv    = []
-        penv    = {}
+        cfg       = self.target.config
+        payload   = obj.get_request().payload_params()
+        ovars     = obj.get_vars()
+        pargs     = None
+        pargfiles = None
+        args      = [cfg['prog']]
+        fenv      = []
+        penv      = {}
 
         if isinstance(payload, dict) and payload.get('args'):
             if cfg.get('disallow-args'):
@@ -188,7 +245,16 @@ class AutonSubProcPlugin(AutonPlugBase):
             else:
                 pargs = copy.copy(payload['args'])
 
-        args    = self._mk_args(cfg['prog'], cfg.get('args'), pargs, ovars)
+        args    = self._mk_args(args, cfg.get('args'), pargs, ovars)
+
+        if isinstance(payload, dict) and payload.get('argfiles'):
+            if cfg.get('disallow-argfiles'):
+                LOG.warning("argfiles from payload isn't allowed for target: %r", self.target.name)
+            else:
+                pargfiles = copy.copy(payload['argfiles'])
+
+        args    = self._mk_argfiles(args, cfg.get('argfiles'), pargfiles)
+
         if not args:
             raise AutonTargetFailed("missing args for command on target: %r" % self.target.name)
 
@@ -245,6 +311,9 @@ class AutonSubProcPlugin(AutonPlugBase):
                 raise subprocess.CalledProcessError(proc.returncode, args[0])
         except (AutonTargetFailed, AutonTargetTimeout):
             raise
+        except subprocess.CalledProcessError, e:
+            raise AutonTargetFailed("error on target: %r. exception: %s"
+                                    % (self.target.name, e), code = e.returncode)
         except Exception, e:
             raise AutonTargetFailed("error on target: %r. exception: %r"
                                     % (self.target.name, e))
@@ -256,6 +325,12 @@ class AutonSubProcPlugin(AutonPlugBase):
                 proc.terminate()
         except OSError:
             pass
+
+    def do_terminate(self):
+        while self._dirs_to_delete:
+            tdir = self._dirs_to_delete.pop()
+            if os.path.isdir(tdir):
+                shutil.rmtree(tdir, True)
 
 
 if __name__ != "__main__":
