@@ -57,12 +57,12 @@ def load_conf(xfile, options = None, envvar = None):
 
     if os.path.exists(xfile):
         with open(xfile, 'r') as f:
-            conf = load_yaml(f)
+            conf = parse_conf(load_yaml(f))
 
         conf['_config_directory'] = os.path.dirname(os.path.abspath(xfile))
     elif envvar and os.environ.get(envvar):
         c = StringIO(os.environ[envvar])
-        conf = load_yaml(c.getvalue())
+        conf = parse_conf(load_yaml(c.getvalue()))
         c.close()
         conf['_config_directory'] = None
 
@@ -81,7 +81,7 @@ def load_conf(xfile, options = None, envvar = None):
     for name, ept_cfg in conf['endpoints'].iteritems():
         cfg     = {'general':  dict(conf['general']),
                    'auton':    {'endpoint_name': name,
-                                'config_dir':    config_dir},
+                                'config_dir':    conf['_config_directory']},
                    'config':   {},
                    'users' :   {},
                    'vars':     {}}
@@ -97,7 +97,7 @@ def load_conf(xfile, options = None, envvar = None):
 
         for x in ('config', 'users', 'vars'):
             if ept_cfg.get("import_%s" % x):
-                cfg[x].update(import_file(ept_cfg["import_%s" % x], config_dir, cfg))
+                cfg[x].update(import_file(ept_cfg["import_%s" % x], conf['_config_directory'], cfg))
 
             if x in ept_cfg:
                 cfg[x].update(dict(ept_cfg[x]))
