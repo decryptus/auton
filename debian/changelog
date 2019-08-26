@@ -1,3 +1,27 @@
+auton (0.1.40) unstable; urgency=medium
+
+  * Removed debug.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 14:48:34 +0200
+
+auton (0.1.39) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 14:42:43 +0200
+
+auton (0.1.38) unstable; urgency=medium
+
+  * Removed plugin http.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 12:00:08 +0200
+
+auton (0.1.37) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 11:44:16 +0200
+
 auton (0.1.36) unstable; urgency=medium
 
   * Added multi-args and multi-argsfiles arguments in auton.

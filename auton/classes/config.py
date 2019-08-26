@@ -49,14 +49,22 @@ def import_file(filepath, config_dir = None, xvars = None):
         return load_yaml(Template(f.read(),
                                   imports = _TPL_IMPORTS).render(**xvars))
 
-def load_conf(xfile, options = None):
+def load_conf(xfile, options = None, envvar = None):
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    config_dir = os.path.dirname(os.path.abspath(xfile))
+    conf = {'_config_directory': None}
 
-    with open(xfile, 'r') as f:
-        conf = parse_conf(load_yaml(f))
+    if os.path.exists(xfile):
+        with open(xfile, 'r') as f:
+            conf = load_yaml(f)
+
+        conf['_config_directory'] = os.path.dirname(os.path.abspath(xfile))
+    elif envvar and os.environ.get(envvar):
+        c = StringIO(os.environ[envvar])
+        conf = load_yaml(c.getvalue())
+        c.close()
+        conf['_config_directory'] = None
 
     for name, module in MODULES.iteritems():
         LOG.info("module init: %r", name)
