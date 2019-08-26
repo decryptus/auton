@@ -1,0 +1,9 @@
+version: '3.2'
+services:
+  auton:
+    image: decryptus/auton:latest
+    container_name: autond
+    ports:
+      - '8666:8666'
+    volumes:
+      - './etc/auton/auton.yml.example:/etc/auton/auton.yml:ro'
