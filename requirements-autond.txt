@@ -3,6 +3,6 @@ httpdis>=0.5.16
 pycurl
 python-dotenv
 PyYAML>=3.10
-sonicprobe>=0.2.79
+sonicprobe>=0.2.80
 requests>=2.0
 six>=1.4.0

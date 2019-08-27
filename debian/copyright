@@ -3,11 +3,11 @@ Upstream-Name: auton
 Upstream-Contact: Adrien Delle Cave
 
 Files: *
-Copyright: 2018 Adrien Delle Cave
+Copyright: 2018-2019 fjord-technologies
 License: GPL-2
 
 Files: debian/*
-Copyright: 2018 Adrien Delle Cave
+Copyright: 2018-2019 Adrien Delle Cave
 License: GPL-2
 
 License: GPL-2

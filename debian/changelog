@@ -1,3 +1,15 @@
+auton (0.1.44) unstable; urgency=medium
+
+  * Reviewed arguments attributes.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Tue, 27 Aug 2019 08:30:39 +0200
+
+auton (0.1.43) unstable; urgency=medium
+
+  * Added possibility to add multiple autond uris.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Tue, 27 Aug 2019 08:25:34 +0200
+
 auton (0.1.42) unstable; urgency=medium
 
   * Added Dockerfile.

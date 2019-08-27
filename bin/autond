@@ -20,14 +20,13 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.42'
+__version__ = '0.1.44'
 
+import argparse
 import logging
 import grp
 import os
 import pwd
-
-from optparse import OptionParser
 
 from dwho.modules import * # XXX
 from dwho.config import init_logger, make_piddir, make_logdir
@@ -65,63 +64,62 @@ def argv_parse_check():
     """
     Parse (and check a little) command line parameters
     """
-    parser              = OptionParser(usage="usage: %prog [options]")
+    parser        = argparse.ArgumentParser()
 
-    parser.add_option("-l",
-                      dest      = 'loglevel',
-                      default   = 'info',   # warning: see affectation under
-                      choices   = ('critical', 'error', 'warning', 'info', 'debug'),
-                      help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
-                                   "critical, error, warning, info, debug"))
-    parser.add_option("-d",
-                      action    = 'store_true',
-                      dest      = 'dontlauchmain',
-                      default   = False,
-                      help      = "Don't call the main function, for installation test purposes")
-    parser.add_option("-f",
-                      action    = 'store_true',
-                      dest      = 'foreground',
-                      default   = False,
-                      help      = "Foreground, don't daemonize")
-    parser.add_option("-c",
-                      dest      = 'conffile',
-                      default   = '/etc/auton/auton.yml',
-                      help      = "Use configuration file <conffile> instead of %default")
-    parser.add_option("-p",
-                      dest      = 'pidfile',
-                      default   = AUTOND_PIDFILE,
-                      help      = "Use PID file <pidfile> instead of %default")
-    parser.add_option("-u",
-                      dest      = 'username',
-                      type      = 'string',
-                      default   = AUTON_USER,
-                      help      = "Use username for the process instead of %default")
-    parser.add_option("-g",
-                      dest      = 'groupname',
-                      type      = 'string',
-                      default   = AUTON_GROUP,
-                      help      = "Use groupname for the process instead of %default")
-    parser.add_option("--logfile",
-                      dest      = 'logfile',
-                      type      = 'string',
-                      default   = AUTOND_LOGFILE,
-                      help      = "Use log file <logfile> instead of %default")
-    parser.add_option("--listen-addr",
-                      dest      = 'listen_addr',
-                      help      = "Listen on address <listen_addr>")
-    parser.add_option("--listen-port",
-                      dest      = 'listen_port',
-                      type      = 'int',
-                      help      = "Listen on port <listen_port>")
+    parser.add_argument("-l",
+                        dest      = 'loglevel',
+                        default   = 'info',   # warning: see affectation under
+                        choices   = ('critical', 'error', 'warning', 'info', 'debug'),
+                        help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
+                                     "critical, error, warning, info, debug"))
+    parser.add_argument("-d",
+                        action    = 'store_true',
+                        dest      = 'dontlauchmain',
+                        default   = False,
+                        help      = "Don't call the main function, for installation test purposes")
+    parser.add_argument("-f",
+                        action    = 'store_true',
+                        dest      = 'foreground',
+                        default   = False,
+                        help      = "Foreground, don't daemonize")
+    parser.add_argument("-c",
+                        dest      = 'conffile',
+                        type      = unicode,
+                        default   = '/etc/auton/auton.yml',
+                        help      = "Use configuration file <conffile> instead of %(default)s")
+    parser.add_argument("-p",
+                        dest      = 'pidfile',
+                        type      = unicode,
+                        default   = AUTOND_PIDFILE,
+                        help      = "Use PID file <pidfile> instead of %(default)s")
+    parser.add_argument("-u",
+                        dest      = 'username',
+                        type      = unicode,
+                        default   = AUTON_USER,
+                        help      = "Use username for the process instead of %(default)s")
+    parser.add_argument("-g",
+                        dest      = 'groupname',
+                        type      = unicode,
+                        default   = AUTON_GROUP,
+                        help      = "Use groupname for the process instead of %(default)s")
+    parser.add_argument("--logfile",
+                        dest      = 'logfile',
+                        type      = unicode,
+                        default   = AUTOND_LOGFILE,
+                        help      = "Use log file <logfile> instead of %(default)s")
+    parser.add_argument("--listen-addr",
+                        dest      = 'listen_addr',
+                        type      = unicode,
+                        help      = "Listen on address <listen_addr>")
+    parser.add_argument("--listen-port",
+                        dest      = 'listen_port',
+                        type      = int,
+                        help      = "Listen on port <listen_port>")
 
-    options, args       = parser.parse_args()
+    args          = parser.parse_args()
+    args.loglevel = getattr(logging, args.loglevel.upper(), logging.INFO)
 
-    if args:
-        parser.error("no argument is allowed - use option --help to get an help screen")
-
-    options.loglevel    = getattr(logging, options.loglevel.upper(), logging.INFO)
-
-    return options
+    return args
 
 
 def main(options):
