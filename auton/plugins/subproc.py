@@ -136,13 +136,13 @@ class AutonSubProcPlugin(AutonPlugBase):
                     LOG.error("invalid filepath in configuration argfiles for target: %r", self.target.name)
                     return None
 
-                if cargfile['arg'].startswith('@'):
+                if cargfile['arg'].endswith('@'):
                     if len(cargfile['arg']) == 1:
                         LOG.error("invalid arg %r in configuration argfiles for target: %r",
                                   cargfile['arg'],
                                   self.target.name)
                         return None
-                    r.extend([cargfile['arg'][1:], "@%s" % cargfile['filepath']])
+                    r.extend([cargfile['arg'][:-1], "@%s" % cargfile['filepath']])
                 else:
                     r.extend([cargfile['arg'], cargfile['filepath']])
 
@@ -163,13 +163,13 @@ class AutonSubProcPlugin(AutonPlugBase):
                     filepath = os.path.join(tmpdir, pargfile['filename'])
                 helpers.base64_decode_file(StringIO(pargfile['content']),
                                            filepath)
-                if pargfile['arg'].startswith('@'):
+                if pargfile['arg'].endswith('@'):
                     if len(pargfile['arg']) == 1:
                         LOG.error("invalid arg %r in payload argfiles for target: %r",
                                   pargfile['arg'],
                                   self.target.name)
                         return None
-                    r.extend([pargfile['arg'][1:], "@%s" % filepath])
+                    r.extend([pargfile['arg'][:-1], "@%s" % filepath])
                 else:
                     r.extend([pargfile['arg'], filepath])
 
@@ -196,7 +196,7 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         if fenv:
             if not isinstance(fenv, list):
-                LOG.warning("invalid configuration envfiles for target: %r", self.target.name)
+                LOG.warning("invalid payload envfiles for target: %r", self.target.name)
                 return r
 
             for key, val in self._load_envfile(fenv).iteritems():
@@ -280,6 +280,8 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         texit   = threading.Event()
         proc    = None
+
+        LOG.debug("cmd line: %r", bargs + args)
 
         try:
             proc  = subprocess.Popen(bargs + args,

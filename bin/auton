@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.44'
+__version__ = '0.1.45'
 
 import argparse
 import os
@@ -118,7 +118,7 @@ def argv_parse_check():
                         dest      = 'mode',
                         default   = 'autorun',
                         choices   = ('autorun', 'run', 'status'),
-                        help      = "Auton mode: autorun, run, status")
+                        help      = "Auton mode: autorun, run, status, instead of %(default)s")
     parser.add_argument("-e",
                         action    = 'append',
                         dest      = 'envvars',
@@ -151,7 +151,7 @@ def argv_parse_check():
     parser.add_argument("--no-return-code",
                         action    = 'store_true',
                         dest      = 'no_return_code',
-                        default   = helpers.boolize(os.environ.get('AUTON_NO_RETURN_CODE', True)),
+                        default   = helpers.boolize(os.environ.get('AUTON_NO_RETURN_CODE', False)),
                         help      = "Do not exit with return code if present")
 
     sys.argv      = helpers.escape_parse_args(('-a',
@@ -160,13 +160,14 @@ def argv_parse_check():
                                                '--multi-argsfiles'),
                                                sys.argv)
 
-    args          = parser.parse_args()
-    args.loglevel = getattr(logging, args.loglevel.upper(), logging.INFO)
+    options, args = parser.parse_known_args()
+    options.loglevel = getattr(logging, options.loglevel.upper(), logging.INFO)
 
-    if not args.uri and os.environ.get('AUTON_URI'):
-        args.uri = os.environ.get('AUTON_URI').split(',')
+    if not options.uri and os.environ.get('AUTON_URI'):
+        options.uri = [x.strip() for x in os.environ.get('AUTON_URI').split(',')]
 
-    return args
+    return options
+
 
 class AutonClient(object):
     def __init__(self, options):
@@ -326,7 +327,7 @@ class AutonClient(object):
             data = self.do_status()
             self._show_results(data)
 
-        if not self.options.no_return_code or data['return_code'] is None:
+        if self.options.no_return_code or data['return_code'] is None:
             return int(data['code'] != 200)
 
         return data['return_code']

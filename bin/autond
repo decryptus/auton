@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.44'
+__version__ = '0.1.45'
 
 import argparse
 import logging
@@ -47,7 +47,7 @@ DEFAULT_USER      = "auton"
 DEFAULT_GROUP     = "auton"
 
 try:
-    AUTON_USER  = pwd.getpwnam(os.environ.get('AUTON_USER') or DEFAULT_GROUP).pw_name
+    AUTON_USER  = pwd.getpwnam(os.environ.get('AUTON_USER') or DEFAULT_USER).pw_name
 except KeyError:
     AUTON_USER  = pwd.getpwuid(os.geteuid())[0]
 

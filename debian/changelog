@@ -1,3 +1,9 @@
+auton (0.1.45) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Tue, 27 Aug 2019 16:10:02 +0200
+
 auton (0.1.44) unstable; urgency=medium
 
   * Reviewed arguments attributes.
