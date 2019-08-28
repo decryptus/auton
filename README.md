@@ -7,7 +7,9 @@ For example, you can use auton from CI/CD to run on remote servers, you just nee
   - [ansible](https://github.com/ansible/ansible)
   - [curl](https://github.com/curl/curl)
   - [terraform](https://github.com/hashicorp/terraform)
-You can also use auton if you need to execute a new version of a software but you can't install it on a legacy server.
+
+You can also use auton if you need to execute a new version of a software but you can't install it on a legacy server
+or tests programs execution.
 
 ## Quickstart
 
@@ -87,15 +89,15 @@ endpoints:
 
 ### Authentication
 
-To enable authentication, you must add `auth_basic` and `auth_basic_file` lines in section general:
+To enable authentication, you must add `auth_basic` and `auth_basic_file` lines in section `general`:
 
 ```yaml
-general:
   auth_basic:      'Restricted'
   auth_basic_file: '/etc/auton/auton.passwd'
 ```
 
-To generate `auth_basic_file` use `htpasswd`:
+Use `htpasswd` to generate `auth_basic_file`:
+
 `htpasswd -c -s /etc/auton/auton.passwd foo`
 
 And you have to add for each modules route `auth: true`:
@@ -139,7 +141,17 @@ Use section `users` to specify users allowed by endpoint:
 
 #### Plugin subproc
 
-subproc plugin executes programs with subprocess.
+subproc plugin executes programs with python `subprocess`.
+
+Predefined AUTON environment variables during execution:
+
+| Variable           | Description                                   |
+|:-------------------|:----------------------------------------------|
+| `AUTON`            | Mark the job is executed in AUTON environment |
+| `AUTON_JOB_TIME`   | Current time in local time zone               |
+| `AUTON_JOB_GMTIME` | Current time in GMT                           |
+| `AUTON_JOB_UID`    | Current job uid passed from client            |
+| `AUTON_JOB_UUID`   | Unique ID of the current job                  |
 
 Use keyword `proc` to specify program path:
 ```yaml
@@ -286,16 +298,6 @@ endpoints:
       disallow-env: true
 ```
 
-Predefined AUTON environment variables during execution:
-
-| Variable           | Description                                   |
-|:-------------------|:----------------------------------------------|
-| `AUTON`            | Mark the job is executed in AUTON environment |
-| `AUTON_JOB_TIME`   | Current time in local time zone               |
-| `AUTON_JOB_GMTIME` | Current time in GMT                           |
-| `AUTON_JOB_UID`    | Current job uid passed from client            |
-| `AUTON_JOB_UUID`   | Unique ID of the current job                  |
-
 ## Auton command-lines
 
 #### endpoint curl examples:
@@ -330,7 +332,7 @@ Add arguments files to send local files:
 
 Add multiple arguments:
 
-`auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar https://example.com' --multi-argsfiles '-d@=foo.txt -d@=bar.txt --cacert=cacert.pem'`
+`auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar https://example.com' --multi-argsfiles '-d@=somedir/foo.txt -d@=bar.txt --cacert=cacert.pem'`
 
 Get file contents from stdin with `-`:
 
