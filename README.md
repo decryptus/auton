@@ -7,6 +7,7 @@ For example, you can use auton from CI/CD to run on remote servers, you just nee
   - [ansible](https://github.com/ansible/ansible)
   - [curl](https://github.com/curl/curl)
   - [terraform](https://github.com/hashicorp/terraform)
+You can also use auton if you need to execute a new version of a software but you can't install it on a legacy server.
 
 ## Quickstart
 
@@ -116,7 +117,7 @@ modules:
         op:        'GET'
 ```
 
-You can use section `users` to specify users allowed by endpoint:
+Use section `users` to specify users allowed by endpoint:
 ```yaml
   ansible-playbook-ssh:
     plugin: subproc
@@ -138,7 +139,7 @@ You can use section `users` to specify users allowed by endpoint:
 
 #### Plugin subproc
 
-subproc plugin executes with subprocess
+subproc plugin executes programs with subprocess.
 
 Use keyword `proc` to specify program path:
 ```yaml
@@ -149,7 +150,7 @@ endpoints:
       prog: curl
 ```
 
-You can also use keyword `workdir` to change the working directory:
+Use keyword `workdir` to change the working directory:
 ```yaml
 endpoints:
   curl:
@@ -159,7 +160,7 @@ endpoints:
       workdir: somedir/
 ```
 
-You can also use keyword `search_paths` to specify paths to search `prog`:
+Use keyword `search_paths` to specify paths to search `prog`:
 ```yaml
 endpoints:
   curl:
@@ -172,7 +173,7 @@ endpoints:
         - /bin
 ```
 
-You can also use section `become` to execute with an other user:
+Use section `become` to execute with an other user:
 ```yaml
 endpoints:
   curl:
@@ -184,7 +185,7 @@ endpoints:
         user: foo
 ```
 
-You can also use keyword `timeout` to raise an exception after n seconds (default: 60 seconds):
+Use keyword `timeout` to raise an exception after n seconds (default: 60 seconds):
 ```yaml
 endpoints:
   curl:
@@ -194,7 +195,7 @@ endpoints:
       timeout: 3600
 ```
 
-You can also use section `args` to define arguments always present:
+Use section `args` to define arguments always present:
 ```yaml
 endpoints:
   curl:
@@ -206,7 +207,7 @@ endpoints:
         - '-4'
 ```
 
-You can also use keyword `disallow-args` to disable args from client:
+Use keyword `disallow-args` to disable arguments from client:
 ```yaml
 endpoints:
   curl:
@@ -219,7 +220,7 @@ endpoints:
       disallow-args: true
 ```
 
-You can also use section `argfiles` to define arguments files always present:
+Use section `argfiles` to define arguments files always present:
 ```yaml
 endpoints:
   curl:
@@ -233,7 +234,7 @@ endpoints:
           filepath: /tmp/data
 ```
 
-You can also use keyword `disallow-argfiles` to disable arguments files from client:
+Use keyword `disallow-argfiles` to disable arguments files from client:
 ```yaml
 endpoints:
   curl:
@@ -248,7 +249,7 @@ endpoints:
       disallow-argfiles: true
 ```
 
-You can also use section `env` to define environment variables always present:
+Use section `env` to define environment variables always present:
 ```yaml
 endpoints:
   curl:
@@ -260,7 +261,19 @@ endpoints:
         HTTPS_PROXY: http://proxy.example.com:3128/
 ```
 
-You can also use keyword `disallow-env` to disable environment variables from client:
+Use section `envfiles` to define environment variables files always present:
+```yaml
+endpoints:
+  curl:
+    plugin: subproc
+    config:
+      prog: curl
+      envfiles:
+        - somedir/foo.env
+        - somedir/bar.env
+```
+
+Use keyword `disallow-env` to disable environment variables from client:
 ```yaml
 endpoints:
   curl:
@@ -287,34 +300,38 @@ Predefined AUTON environment variables during execution:
 
 #### endpoint curl examples:
 
-Call url https://example.com:
+Get URL https://example.com:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com'`
 
-You can also add environment variable HTTP\_PROXY:
+Get URL https://example.com with auton authentication:
+
+`auton --endpoint curl --uri http://localhost:8666 --auth-user foo --auth-passwd bar -a 'https://example.com'`
+
+Add environment variable HTTP\_PROXY:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' -e 'HTTP_PROXY=http://proxy.example.com:3128/'`
 
-You can also load environment variables from local files:
+Load environment variables from local files:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' --load-envfile foo.env`
 
-You can also tell to autond to load environment variables files from its local fs:
+Tell to autond to load environment variables files from its local fs:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' --envfile /etc/auton/auton.env`
 
-You can also add multiple autond URIs for high availability:
+Add multiple autond URIs for high availability:
 
 `auton --endpoint curl --uri http://localhost:8666 --uri http://localhost:8667 -a 'https://example.com'`
 
-You can also add arguments files to send local files:
+Add arguments files to send local files:
 
 `auton --endpoint curl --uri http://localhost:8666 -A '--cacert=cacert.pem' -a 'https://example.com'`
 
-You can also add multiple arguments:
+Add multiple arguments:
 
 `auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar https://example.com' --multi-argsfiles '-d@=foo.txt -d@=bar.txt --cacert=cacert.pem'`
 
-You can also get file content from stdin with `-`:
+Get file contents from stdin with `-`:
 
-`cat foo | auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar sftp://example.com' --multi-argsfiles '--key=private_key.pem --pubkey=public_key.pem -T=-'`
+`cat foo.txt | auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar sftp://example.com' --multi-argsfiles '--key=private_key.pem --pubkey=public_key.pem -T=-'`
