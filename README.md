@@ -19,6 +19,16 @@ Using autond in Docker
 
 See [docker-compose.yml](docker-compose.yml)
 
+## Installation
+
+### autond for server side
+
+`pip install autond`
+
+### auton for client side
+
+`pip install auton`
+
 ## Environment variables
 
 ### autond
