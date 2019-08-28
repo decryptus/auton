@@ -63,7 +63,7 @@ class AutonSubProcPlugin(AutonPlugBase):
                 for x in iter(proc.stdout.readline, b''):
                     if x != '':
                         obj.add_result(x.rstrip())
-            except Exception, e:
+            except Exception as e:
                 obj.add_error(repr(e))
                 LOG.exception(e)
                 break
@@ -78,7 +78,7 @@ class AutonSubProcPlugin(AutonPlugBase):
                 for x in iter(proc.stderr.readline, b''):
                     if x != '':
                         obj.add_error(x.rstrip())
-            except Exception, e:
+            except Exception as e:
                 obj.add_error(repr(e))
                 LOG.exception(e)
                 break
@@ -185,21 +185,29 @@ class AutonSubProcPlugin(AutonPlugBase):
         for envfile in envfiles:
             try:
                 r.update(dotenv_values(envfile))
-            except Exception, e:
+            except Exception as e:
                 LOG.warning("unable to load envfile: %r, error: %r", envfile, e)
 
         return r
 
-    def _mk_env(self, cenv, fenv, penv, ovars):
+    def _mk_env(self, cenvfiles, penvfiles, cenv, penv, ovars):
         r   = {}
         env = []
 
-        if fenv:
-            if not isinstance(fenv, list):
+        if penvfiles:
+            if not isinstance(penvfiles, list):
                 LOG.warning("invalid payload envfiles for target: %r", self.target.name)
                 return r
 
-            for key, val in self._load_envfile(fenv).iteritems():
+            for key, val in self._load_envfile(penvfiles).iteritems():
+                env.append({key: val})
+
+        if cenvfiles:
+            if not isinstance(cenvfiles, list):
+                LOG.warning("invalid configuration envfiles for target: %r", self.target.name)
+                return r
+
+            for key, val in self._load_envfile(cenvfiles).iteritems():
                 env.append({key: val})
 
         if cenv:
@@ -227,7 +235,7 @@ class AutonSubProcPlugin(AutonPlugBase):
         AutonPlugBase.safe_init(self)
 
         if not self.target.config.get('prog'):
-            raise AutonConfigurationError("missing prog option in target: %r" % self.target.name)
+            raise AutonConfigurationError("missing prog keyword for target: %r" % self.target.name)
 
     def do_run(self, obj):
         cfg       = self.target.config
@@ -236,7 +244,7 @@ class AutonSubProcPlugin(AutonPlugBase):
         pargs     = None
         pargfiles = None
         args      = [cfg['prog']]
-        fenv      = []
+        penvfiles = []
         penv      = {}
 
         if isinstance(payload, dict) and payload.get('args'):
@@ -262,7 +270,7 @@ class AutonSubProcPlugin(AutonPlugBase):
             if cfg.get('disallow-env'):
                 LOG.warning("envfile from payload isn't allowed for target: %r", self.target.name)
             else:
-                fenv = payload['envfiles']
+                penvfiles = payload['envfiles']
 
         if isinstance(payload, dict) and payload.get('env'):
             if cfg.get('disallow-env'):
@@ -270,9 +278,15 @@ class AutonSubProcPlugin(AutonPlugBase):
             else:
                 penv.update(copy.copy(payload['env']))
 
-        env     = self._mk_env(cfg.get('env'), fenv, penv, ovars)
+        env     = self._mk_env(cfg.get('envfiles'), penvfiles, cfg.get('env'), penv, ovars)
         if not env:
             env = {}
+
+        if cfg.get('search_paths'):
+            if not isinstance(cfg['search_paths'], list):
+                LOG.warning("invalid search_paths for target: %r", self.target.name)
+            else:
+                env['PATH'] = os.path.pathsep.join(cfg['search_paths'])
 
         env     = self._set_default_env(env, ovars)
 
@@ -313,10 +327,10 @@ class AutonSubProcPlugin(AutonPlugBase):
                 raise subprocess.CalledProcessError(proc.returncode, args[0])
         except (AutonTargetFailed, AutonTargetTimeout):
             raise
-        except subprocess.CalledProcessError, e:
+        except subprocess.CalledProcessError as e:
             raise AutonTargetFailed("error on target: %r. exception: %s"
                                     % (self.target.name, e), code = e.returncode)
-        except Exception, e:
+        except Exception as e:
             raise AutonTargetFailed("error on target: %r. exception: %r"
                                     % (self.target.name, e))
         finally:

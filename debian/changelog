@@ -1,3 +1,9 @@
+auton (0.1.46) unstable; urgency=medium
+
+  * Added keyword search_paths in plugin subproc.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 28 Aug 2019 07:33:09 +0200
+
 auton (0.1.45) unstable; urgency=medium
 
   * Reviewed README.md.

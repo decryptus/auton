@@ -149,7 +149,7 @@ class JobModule(DWhoModuleBase):
             return self._build_result(obj)
         except HttpReqErrJson:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception(e)
             raise HttpReqErrJson(503, repr(e))
         finally:
@@ -179,7 +179,7 @@ class JobModule(DWhoModuleBase):
             return self._build_result(obj)
         except HttpReqErrJson:
             raise
-        except Exception, e:
+        except Exception as e:
             LOG.exception(e)
             raise HttpReqErrJson(503, repr(e))
         finally:

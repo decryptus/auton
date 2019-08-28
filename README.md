@@ -38,7 +38,7 @@ See [docker-compose.yml](docker-compose.yml)
 | `AUTON_LOGFILE`        | Log file path               | /var/log/auton/auton.log |
 | `AUTON_NO_RETURN_CODE` | Do not exit with return code if present | False |
 | `AUTON_UID`            | auton job uid               | random uuid |
-| `AUTON_URI`            | autond uri(s)<br />(e.g. http://auton-01.example.org:8666,http://auton-02.example.org) |  |
+| `AUTON_URI`            | autond URI(s)<br />(e.g. http://auton-01.example.org:8666,http://auton-02.example.org:8666) |  |
 
 ## Autond configuration
 
@@ -138,13 +138,38 @@ You can use section `users` to specify users allowed by endpoint:
 
 #### Plugin subproc
 
-subproc plugin execute subprocess `proc`:
+subproc plugin executes with subprocess
+
+Use keyword `proc` to specify program path:
 ```yaml
 endpoints:
   curl:
     plugin: subproc
     config:
       prog: curl
+```
+
+You can also use keyword `workdir` to change the working directory:
+```yaml
+endpoints:
+  curl:
+    plugin: subproc
+    config:
+      prog: curl
+      workdir: somedir/
+```
+
+You can also use keyword `search_paths` to specify paths to search `prog`:
+```yaml
+endpoints:
+  curl:
+    plugin: subproc
+    config:
+      prog: curl
+      search_paths:
+        - /usr/local/bin
+        - /usr/bin
+        - /bin
 ```
 
 You can also use section `become` to execute with an other user:
@@ -262,7 +287,7 @@ Predefined AUTON environment variables during execution:
 
 #### endpoint curl examples:
 
-Simple call url https://example.com:
+Call url https://example.com:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com'`
 
@@ -274,11 +299,11 @@ You can also load environment variables from local files:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' --load-envfile foo.env`
 
-You can also tell to autond to load environment variables files from its fs:
+You can also tell to autond to load environment variables files from its local fs:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' --envfile /etc/auton/auton.env`
 
-You can also add multiple autond uris for high availability:
+You can also add multiple autond URIs for high availability:
 
 `auton --endpoint curl --uri http://localhost:8666 --uri http://localhost:8667 -a 'https://example.com'`
 
@@ -288,8 +313,8 @@ You can also add arguments files to send local files:
 
 You can also add multiple arguments:
 
-`auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar https://example.com' --multi-argsfiles '-d@=foo -d@=bar --cacert=cacert.pem'`
+`auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar https://example.com' --multi-argsfiles '-d@=foo.txt -d@=bar.txt --cacert=cacert.pem'`
 
 You can also get file content from stdin with `-`:
 
-`cat foo | auton --endpoint curl --uri http://localhost:8666 --multi-argsfiles '--key=private_key --pubkey=public_key -T=-' --multi-args '-vvv -u foo:bar sftp://example.com'`
+`cat foo | auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar sftp://example.com' --multi-argsfiles '--key=private_key.pem --pubkey=public_key.pem -T=-'`

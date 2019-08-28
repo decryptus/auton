@@ -260,10 +260,10 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 obj.set_status(STATUS_PROCESSING)
                 getattr(self, func)(obj)
                 obj.set_return_code(0)
-            except Exception, e:
+            except Exception as e:
                 obj.add_error(str(e))
                 obj.set_return_code(getattr(e, 'code', None))
-                LOG.exception("%r", e)
+                LOG.exception(e)
             finally:
                 obj.set_status(STATUS_COMPLETE)
                 obj.set_ended_at()
@@ -279,7 +279,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
 
         try:
             getattr(self, func)()
-        except Exception, e:
+        except Exception as e:
             LOG.debug(e)
 
     def __call__(self):
