@@ -1,3 +1,9 @@
+auton (0.1.51) unstable; urgency=medium
+
+  * Fixed py3 compatibilities.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 04 Sep 2019 18:10:20 +0200
+
 auton (0.1.50) unstable; urgency=medium
 
   * Reviewed README.md.

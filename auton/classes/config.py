@@ -95,7 +95,7 @@ def load_conf(xfile, options = None, envvar = None):
                                              name))
         cfg['auton']['plugin_name'] = ept_cfg['plugin']
 
-        for x in ('config', 'users', 'vars'):
+        for x in ('vars', 'config', 'users'):
             if ept_cfg.get("import_%s" % x):
                 cfg[x].update(import_file(ept_cfg["import_%s" % x], conf['_config_directory'], cfg))
 
