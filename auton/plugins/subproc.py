@@ -62,7 +62,7 @@ class AutonSubProcPlugin(AutonPlugBase):
             try:
                 for x in iter(proc.stdout.readline, b''):
                     if x != '':
-                        obj.add_result(x.rstrip())
+                        obj.add_result(x)
             except Exception as e:
                 obj.add_error(repr(e))
                 LOG.exception(e)
@@ -77,7 +77,7 @@ class AutonSubProcPlugin(AutonPlugBase):
             try:
                 for x in iter(proc.stderr.readline, b''):
                     if x != '':
-                        obj.add_error(x.rstrip())
+                        obj.add_error(x)
             except Exception as e:
                 obj.add_error(repr(e))
                 LOG.exception(e)

@@ -1,3 +1,9 @@
+auton (0.1.52) unstable; urgency=medium
+
+  * Fixed auton stdout.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 06 Sep 2019 14:12:28 +0200
+
 auton (0.1.51) unstable; urgency=medium
 
   * Fixed py3 compatibilities.

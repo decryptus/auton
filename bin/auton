@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.51'
+__version__ = '0.1.52'
 
 import argparse
 import os
@@ -216,7 +216,7 @@ class AutonClient(object):
         if data['status'] == 'complete' \
            and data.get('errors'):
             for x in data['errors']:
-                LOG.error(x)
+                LOG.error(x.rstrip())
 
     def _load_envfiles(self):
         for envfile in self.options.load_envfiles:
