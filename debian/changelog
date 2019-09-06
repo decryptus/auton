@@ -1,3 +1,9 @@
+auton (0.1.53) unstable; urgency=medium
+
+  * Fixed auton and autond arguments.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 06 Sep 2019 17:09:44 +0200
+
 auton (0.1.52) unstable; urgency=medium
 
   * Fixed auton stdout.

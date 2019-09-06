@@ -20,7 +20,7 @@ __license__ = """
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-__version__ = '0.1.52'
+__version__ = '0.1.53'
 
 import argparse
 import os
@@ -63,51 +63,51 @@ def argv_parse_check():
     parser.add_argument("-a",
                         action    = 'append',
                         dest      = 'args',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Passed arguments")
     parser.add_argument("-A",
                         action    = 'append',
                         dest      = 'argfiles',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Passed argument files")
     parser.add_argument("--multi-args",
                         action    = 'append',
                         dest      = 'margs',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Passed multiple arguments (arguments splitted)")
     parser.add_argument("--multi-argsfiles",
                         action    = 'append',
                         dest      = 'margsfiles',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Passed multiple arguments files (arguments splitted)")
     parser.add_argument("--uri",
                         action    = 'append',
                         dest      = 'uri',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Auton daemon URI addresses")
     parser.add_argument("--uid",
                         dest      = 'uid',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = os.environ.get('AUTON_UID') or ("%s" % uuid.uuid4()),
                         help      = "Auton uid")
     parser.add_argument("--endpoint",
                         dest      = 'endpoint',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = os.environ.get('AUTON_ENDPOINT'),
                         help      = "Auton endpoint")
     parser.add_argument("--auth-user",
                         dest      = 'auth_user',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = os.environ.get('AUTON_AUTH_USER'),
                         help      = "Auton auth user")
     parser.add_argument("--auth-passwd",
                         dest      = 'auth_passwd',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = os.environ.get('AUTON_AUTH_PASSWD'),
                         help      = "Auton auth password")
     parser.add_argument("--delay",
@@ -123,19 +123,19 @@ def argv_parse_check():
     parser.add_argument("-e",
                         action    = 'append',
                         dest      = 'envvars',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Passed environment variables")
     parser.add_argument("--envfile",
                         action    = 'append',
                         dest      = 'envfiles',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Passed envfile parameters")
     parser.add_argument("--load-envfile",
                         action    = 'append',
                         dest      = 'load_envfiles',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = [],
                         help      = "Load environment variables from file")
     parser.add_argument("-l",
@@ -146,7 +146,7 @@ def argv_parse_check():
                                      "critical, error, warning, info, debug"))
     parser.add_argument("--logfile",
                         dest      = 'logfile',
-                        type      = six.u,
+                        type      = six.text_type,
                         default   = AUTON_LOGFILE,
                         help      = "Use log file <logfile> instead of %(default)s")
     parser.add_argument("--no-return-code",

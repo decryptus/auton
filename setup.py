@@ -4,7 +4,7 @@
 import os
 from setuptools import find_packages, setup
 
-version                = '0.1.52'
+version                = '0.1.53'
 
 current_dir            = os.path.abspath(os.path.dirname(__file__))
 
