@@ -1,5 +1,10 @@
 ## auton project
 
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/auton.svg)](https://pypi.org/project/auton/)
+[![PyPI version shields.io](https://img.shields.io/pypi/v/auton.svg)](https://pypi.org/project/auton/)
+[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/decryptus/auton)](https://hub.docker.com/r/decryptus/auton)
+[![Documentation Status](https://readthedocs.org/projects/auton/badge/?version=latest)](https://auton.readthedocs.io/)
+
 auton is a free and open-source, we develop it to run programs and command-lines on remote servers through HTTP protocol.
 There are two programs, auton for client side and autond for server side.
 auton is just a helper to transform command-lines into HTTP protocol, it is able to transform basic arguments, file arguments and environment variables.
@@ -45,13 +50,13 @@ See [docker-compose.yml](docker-compose.yml)
 
 | Variable               | Description                 | Default |
 |:-----------------------|:----------------------------|:--------|
-| `AUTON_AUTH_USER`      | user for authentication     |  |
-| `AUTON_AUTH_PASSWD`    | password for authentication |  |
-| `AUTON_ENDPOINT`       | name of endpoint            |  |
+| `AUTON_AUTH_USER`      | user for authentication     | <span/> |
+| `AUTON_AUTH_PASSWD`    | password for authentication | <span/> |
+| `AUTON_ENDPOINT`       | name of endpoint            | <span/> |
 | `AUTON_LOGFILE`        | Log file path               | /var/log/auton/auton.log |
 | `AUTON_NO_RETURN_CODE` | Do not exit with return code if present | False |
 | `AUTON_UID`            | auton job uid               | random uuid |
-| `AUTON_URI`            | autond URI(s)<br />(e.g. http://auton-01.example.org:8666,http://auton-02.example.org:8666) |  |
+| `AUTON_URI`            | autond URI(s)<br />(e.g. http://auton-01.example.org:8666,http://auton-02.example.org:8666) | <span/> |
 
 ## Autond configuration
 
@@ -149,7 +154,7 @@ Use section `users` to specify users allowed by endpoint:
         DISPLAY_SKIPPED_HOSTS: 'false'
 ```
 
-#### Plugin subproc
+### Plugin subproc
 
 subproc plugin executes programs with python `subprocess`.
 
@@ -310,7 +315,7 @@ endpoints:
 
 ## Auton command-lines
 
-#### endpoint curl examples:
+### endpoint curl examples:
 
 Get URL https://example.com:
 

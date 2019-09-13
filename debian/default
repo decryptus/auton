@@ -1,6 +1,0 @@
-# defaults file for auton
-EXTRA_OPTS="-l info"
-
-# Service can be enabled by setting
-# AUTON_ENABLE="yes"
-AUTON_ENABLE="yes"

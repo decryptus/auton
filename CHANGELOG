@@ -1,0 +1,341 @@
+auton (0.2.1) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 13 Sep 2019 20:46:41 +0200
+
+auton (0.2.0) unstable; urgency=medium
+
+  * Fixed version.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 13 Sep 2019 20:26:50 +0200
+
+auton (0.1.54) unstable; urgency=medium
+
+  * Added py3 compatibility.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 13 Sep 2019 19:56:03 +0200
+
+auton (0.1.53) unstable; urgency=medium
+
+  * Fixed auton and autond arguments.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 06 Sep 2019 17:09:44 +0200
+
+auton (0.1.52) unstable; urgency=medium
+
+  * Fixed auton stdout.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 06 Sep 2019 14:12:28 +0200
+
+auton (0.1.51) unstable; urgency=medium
+
+  * Fixed py3 compatibilities.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 04 Sep 2019 18:10:20 +0200
+
+auton (0.1.50) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 28 Aug 2019 16:17:04 +0200
+
+auton (0.1.49) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 28 Aug 2019 15:18:24 +0200
+
+auton (0.1.48) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 28 Aug 2019 15:13:42 +0200
+
+auton (0.1.47) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 28 Aug 2019 08:41:49 +0200
+
+auton (0.1.46) unstable; urgency=medium
+
+  * Added keyword search_paths in plugin subproc.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 28 Aug 2019 07:33:09 +0200
+
+auton (0.1.45) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Tue, 27 Aug 2019 16:10:02 +0200
+
+auton (0.1.44) unstable; urgency=medium
+
+  * Reviewed arguments attributes.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Tue, 27 Aug 2019 08:30:39 +0200
+
+auton (0.1.43) unstable; urgency=medium
+
+  * Added possibility to add multiple autond uris.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Tue, 27 Aug 2019 08:25:34 +0200
+
+auton (0.1.42) unstable; urgency=medium
+
+  * Added Dockerfile.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 16:28:17 +0200
+
+auton (0.1.41) unstable; urgency=medium
+
+  * Fixed load_conf.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 15:12:11 +0200
+
+auton (0.1.40) unstable; urgency=medium
+
+  * Removed debug.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 14:48:34 +0200
+
+auton (0.1.39) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 14:42:43 +0200
+
+auton (0.1.38) unstable; urgency=medium
+
+  * Removed plugin http.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 12:00:08 +0200
+
+auton (0.1.37) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 26 Aug 2019 11:44:16 +0200
+
+auton (0.1.36) unstable; urgency=medium
+
+  * Added multi-args and multi-argsfiles arguments in auton.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 16:45:45 +0200
+
+auton (0.1.35) unstable; urgency=medium
+
+  * Renamed debian/autond.default to debian/autond.auton.default.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 11:58:12 +0200
+
+auton (0.1.34) unstable; urgency=medium
+
+  * Removed file debian/autond.pyinstall.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 11:26:31 +0200
+
+auton (0.1.33) unstable; urgency=medium
+
+  * Added argfiles argument in auton and separated packages auton and autond.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 25 Aug 2019 11:18:47 +0200
+
+auton (0.1.32) unstable; urgency=medium
+
+  * Refactoring plugins class.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 07 Mar 2019 11:50:01 +0100
+
+auton (0.1.31) unstable; urgency=medium
+
+  * Cleaned codes.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 07 Mar 2019 10:21:57 +0100
+
+auton (0.1.30) unstable; urgency=medium
+
+  * Fixed environment name regex.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 06 Mar 2019 18:47:56 +0100
+
+auton (0.1.29) unstable; urgency=medium
+
+  * Reviewed requirements. 
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sat, 23 Feb 2019 07:59:06 +0100
+
+auton (0.1.28) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 22 Feb 2019 19:22:00 +0100
+
+auton (0.1.27) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 22 Feb 2019 19:21:16 +0100
+
+auton (0.1.26) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 22 Feb 2019 19:01:03 +0100
+
+auton (0.1.25) unstable; urgency=medium
+
+  * Added users authentication in auton.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 24 Jan 2019 11:53:14 +0100
+
+auton (0.1.24) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 23 Jan 2019 21:04:05 +0100
+
+auton (0.1.23) unstable; urgency=medium
+
+  * Added users authentication by endpoints. 
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 23 Jan 2019 20:48:30 +0100
+
+auton (0.1.22) unstable; urgency=medium
+
+  * Fixed environment variables.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sat, 22 Dec 2018 01:06:28 +0100
+
+auton (0.1.21) unstable; urgency=medium
+
+  * Added default environment variables.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 21 Dec 2018 22:59:58 +0100
+
+auton (0.1.20) unstable; urgency=medium
+
+  * Fixed job results on error.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 20 Dec 2018 20:18:07 +0100
+
+auton (0.1.19) unstable; urgency=medium
+
+  * Reviewed README.md.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 20 Dec 2018 11:17:10 +0100
+
+auton (0.1.18) unstable; urgency=medium
+
+  * Fixed setup.py.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 17 Dec 2018 10:02:42 +0100
+
+auton (0.1.17) unstable; urgency=medium
+
+  * Renamed auton to autond and auton-client to auton.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 17 Dec 2018 06:58:02 +0100
+
+auton (0.1.16) unstable; urgency=medium
+
+  * Reviewed auton-client.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 12 Dec 2018 14:34:39 +0100
+
+auton (0.1.15) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 10 Dec 2018 11:44:40 +0100
+
+auton (0.1.14) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 10 Dec 2018 11:26:32 +0100
+
+auton (0.1.13) unstable; urgency=medium
+
+  * Reviewed envname regex in module job.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 10 Dec 2018 05:14:53 +0100
+
+auton (0.1.12) unstable; urgency=medium
+
+  * Reviewed method _build_params_dict in plugin subproc.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 12:01:37 +0100
+
+auton (0.1.11) unstable; urgency=medium
+
+  * Fixed env variables.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 11:18:27 +0100
+
+auton (0.1.10) unstable; urgency=medium
+
+  * Fixed plugins class.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 10:42:11 +0100
+
+auton (0.1.9) unstable; urgency=medium
+
+  * Fixed become.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 10:24:54 +0100
+
+auton (0.1.8) unstable; urgency=medium
+
+  * Fixed envfiles.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 10:17:25 +0100
+
+auton (0.1.7) unstable; urgency=medium
+
+  * Fixed debian dirs.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 09:50:29 +0100
+
+auton (0.1.6) unstable; urgency=medium
+
+  * Added auton-client.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 09:34:55 +0100
+
+auton (0.1.5) unstable; urgency=medium
+
+  * Added envfiles option.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sun, 09 Dec 2018 09:33:21 +0100
+
+auton (0.1.4) unstable; urgency=medium
+
+  * Fixed args position in subproc.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 07 Dec 2018 20:34:48 +0100
+
+auton (0.1.3) unstable; urgency=medium
+
+  * Bugfix.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 07 Dec 2018 15:59:43 +0100
+
+auton (0.1.2) unstable; urgency=medium
+
+  * Reviewed requests results.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 07 Dec 2018 14:58:44 +0100
+
+auton (0.1.1) unstable; urgency=medium
+
+  * Renamed deploy module to job module.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 06 Dec 2018 15:43:39 +0100
+
+auton (0.1.0) unstable; urgency=medium
+
+  * First version package
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 06 Dec 2018 07:29:34 +0100

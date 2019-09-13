@@ -1,34 +1,19 @@
 # -*- coding: utf-8 -*-
-"""auton plugins"""
-
-__author__  = "Adrien DELLE CAVE <adc@doowan.net>"
-__license__ = """
-    Copyright (C) 2018-2019  fjord-technologies
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA..
-"""
+# Copyright (C) 2018-2019 fjord-technologies
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""auton.classes.plugins"""
 
 import abc
 import logging
 import os
-import Queue
 import threading
 import time
 import uuid
 
 from datetime import datetime
+
+from six.moves import queue as _queue
+
 from dwho.classes.plugins import DWhoPluginBase
 from dwho.config import load_credentials
 
@@ -73,7 +58,7 @@ class AutonEPTsSync(dict):
 EPTS_SYNC = AutonEPTsSync()
 
 
-class AutonEPTObject(object):
+class AutonEPTObject(object): # pylint: disable=useless-object-inheritance
     def __init__(self, name, uid, endpoint, method, request, callback = None):
         self.name        = name
         self.uid         = uid
@@ -166,12 +151,12 @@ class AutonEPTObject(object):
             self.callback(self)
 
 
-class AutonEPTSync(object):
+class AutonEPTSync(object): # pylint: disable=useless-object-inheritance
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, name):
         self.name       = name
-        self.queue      = Queue.Queue()
+        self.queue      = _queue.Queue()
         self.results    = {}
 
     def qput(self, item):
@@ -247,7 +232,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 obj  = EPTS_SYNC[self.name].qget(True)
 
                 if self.users:
-                    user = obj.get_request()._SERVER.get('HTTP_AUTH_USER')
+                    user = obj.get_request().get_server_vars().get('HTTP_AUTH_USER')
                     if user is None or not self.users.get(user):
                         raise AutonTargetUnauthorized("unauthorized user: %r" % user)
 
@@ -261,7 +246,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 getattr(self, func)(obj)
                 obj.set_return_code(0)
             except Exception as e:
-                obj.add_error(str(e))
+                obj.add_error("ERROR: %s\n" % e)
                 obj.set_return_code(getattr(e, 'code', None))
                 LOG.exception(e)
             finally:

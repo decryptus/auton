@@ -1,26 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-autond
-"""
+# Copyright (C) 2018-2019 fjord-technologies
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""autond"""
 
-__license__ = """
-    Copyright (C) 2018-2019  fjord-technologies
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
-__version__ = '0.1.53'
+__version__ = '0.2.1'
 
 import argparse
 import logging
@@ -85,32 +69,32 @@ def argv_parse_check():
                         help      = "Foreground, don't daemonize")
     parser.add_argument("-c",
                         dest      = 'conffile',
-                        type      = six.text_type,
+                        type      = six.ensure_text,
                         default   = '/etc/auton/auton.yml',
                         help      = "Use configuration file <conffile> instead of %(default)s")
     parser.add_argument("-p",
                         dest      = 'pidfile',
-                        type      = six.text_type,
+                        type      = six.ensure_text,
                         default   = AUTOND_PIDFILE,
                         help      = "Use PID file <pidfile> instead of %(default)s")
     parser.add_argument("-u",
                         dest      = 'username',
-                        type      = six.text_type,
+                        type      = six.ensure_text,
                         default   = AUTON_USER,
                         help      = "Use username for the process instead of %(default)s")
     parser.add_argument("-g",
                         dest      = 'groupname',
-                        type      = six.text_type,
+                        type      = six.ensure_text,
                         default   = AUTON_GROUP,
                         help      = "Use groupname for the process instead of %(default)s")
     parser.add_argument("--logfile",
                         dest      = 'logfile',
-                        type      = six.text_type,
+                        type      = six.ensure_text,
                         default   = AUTOND_LOGFILE,
                         help      = "Use log file <logfile> instead of %(default)s")
     parser.add_argument("--listen-addr",
                         dest      = 'listen_addr',
-                        type      = six.text_type,
+                        type      = six.ensure_text,
                         help      = "Listen on address <listen_addr>")
     parser.add_argument("--listen-port",
                         dest      = 'listen_port',
@@ -155,7 +139,7 @@ def main(options):
         os.chown(options.pidfile, uid, gid)
         os.setgid(gid)
         os.setuid(uid)
-        os.umask(022)
+        os.umask(0o22)
 
         start_endpoints()
         httpdis_json.run(options)

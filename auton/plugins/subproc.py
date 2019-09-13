@@ -1,24 +1,7 @@
 # -*- coding: utf-8 -*-
-"""auton plugin subproc"""
-
-__author__  = "Adrien DELLE CAVE"
-__license__ = """
-    Copyright (C) 2018-2019  fjord-technologies
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA..
-"""
+# Copyright (C) 2018-2019 fjord-technologies
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""auton.plugins.subproc"""
 
 import copy
 import logging
@@ -29,6 +12,12 @@ import threading
 import time
 import tempfile
 
+import six
+try:
+    from six.moves import cStringIO as StringIO
+except ImportError:
+    from six import StringIO
+
 from dotenv.main import dotenv_values
 
 from sonicprobe import helpers
@@ -36,11 +25,6 @@ from auton.classes.exceptions import (AutonConfigurationError,
                                       AutonTargetFailed,
                                       AutonTargetTimeout)
 from auton.classes.plugins import AutonPlugBase, PLUGINS
-
-try:
-    from StringIO import CStringIO as StringIO
-except ImportError:
-    from six import StringIO
 
 LOG = logging.getLogger('auton.plugins.subproc')
 
@@ -95,7 +79,7 @@ class AutonSubProcPlugin(AutonPlugBase):
                 return None
 
             for x in cargs:
-                if isinstance(x, basestring) and '%' in x:
+                if isinstance(x, six.string_types) and '%' in x:
                     x.format(**ovars)
                 r.append(x)
 
@@ -105,7 +89,7 @@ class AutonSubProcPlugin(AutonPlugBase):
                 return None
 
             for x in pargs:
-                if isinstance(x, basestring) and '%' in x:
+                if isinstance(x, six.string_types) and '%' in x:
                     x.format(**ovars)
                 r.append(x)
 
@@ -199,7 +183,7 @@ class AutonSubProcPlugin(AutonPlugBase):
                 LOG.warning("invalid payload envfiles for target: %r", self.target.name)
                 return r
 
-            for key, val in self._load_envfile(penvfiles).iteritems():
+            for key, val in six.iteritems(self._load_envfile(penvfiles)):
                 env.append({key: val})
 
         if cenvfiles:
@@ -207,12 +191,12 @@ class AutonSubProcPlugin(AutonPlugBase):
                 LOG.warning("invalid configuration envfiles for target: %r", self.target.name)
                 return r
 
-            for key, val in self._load_envfile(cenvfiles).iteritems():
+            for key, val in six.iteritems(self._load_envfile(cenvfiles)):
                 env.append({key: val})
 
         if cenv:
             if isinstance(cenv, dict):
-                for key, val in cenv.iteritems():
+                for key, val in six.iteritems(cenv):
                     env.append({key: val})
             elif not isinstance(cenv, list):
                 LOG.warning("invalid configuration env for target: %r", self.target.name)
