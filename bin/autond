@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """autond"""
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 import argparse
 import logging
@@ -144,7 +144,7 @@ def main(options):
         start_endpoints()
         httpdis_json.run(options)
     except (KeyboardInterrupt, SystemExit):
-        raise
+        pass
     except Exception:
         LOG.exception("bad things happen")
     finally:

@@ -1,3 +1,9 @@
+auton (0.2.2) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Mon, 16 Sep 2019 11:07:08 +0200
+
 auton (0.2.1) unstable; urgency=medium
 
   * Reviewed requirements.
