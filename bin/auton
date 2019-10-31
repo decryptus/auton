@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """auton"""
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 import argparse
 import os
@@ -279,11 +279,16 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
             if not self.uri:
                 raise exceptions.ConnectionError("unable to connect autond")
 
-            req.raise_for_status()
-
             if not req.text:
                 return self._check_results()
-            return self._check_results(req.json())
+
+            try:
+                rs = req.json()
+            except ValueError:
+                req.raise_for_status()
+                return self._check_results()
+
+            return self._check_results(rs)
         finally:
             if req:
                 req.close()
@@ -309,11 +314,16 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
                                    auth = self._auth,
                                    headers = self._build_headers())
 
-            req.raise_for_status()
-
             if not req.text:
                 return self._check_results()
-            return self._check_results(req.json())
+
+            try:
+                rs = req.json()
+            except ValueError:
+                req.raise_for_status()
+                return self._check_results()
+
+            return self._check_results(rs)
         finally:
             if req:
                 req.close()

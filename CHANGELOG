@@ -1,3 +1,9 @@
+auton (0.2.4) unstable; urgency=medium
+
+  * Reviewed request with error on auton client.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 31 Oct 2019 16:14:30 +0100
+
 auton (0.2.3) unstable; urgency=medium
 
   * Raise if request error on auton client.
