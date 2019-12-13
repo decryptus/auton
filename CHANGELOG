@@ -1,3 +1,9 @@
+auton (0.2.6) unstable; urgency=medium
+
+  * Removed option need-args.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 13 Dec 2019 16:51:28 +0100
+
 auton (0.2.5) unstable; urgency=medium
 
   * Added options need-args and disallow-envfiles.

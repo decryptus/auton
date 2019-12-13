@@ -234,16 +234,6 @@ endpoints:
         - '-4'
 ```
 
-By default, at least one argument is mandatory, set keyword `need-args` to false, if you want to allow no argument:
-```yaml
-endpoints:
-  curl:
-    plugin: subproc
-    config:
-      prog: curl
-      need-args: false
-```
-
 Use keyword `disallow-args` to disable arguments from client:
 ```yaml
 endpoints:

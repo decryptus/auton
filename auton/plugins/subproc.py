@@ -246,6 +246,8 @@ class AutonSubProcPlugin(AutonPlugBase):
                 pargs = copy.copy(payload['args'])
 
         args    = self._mk_args(args, cfg.get('args'), pargs, ovars)
+        if not args:
+            raise AutonTargetFailed("invalid args for command on target: %r" % self.target.name)
 
         if isinstance(payload, dict) and payload.get('argfiles'):
             if cfg.get('disallow-argfiles'):
@@ -254,9 +256,8 @@ class AutonSubProcPlugin(AutonPlugBase):
                 pargfiles = copy.copy(payload['argfiles'])
 
         args    = self._mk_argfiles(args, cfg.get('argfiles'), pargfiles)
-
-        if not args and cfg.get('need-args', True):
-            raise AutonTargetFailed("missing args for command on target: %r" % self.target.name)
+        if not args:
+            raise AutonTargetFailed("invalid argfiles for command on target: %r" % self.target.name)
 
         if isinstance(payload, dict) and payload.get('envfiles'):
             if cfg.get('disallow-envfiles'):
