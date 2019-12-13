@@ -234,6 +234,16 @@ endpoints:
         - '-4'
 ```
 
+By default, at least one argument is mandatory, set keyword `need-args` to false, if you want to allow no argument:
+```yaml
+endpoints:
+  curl:
+    plugin: subproc
+    config:
+      prog: curl
+      need-args: false
+```
+
 Use keyword `disallow-args` to disable arguments from client:
 ```yaml
 endpoints:
@@ -288,6 +298,19 @@ endpoints:
         HTTPS_PROXY: http://proxy.example.com:3128/
 ```
 
+Use keyword `disallow-env` to disable environment variables from client:
+```yaml
+endpoints:
+  curl:
+    plugin: subproc
+    config:
+      prog: curl
+      env:
+        HTTP_PROXY: http://proxy.example.com:3128/
+        HTTPS_PROXY: http://proxy.example.com:3128/
+      disallow-env: true
+```
+
 Use section `envfiles` to define environment variables files always present:
 ```yaml
 endpoints:
@@ -300,17 +323,17 @@ endpoints:
         - somedir/bar.env
 ```
 
-Use keyword `disallow-env` to disable environment variables from client:
+Use keyword `disallow-envfiles` to disable environment files from client:
 ```yaml
 endpoints:
   curl:
     plugin: subproc
     config:
       prog: curl
-      env:
-        HTTP_PROXY: http://proxy.example.com:3128/
-        HTTPS_PROXY: http://proxy.example.com:3128/
-      disallow-env: true
+      envfiles:
+        - somedir/foo.env
+        - somedir/bar.env
+      disallow-envfiles: true
 ```
 
 ## Auton command-lines

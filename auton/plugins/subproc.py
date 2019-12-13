@@ -79,8 +79,12 @@ class AutonSubProcPlugin(AutonPlugBase):
                 return None
 
             for x in cargs:
-                if isinstance(x, six.string_types) and '%' in x:
-                    x.format(**ovars)
+                if not isinstance(x, six.string_types):
+                    LOG.error("invalid configuration argument %r for target: %r", x, self.target.name)
+                    return None
+
+                if '{' in x and '}' in x:
+                    x = x.format(**ovars)
                 r.append(x)
 
         if pargs:
@@ -89,8 +93,12 @@ class AutonSubProcPlugin(AutonPlugBase):
                 return None
 
             for x in pargs:
-                if isinstance(x, six.string_types) and '%' in x:
-                    x.format(**ovars)
+                if not isinstance(x, six.string_types):
+                    LOG.error("invalid payload argument %r for target: %r", x, self.target.name)
+                    return None
+
+                if '{' in x and '}' in x:
+                    x = x.format(**ovars)
                 r.append(x)
 
         return r
@@ -247,11 +255,11 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         args    = self._mk_argfiles(args, cfg.get('argfiles'), pargfiles)
 
-        if not args:
+        if not args and cfg.get('need-args', True):
             raise AutonTargetFailed("missing args for command on target: %r" % self.target.name)
 
         if isinstance(payload, dict) and payload.get('envfiles'):
-            if cfg.get('disallow-env'):
+            if cfg.get('disallow-envfiles'):
                 LOG.warning("envfile from payload isn't allowed for target: %r", self.target.name)
             else:
                 penvfiles = payload['envfiles']

@@ -1,3 +1,9 @@
+auton (0.2.5) unstable; urgency=medium
+
+  * Added options need-args and disallow-envfiles.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 13 Dec 2019 10:17:18 +0100
+
 auton (0.2.4) unstable; urgency=medium
 
   * Reviewed request with error on auton client.
