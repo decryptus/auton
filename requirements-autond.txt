@@ -1,4 +1,4 @@
-dwho>=0.3.11
+dwho>=0.3.15
 httpdis>=0.6.6
 pycurl
 python-dotenv

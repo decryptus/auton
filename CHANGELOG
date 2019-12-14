@@ -1,3 +1,15 @@
+auton (0.2.8) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sat, 14 Dec 2019 15:09:50 +0100
+
+auton (0.2.7) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Sat, 14 Dec 2019 10:42:32 +0100
+
 auton (0.2.6) unstable; urgency=medium
 
   * Removed option need-args.
