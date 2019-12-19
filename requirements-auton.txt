@@ -1,4 +1,4 @@
 python-dotenv
-sonicprobe>=0.3.16
+sonicprobe>=0.3.19
 requests>=2.0
-six>=1.12.0
+six>=1.13.0
