@@ -176,6 +176,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
     def __init__(self, name):
         threading.Thread.__init__(self)
         DWhoPluginBase.__init__(self)
+
         self.daemon      = True
         self.name        = name
         self.credentials = None

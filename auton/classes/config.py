@@ -23,7 +23,8 @@ from sonicprobe.helpers import load_yaml
 from auton.classes.exceptions import AutonConfigurationError
 from auton.classes.plugins import ENDPOINTS, PLUGINS
 
-_TPL_IMPORTS = ('from os import environ as ENV',)
+_TPL_IMPORTS = ('from os import environ as ENV',
+                'from sonicprobe.helpers import to_yaml as my')
 LOG          = logging.getLogger('auton.config')
 
 
