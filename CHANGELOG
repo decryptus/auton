@@ -1,3 +1,9 @@
+auton (0.2.13) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 04 Dec 2020 12:20:56 +0100
+
 auton (0.2.12) unstable; urgency=medium
 
   * Added my filter for configuration vars.

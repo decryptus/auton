@@ -2,8 +2,8 @@
 author: Adrien Delle Cave
 author_email: pypi@doowan.net
 copyright: '2020 fjord-technologies'
-release: '0.2.12'
-version: '0.2.12'
+release: '0.2.13'
+version: '0.2.13'
 license: License GPL-3
 url: https://github.com/decryptus/auton
 python_requires:

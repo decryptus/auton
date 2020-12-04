@@ -168,7 +168,7 @@ Predefined AUTON environment variables during execution:
 | `AUTON_JOB_UID`    | Current job uid passed from client            |
 | `AUTON_JOB_UUID`   | Unique ID of the current job                  |
 
-Use keyword `proc` to specify program path:
+Use keyword `prog` to specify program path:
 ```yaml
 endpoints:
   curl:
