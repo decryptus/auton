@@ -51,10 +51,29 @@ case "$1" in
             ;;
         esac
 
-        update-rc.d auton defaults
-        if [ -f /etc/auton/auton.yml ];
+        CONFIGURED=0
+
+        if [ -f "/etc/auton/auton.yml" ];
         then
-            invoke-rc.d auton start || true
+            CONFIGURED=1
+        fi
+
+        if [ "$(realpath "$(which init)"|grep '\/systemd$')" != "" ];
+        then
+            systemctl enable auton.service
+
+            if [ ${CONFIGURED} -eq 1 ];
+            then
+                systemctl restart auton.service
+            fi
+        else
+            update-rc.d auton defaults
+            update-rc.d auton enable
+
+            if [ ${CONFIGURED} -eq 1 ];
+            then
+                invoke-rc.d auton restart
+            fi
         fi
     ;;
 

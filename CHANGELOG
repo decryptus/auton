@@ -1,3 +1,33 @@
+auton (0.2.18) unstable; urgency=medium
+
+  * Reviewed requirements.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Fri, 07 Jan 2022 11:33:59 +0100
+
+auton (0.2.17) unstable; urgency=medium
+
+  * Fixed debian postinst.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 30 Jun 2021 18:11:01 +0200
+
+auton (0.2.16) unstable; urgency=medium
+
+  * Fixed debian pidfile.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 30 Jun 2021 12:27:06 +0200
+
+auton (0.2.15) unstable; urgency=medium
+
+  * Fixed debian postinst.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 30 Jun 2021 12:12:35 +0200
+
+auton (0.2.14) unstable; urgency=medium
+
+  * Reviewed debian packaging to add systemctl service.
+
+ -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Wed, 30 Jun 2021 11:07:26 +0200
+
 auton (0.2.13) unstable; urgency=medium
 
   * Reviewed requirements.

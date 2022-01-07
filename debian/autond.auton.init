@@ -17,7 +17,7 @@ DAEMON=/usr/bin/$DAEMONNAME
 PIDFILE=/run/auton/$DAEMONNAME.pid
 IOSCHED=idle
 NICE=0
-EXTRA_OPTS=""
+ARGS=""
 
 [ -r /etc/default/auton ] && . /etc/default/auton
 
@@ -32,7 +32,7 @@ case "$1" in
     log_daemon_msg "Starting auton" "$DAEMONNAME"
     if start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE \
            --iosched $IOSCHED --nicelevel $NICE \
-           --exec $DAEMON -- -p $PIDFILE $EXTRA_OPTS 2>/dev/null;
+           --exec $DAEMON -- -p $PIDFILE $ARGS 2>/dev/null;
     then
         log_end_msg 0
     else

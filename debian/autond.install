@@ -1,5 +1,6 @@
 bin/autond  usr/bin
 etc/* etc/
+envfile usr/share/autond
 requirements-autond.txt usr/share/autond
 setup.py usr/share/autond
 VERSION usr/share/autond

@@ -1,6 +1,13 @@
 # defaults file for auton
-EXTRA_OPTS="-l info"
 
 # Service can be enabled by setting
 # AUTON_ENABLE="yes"
 AUTON_ENABLE="yes"
+ARGS="-l info"
+
+if [ -f /usr/share/autond/envfile ];
+then
+    set -a
+    . /usr/share/autond/envfile
+    set +a
+fi
