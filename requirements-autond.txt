@@ -1,8 +1,8 @@
-dwho>=0.3.54
-httpdis>=0.6.20
+dwho>=0.3.56
+httpdis>=0.6.22
 pycurl
 python-dotenv
 PyYAML>=3.10
-sonicprobe>=0.3.43
+sonicprobe>=0.3.45
 requests>=2.0
 six>=1.13.0

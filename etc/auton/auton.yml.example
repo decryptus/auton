@@ -9,6 +9,8 @@ general:
   content_type:  'application/json; charset=utf-8'
   #auth_basic:      'Restricted'
   #auth_basic_file: '/etc/auton/auton.passwd'
+import_modules:
+  - modules/job.yml
 endpoints:
   si.corp-ansible:
     plugin: subproc
@@ -25,17 +27,3 @@ endpoints:
     config:
       prog: curl
       timeout: 3600
-modules:
-  job:
-    routes:
-      run:
-        handler:   'job_run'
-        regexp:    '^run/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
-        safe_init: true
-        auth:      false
-        op:        'POST'
-      status:
-        handler:   'job_status'
-        regexp:    '^status/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
-        auth:      false
-        op:        'GET'

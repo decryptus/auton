@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (C) 2018-2019 fjord-technologies
+# Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
 """auton.classes.config"""
 
@@ -13,7 +13,7 @@ try:
 except ImportError:
     from six import StringIO
 
-from dwho.config import parse_conf, stop, DWHO_THREADS
+from dwho.config import import_conf_files, init_modules, parse_conf, stop, DWHO_THREADS
 from dwho.classes.libloader import DwhoLibLoader
 from dwho.classes.modules import MODULES
 from httpdis.httpdis import get_default_options
@@ -56,9 +56,9 @@ def load_conf(xfile, options = None, envvar = None):
         c.close()
         conf['_config_directory'] = None
 
-    for name, module in six.iteritems(MODULES):
-        LOG.info("module init: %r", name)
-        module.init(conf)
+    conf = import_conf_files('modules', conf)
+
+    init_modules(conf)
 
     for x in ('module', 'plugin'):
         path = conf['general'].get('%ss_path' % x)

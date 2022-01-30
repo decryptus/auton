@@ -21,6 +21,7 @@ RUN apk -Uuv add bash \
 RUN pip install autond
 
 ADD docker-run.sh /run.sh
+ADD etc/auton/modules /etc/auton/modules
 
 EXPOSE 8666/tcp
 
