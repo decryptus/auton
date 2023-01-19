@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """auton"""
 
-__version__ = '0.2.19'
+__version__ = '0.2.22'
 
 import argparse
 import os
@@ -112,6 +112,12 @@ def argv_parse_check():
                         type      = six.ensure_text,
                         default   = [],
                         help      = "Passed envfile parameters")
+    parser.add_argument("--imp-env",
+                        action    = 'append',
+                        dest      = 'imp_envvars',
+                        type      = six.ensure_text,
+                        default   = [],
+                        help      = "Import existing environment variables")
     parser.add_argument("--load-envfile",
                         action    = 'append',
                         dest      = 'load_envfiles',
@@ -168,6 +174,7 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
 
         self._parse_multi_args()
         self._parse_multi_argsfiles()
+        self._import_envvars()
         self._load_envfiles()
         self._parse_envvars()
         self._parse_argfiles()
@@ -199,6 +206,13 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
            and data.get('errors'):
             for x in data['errors']:
                 sys.stderr.write(x)
+
+    def _import_envvars(self):
+        for envvar in self.options.imp_envvars:
+            if envvar in os.environ:
+                self.envvars[envvar] = os.environ[envvar]
+            else:
+                LOG.debug("unable to find environment variable: %r", envvar)
 
     def _load_envfiles(self):
         for envfile in self.options.load_envfiles:
@@ -250,7 +264,8 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
 
         return urisup.uri_help_unsplit(r)
 
-    def _build_headers(self, headers = None):
+    @staticmethod
+    def _build_headers(headers = None):
         if not headers:
             headers = {}
 

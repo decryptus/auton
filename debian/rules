@@ -9,12 +9,25 @@ export DH_OPTIONS=-v
 export PYBUILD_VERBOSE=1
 
 export PYBUILD_NAME=auton
+export PYBUILD_NAME_python-auton=python-auton
 export PYBUILD_AFTER_INSTALL=rm -rf '{destdir}/usr/bin' '{destdir}/{install_dir}/auton-'*.egg-info
 
+DISTRIB_VERSION=$(shell lsb_release -s -r | sed -nre 's/^[^0-9]*([0-9]+).*/\1/p')
+
+ifeq ($(shell test $(DISTRIB_VERSION) -lt 11; echo $$?),0)
+	DH_WITH_PYTHON=python2
+	export PYBUILD_DISABLE_python3=1
+else
+	DH_WITH_PYTHON=python3
+	export PYBUILD_DISABLE_python2=1
+endif
+
+
 %:
-	dh $@ --with python2 --buildsystem=pybuild
+	dh $@ --with $(DH_WITH_PYTHON) --buildsystem=pybuild
 
 override_dh_auto_install:
+	$(shell echo "python-auton:Depends=python-auton (= $(DEB_VERSION_UPSTREAM)) | python3-auton (= $(DEB_VERSION_UPSTREAM))" > $(CURDIR)/debian/autond.substvars)
 	dh_auto_install
 	$(shell echo "$(DEB_VERSION_UPSTREAM)" > $(CURDIR)/VERSION)
 

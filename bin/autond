@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """autond"""
 
-__version__ = '0.2.19'
+__version__ = '0.2.22'
 
 import argparse
 import logging
