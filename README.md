@@ -342,6 +342,10 @@ Add environment variable HTTP\_PROXY:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' -e 'HTTP_PROXY=http://proxy.example.com:3128/'`
 
+Import already declared environment variable with argument --imp-env:
+
+`HTTPS_PROXY=http://proxy.example.com:3128/ auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' --imp-env HTTPS_PROXY`
+
 Load environment variables from local files:
 
 `auton --endpoint curl --uri http://localhost:8666 -a 'https://example.com' --load-envfile foo.env`
