@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 import os
+from email.parser import Parser
 import yaml
 from setuptools import find_packages, setup
 
@@ -29,6 +30,12 @@ if os.path.isfile(readme_file):
     long_desc_content_type = 'text/markdown'
 
 package = os.environ.get('AUTON_PACKAGE')
+# A published source distribution must retain its identity without requiring
+# users to set AUTON_PACKAGE when installing it with pip.
+package_info = os.path.join(current_dir, 'PKG-INFO')
+if package is None and os.path.isfile(package_info):
+    with open(package_info) as stream:
+        package = Parser().parsestr(stream.read())['Name']
 if package not in (None, 'auton', 'autond'):
     raise ValueError('AUTON_PACKAGE must be auton or autond')
 

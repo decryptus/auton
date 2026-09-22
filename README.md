@@ -455,3 +455,7 @@ To retry a failed upload or publish an existing release such as `v0.3.0`, select
 **Actions → Docker Hub → Run workflow**, use branch `master`, and enter the tag.
 The workflow builds the tagged commit, verifies it belongs to master's history,
 and tests it before uploading. Published tags are versioned; `latest` is not changed.
+
+## Publishing to PyPI
+
+See [PyPI publishing](docs/pypi.md) for Trusted Publisher setup and automated releases.
