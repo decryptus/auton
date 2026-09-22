@@ -1,3 +1,15 @@
+auton (0.3.0) unstable; urgency=medium
+
+  * Require Python 3.10-3.12; remove Python 2 support.
+  * Confine uploaded filenames and keep client arguments literal.
+  * Fix multi-server failover, HTTP timeouts and process-group cleanup.
+  * Retain bounded job results with replayable output offsets and ownership checks.
+  * Fix request-local authentication and Python 3 compatibility.
+  * Modernize Docker and isolate client/server package builds.
+  * Add regression tests and Python/Docker CI.
+
+ -- Adrien DELLE CAVE <pypi@doowan.net>  Tue, 22 Sep 2026 00:00:00 +0000
+
 auton (0.2.23) unstable; urgency=medium
 
   * [RELEASE] version: 0.2.23.
