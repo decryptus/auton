@@ -20,9 +20,76 @@ or tests programs execution.
 
 Using autond in Docker
 
-`docker-compose up -d`
+`docker compose up --build -d`
 
 See [docker-compose.yml](docker-compose.yml)
+
+## Runtime and reliability notes
+
+This branch targets Linux/Unix with Python **3.10–3.12**. Python 2 support is
+removed. Python 3.13+ is not supported yet because the HTTP dependency uses
+`crypt`. Python 3.12 installs the `pyasyncore` compatibility dependency.
+
+The Docker image now installs **this checkout**, runs as the `auton` user, and
+Compose publishes port 8666 on **127.0.0.1 only**. The demo still has no
+authentication; enable Basic authentication on both routes, configure endpoint
+users and use HTTPS before exposing it remotely. Basic authentication supports
+the documented `{SHA}` htpasswd format and formats available through system
+`crypt`. The handler keeps each authenticated identity local to its request.
+
+### Execution and failover
+
+* The first successful server accepts the job; the client stops trying other
+  servers. Automatic failover is limited to failures to establish a connection.
+  A read timeout or disconnect after sending a request is ambiguous and **does
+  not cause another POST**. Use `--mode status --uid <original-id>` to inspect it.
+  There is no shared state or cross-server exactly-once guarantee.
+* `--http-timeout 30` bounds each HTTP connection/read wait. It is distinct from
+  the endpoint's execution `timeout` and is not a total job deadline.
+* On execution timeout, the process group is terminated and reaped; the client
+  receives exit code 124. Shutdown interrupts the active command with code 130.
+  Jobs must remain in their process group; this is not a container sandbox.
+* stdout/stderr are decoded as UTF-8, replacing invalid sequences. Partial lines
+  are available without waiting for a newline. The initial response is displayed.
+* Client arguments are literal, including braces and JSON. Only administrator
+  configured arguments support variable interpolation. Uploaded names must be
+  plain basenames; absolute paths and traversal are rejected.
+
+### Results and resource limits
+
+New clients send `X-Auton-Output-Offset` on status requests and consume the
+`next_offset` from responses. Offsets count output chunks, not bytes. Repeating
+an offset returns the same prefix plus any output subsequently produced, without
+consuming another reader's output. Legacy clients retain their shared cursor.
+A completed job is no longer deleted on the first status request.
+
+Limits in `general`:
+
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| `result_ttl` | 3600 seconds | Completed results expire; cleanup occurs on subsequent run/status requests. |
+| `max_jobs` | 128 | Caps queued, running and retained jobs together. Oldest completed results are evicted first; if all jobs are active, new submissions receive 503. |
+| `max_output_bytes` | 1048576 | Combined UTF-8 stdout/stderr budget per job. Exceeding it stops the command with exit code 1. A short diagnostic is retained in addition. |
+
+Results are in memory and are lost on restart. IDs are reserved only while their
+job is retained; use a fresh UUID for each operation. Once evicted or expired,
+results cannot be replayed and IDs no longer protect against repeat execution.
+Status access is restricted to the submitting authenticated user and the current
+endpoint permissions. Unauthenticated demo jobs have no individual user identity.
+
+### Development
+
+```sh
+python -m pip install -r requirements-autond.txt
+python -m unittest discover -s tests -v
+AUTON_PACKAGE=autond python -m pip wheel --no-deps . -w dist/server
+AUTON_PACKAGE=auton python -m pip wheel --no-deps . -w dist/client
+```
+
+The test suite includes real subprocesses and an HTTP client/server integration
+with authentication. CI runs Python 3.10, 3.11 and 3.12 and builds the Docker image.
+Docker builds track the checkout's code; dependencies and the base image are not
+fully locked, so builds are not yet bit-for-bit reproducible.
 
 ## Installation
 

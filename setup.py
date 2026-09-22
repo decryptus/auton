@@ -28,7 +28,11 @@ if os.path.isfile(readme_file):
     long_desc = open(readme_file, 'r').read()
     long_desc_content_type = 'text/markdown'
 
-if requirements_auton:
+package = os.environ.get('AUTON_PACKAGE')
+if package not in (None, 'auton', 'autond'):
+    raise ValueError('AUTON_PACKAGE must be auton or autond')
+
+if requirements_auton and package in (None, 'auton'):
     setup(
         name                          = setup_cfg['auton']['name'],
         version                       = setup_cfg['version'],
@@ -38,6 +42,8 @@ if requirements_auton:
         license                       = setup_cfg['license'],
         url                           = setup_cfg['url'],
         scripts                       = ['bin/auton'],
+        packages                      = [],
+        options                       = {'build': {'build_base': 'build/auton'}},
         install_requires              = requirements_auton,
         python_requires               = ', '.join(setup_cfg['python_requires']),
         classifiers                   = setup_cfg['common']['classifiers'] + setup_cfg['auton'].get('classifiers', []),
@@ -45,7 +51,7 @@ if requirements_auton:
         long_description_content_type = long_desc_content_type
     )
 
-if requirements_autond:
+if requirements_autond and package in (None, 'autond'):
     setup(
         name                          = setup_cfg['autond']['name'],
         version                       = setup_cfg['version'],
@@ -55,6 +61,7 @@ if requirements_autond:
         license                       = setup_cfg['license'],
         url                           = setup_cfg['url'],
         scripts                       = ['bin/autond'],
+        options                       = {'build': {'build_base': 'build/autond'}},
         packages                      = find_packages(),
         install_requires              = requirements_autond,
         python_requires               = ', '.join(setup_cfg['python_requires']),

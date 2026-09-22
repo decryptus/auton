@@ -5,7 +5,9 @@
 
 import copy
 import logging
+import math
 import re
+import time
 
 from dwho.classes.modules import DWhoModuleBase, MODULES
 from httpdis.ext.httpdis_json import HttpReqErrJson
@@ -15,6 +17,7 @@ from sonicprobe.libs.moresynchro import RWLock
 # pylint: disable=unused-import
 from auton.classes.plugins import (AutonEPTObject,
                                    EPTS_SYNC,
+                                   ENDPOINTS,
                                    STATUS_NEW,
                                    STATUS_PROCESSING,
                                    STATUS_COMPLETE)
@@ -32,6 +35,48 @@ class JobModule(DWhoModuleBase):
     def safe_init(self, options):
         self.objs         = {}
         self.lock_timeout = self.config['general']['lock_timeout']
+        self.result_ttl = float(self.config['general'].get('result_ttl', 3600))
+        self.max_jobs = int(self.config['general'].get('max_jobs', 128))
+        self.max_output_bytes = int(self.config['general'].get('max_output_bytes', 1048576))
+        if (not math.isfinite(self.result_ttl) or self.result_ttl <= 0
+                or self.max_jobs <= 0 or self.max_output_bytes <= 0):
+            raise ValueError('job limits must be positive')
+
+    def _expire_results(self):
+        cutoff = time.time() - self.result_ttl
+        for uid, obj in list(self.objs.items()):
+            if obj.get_status() == STATUS_COMPLETE and obj.get_ended_at() <= cutoff:
+                del self.objs[uid]
+
+    def _make_capacity(self):
+        if len(self.objs) < self.max_jobs:
+            return
+        completed = [(obj.get_ended_at(), uid) for uid, obj in self.objs.items()
+                     if obj.get_status() == STATUS_COMPLETE]
+        if not completed:
+            raise HttpReqErrJson(503, 'job capacity reached; retry later')
+        del self.objs[min(completed)[1]]
+
+    @staticmethod
+    def _authorize(endpoint, request, obj=None):
+        plugin = ENDPOINTS.get(endpoint)
+        if plugin is None:
+            raise HttpReqErrJson(404, 'unknown endpoint')
+        user = request.get_server_vars().get('HTTP_AUTH_USER')
+        if plugin.users and not plugin.users.get(user):
+            raise HttpReqErrJson(403, 'endpoint access denied')
+        if obj is not None and obj.owner != user:
+            raise HttpReqErrJson(403, 'job access denied')
+
+    @staticmethod
+    def _output_offset(request):
+        headers = {key.lower(): value for key, value in request.get_headers().items()}
+        value = headers.get('x-auton-output-offset')
+        if value is None:
+            return None  # Compatibility with clients using the legacy cursor.
+        if not re.match(r'^[0-9]{1,12}$', value):
+            raise HttpReqErrJson(400, 'invalid output offset')
+        return int(value)
 
     @staticmethod
     def _get_ept_sync(endpoint):
@@ -71,23 +116,30 @@ class JobModule(DWhoModuleBase):
                                   method,
                                   request)
         self.objs[uid] = obj
+        obj.max_output_bytes = self.max_output_bytes
         ept_sync.qput(obj)
 
         return obj
 
     @staticmethod
-    def _build_result(obj):
+    def _build_result(obj, offset=None):
+        with obj.output_lock:
+            return JobModule._build_result_locked(obj, offset)
+
+    @staticmethod
+    def _build_result_locked(obj, offset=None):
         r = {'code':        200,
              'uid':         obj.get_uid(),
              'status':      obj.get_status(),
              'return_code': obj.get_return_code(),
              'started_at':  obj.get_started_at(),
-             'stream':      obj.get_last_result(),
+             'stream':      obj.get_last_result(offset),
+             'next_offset': len(obj.result),
              'ended_at':    obj.get_ended_at()}
 
         if obj.has_error():
             r['code']   = 400
-            r['errors'] = obj.get_errors()
+            r['errors'] = list(obj.get_errors())
 
         return r
 
@@ -123,16 +175,23 @@ class JobModule(DWhoModuleBase):
         if not xys.validate(payload, self.RUN_PSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command")
 
+        offset = self._output_offset(request)
         if not self.LOCK.acquire_write(self.lock_timeout):
             raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
 
         try:
+            self._authorize(params['endpoint'], request)
+            self._expire_results()
+            # Reject duplicate IDs before capacity eviction could discard them.
+            if self._get_uid(params['endpoint'], params['id']) in self.objs:
+                raise HttpReqErrJson(415, 'uid already exists')
+            self._make_capacity()
             obj = self._push_epts_sync(params['endpoint'],
                                        params['id'],
                                        'run',
                                        copy.copy(request))
 
-            return self._build_result(obj)
+            return self._build_result(obj, offset)
         except HttpReqErrJson:
             raise
         except Exception as e:
@@ -156,21 +215,21 @@ class JobModule(DWhoModuleBase):
         if not xys.validate(params, self.STATUS_QSCHEMA):
             raise HttpReqErrJson(415, "invalid arguments for command")
 
-        obj = self._get_obj(params['endpoint'], params['id'])
-
-        if not self.LOCK.acquire_read(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for reading after %s seconds" % self.lock_timeout)
+        offset = self._output_offset(request)
+        if not self.LOCK.acquire_write(self.lock_timeout):
+            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
 
         try:
-            return self._build_result(obj)
+            self._expire_results()
+            obj = self._get_obj(params['endpoint'], params['id'])
+            self._authorize(params['endpoint'], request, obj)
+            return self._build_result(obj, offset)
         except HttpReqErrJson:
             raise
         except Exception as e:
             LOG.exception(e)
             raise HttpReqErrJson(503, repr(e))
         finally:
-            if obj.get_status() == STATUS_COMPLETE:
-                self._clear_obj(params['endpoint'], params['id'])
             self.LOCK.release()
 
 

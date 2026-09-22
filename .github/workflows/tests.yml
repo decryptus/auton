@@ -1,0 +1,28 @@
+name: Tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: sudo apt-get update && sudo apt-get install -y libmagic1 libcurl4-openssl-dev libssl-dev
+      - run: python -m pip install -r requirements-autond.txt
+      - run: python -m unittest discover -s tests -v
+      - run: AUTON_PACKAGE=autond python -m pip wheel --no-deps . -w dist/server
+      - run: AUTON_PACKAGE=auton python -m pip wheel --no-deps . -w dist/client
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t auton:test .
+      - run: docker run --rm --entrypoint autond auton:test -d

@@ -5,12 +5,16 @@
 
 import copy
 import logging
+import math
 import os
+import signal
+import selectors
+import codecs
 import shutil
 import subprocess
-import threading
 import time
 import tempfile
+import threading
 
 import six
 try:
@@ -39,36 +43,40 @@ class AutonSubProcPlugin(AutonPlugBase):
 
     def at_stop(self):
         self._killed = True
+        if self.is_alive() and threading.current_thread() is not self:
+            self.join(timeout=3)
 
-    def _proc_stdout(self, obj, proc, texit):
-        stopped = False
-        while not self._killed and not stopped:
-            try:
-                for x in iter(proc.stdout.readline, b''):
-                    if x != '':
-                        obj.add_result(x)
-            except Exception as e:
-                obj.add_error(repr(e))
-                LOG.exception(e)
-                break
-            finally:
-                if texit.is_set():
-                    stopped = True
+    @staticmethod
+    def _signal_process_group(proc, sig):
+        try:
+            os.killpg(proc.pid, sig)
+        except ProcessLookupError:
+            pass
 
-    def _proc_stderr(self, obj, proc, texit):
-        stopped = False
-        while not self._killed and not stopped:
-            try:
-                for x in iter(proc.stderr.readline, b''):
-                    if x != '':
-                        obj.add_error(x)
-            except Exception as e:
-                obj.add_error(repr(e))
-                LOG.exception(e)
-                break
-            finally:
-                if texit.is_set():
-                    stopped = True
+    def _collect(self, obj, proc, timeout):
+        """Drain both pipes, including partial lines, within a monotonic deadline."""
+        deadline = time.monotonic() + timeout
+        with selectors.DefaultSelector() as selector:
+            for pipe, callback in ((proc.stdout, obj.add_result),
+                                   (proc.stderr, obj.add_error)):
+                os.set_blocking(pipe.fileno(), False)
+                decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
+                selector.register(pipe, selectors.EVENT_READ, (callback, decoder))
+            while selector.get_map() or proc.poll() is None:
+                if self._killed:
+                    raise AutonTargetFailed('daemon stopping', code=130)
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise AutonTargetTimeout("timeout on target: %r" % self.target.name,
+                                            code=124)
+                for key, _ in selector.select(min(remaining, 0.1)):
+                    data = os.read(key.fd, 65536)
+                    callback, decoder = key.data
+                    value = decoder.decode(data, final=not data)
+                    if value:
+                        callback(value)
+                    if not data:
+                        selector.unregister(key.fileobj)
 
     def _mk_args(self, args, cargs, pargs, ovars):
         r = copy.copy(args)
@@ -97,8 +105,6 @@ class AutonSubProcPlugin(AutonPlugBase):
                     LOG.error("invalid payload argument %r for target: %r", x, self.target.name)
                     return None
 
-                if '{' in x and '}' in x:
-                    x = x.format(**ovars)
                 r.append(x)
 
         return r
@@ -147,6 +153,11 @@ class AutonSubProcPlugin(AutonPlugBase):
             self._dirs_to_delete.append(tmpdir)
 
             for pargfile in pargfiles:
+                filename = pargfile['filename']
+                if (not isinstance(filename, six.string_types)
+                        or filename in ('.', '..')
+                        or '/' in filename or '\\' in filename or '\x00' in filename):
+                    raise AutonTargetFailed('invalid upload filename', code=1)
                 if pargfile['filename'] == '':
                     with tempfile.NamedTemporaryFile(dir = tmpdir, delete = False) as tmpfile:
                         tmpfile.close()
@@ -226,6 +237,10 @@ class AutonSubProcPlugin(AutonPlugBase):
     def safe_init(self):
         AutonPlugBase.safe_init(self)
 
+        timeout = self.target.config['timeout']
+        if not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+            raise AutonConfigurationError('timeout must be a finite positive number')
+
         if not self.target.config.get('prog'):
             raise AutonConfigurationError("missing prog keyword for target: %r" % self.target.name)
 
@@ -285,7 +300,6 @@ class AutonSubProcPlugin(AutonPlugBase):
 
         bargs   = self._get_become(cfg.get('become'))
 
-        texit   = threading.Event()
         proc    = None
 
         LOG.debug("cmd line: %r", bargs + args)
@@ -295,26 +309,10 @@ class AutonSubProcPlugin(AutonPlugBase):
                                      stdout = subprocess.PIPE,
                                      stderr = subprocess.PIPE,
                                      env    = env,
-                                     cwd    = cfg.get('workdir'))
+                                     cwd    = cfg.get('workdir'),
+                                     start_new_session = True)
 
-            to    = threading.Thread(target=self._proc_stdout,
-                                     args=(obj, proc, texit))
-            to.daemon = True
-            to.start()
-
-            te    = threading.Thread(target=self._proc_stderr,
-                                     args=(obj, proc, texit))
-            te.daemon = True
-            te.start()
-
-            start = time.time()
-
-            while True:
-                if proc.poll() is not None:
-                    break
-
-                if start + cfg['timeout'] <= time.time():
-                    raise AutonTargetTimeout("timeout on target: %r" % self.target.name)
+            self._collect(obj, proc, cfg['timeout'])
 
             if proc.returncode:
                 raise subprocess.CalledProcessError(proc.returncode, args[0])
@@ -327,13 +325,19 @@ class AutonSubProcPlugin(AutonPlugBase):
             raise AutonTargetFailed("error on target: %r. exception: %r"
                                     % (self.target.name, e))
         finally:
-            texit.set()
-
-        try:
-            if proc and proc.returncode is None:
-                proc.terminate()
-        except OSError:
-            pass
+            if proc is not None:
+                # Kill the session's remaining children too, even if the leader exited.
+                try:
+                    self._signal_process_group(proc, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        pass
+                finally:
+                    self._signal_process_group(proc, signal.SIGKILL)
+                    proc.wait()
+                    proc.stdout.close()
+                    proc.stderr.close()
 
     def do_terminate(self):
         while self._dirs_to_delete:
