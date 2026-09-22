@@ -1,3 +1,8 @@
+auton (0.3.1) unstable; urgency=medium
+
+  * Publish validated Python distributions to PyPI with Trusted Publishing.
+  * Include build requirements and metadata for source distribution installs.
+
 auton (0.3.0) unstable; urgency=medium
 
   * Require Python 3.10-3.12; remove Python 2 support.
