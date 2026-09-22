@@ -1,28 +1,23 @@
-FROM alpine:3.5
+FROM python:3.12-slim-bookworm
 
 LABEL maintainer="docker@doowan.net"
 
-RUN apk -Uuv add bash \
-                 curl \
-                 curl-dev \
-                 gcc \
-                 libffi-dev \
-                 libmagic \
-                 linux-headers \
-                 libressl-dev \
-                 musl-dev \
-                 python \
-                 python-dev \
-                 py-curl \
-                 py-openssl \
-                 py-pip && \
-    find /var/cache/apk/ -type f -delete
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        bash curl libmagic1 libcurl4 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system auton \
+    && useradd --system --gid auton --home-dir /etc/auton auton \
+    && mkdir -p /run/auton /var/log/autond /etc/auton \
+    && chown -R auton:auton /run/auton /var/log/autond /etc/auton
 
-RUN pip install autond
+WORKDIR /opt/auton
+COPY . .
+RUN AUTON_PACKAGE=autond pip install --no-cache-dir .
+COPY docker-run.sh /run.sh
+COPY etc/auton/modules /etc/auton/modules
+COPY etc/auton/auton.yml.example /etc/auton/auton.yml
+RUN chmod +x /run.sh
 
-ADD docker-run.sh /run.sh
-ADD etc/auton/modules /etc/auton/modules
-
+USER auton
 EXPOSE 8666/tcp
-
 CMD ["/run.sh"]

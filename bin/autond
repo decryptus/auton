@@ -19,6 +19,7 @@ from httpdis.ext import httpdis_json
 from sonicprobe.libs import daemonize
 
 from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
+from auton.classes.http import AutonHttpReqHandler
 from auton.modules import * # XXX
 from auton.plugins import * # XXX
 
@@ -124,6 +125,8 @@ def main(options):
     setattr(options, 'sys_version', '')
 
     httpdis_json.init(options, False)
+    AutonHttpReqHandler.configure_auth(getattr(options, 'auth_basic_file', None),
+                                      getattr(options, 'auth_basic', None))
     DWHO_THREADS.append(httpdis_json.stop)
 
     if not options.foreground:
@@ -142,7 +145,7 @@ def main(options):
         os.umask(0o22)
 
         start_endpoints()
-        httpdis_json.run(options)
+        httpdis_json.run(options, http_req_handler=AutonHttpReqHandler)
     except (KeyboardInterrupt, SystemExit):
         pass
     except Exception:

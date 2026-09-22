@@ -4,8 +4,10 @@
 """auton.classes.config"""
 
 import logging
+import importlib.util
 import os
 import signal
+import sys
 
 import six
 try:
@@ -14,7 +16,6 @@ except ImportError:
     from six import StringIO
 
 from dwho.config import import_conf_files, init_modules, parse_conf, stop, DWHO_THREADS
-from dwho.classes.libloader import DwhoLibLoader
 from dwho.classes.modules import MODULES
 from httpdis.httpdis import get_default_options
 from mako.template import Template
@@ -26,6 +27,24 @@ from auton.classes.plugins import ENDPOINTS, PLUGINS
 _TPL_IMPORTS = ('from os import environ as ENV',
                 'from sonicprobe.helpers import to_yaml as my')
 LOG          = logging.getLogger('auton.config')
+
+
+def load_extensions(kind, path):
+    """Load configured extensions without the removed Python imp module."""
+    for filename in sorted(os.listdir(path)):
+        if filename.startswith('.') or filename == '__init__.py' or not filename.endswith('.py'):
+            continue
+        name = '%s.%s' % (kind, filename[:-3])
+        if name in sys.modules:
+            continue
+        spec = importlib.util.spec_from_file_location(name, os.path.join(path, filename))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        try:
+            spec.loader.exec_module(module)
+        except Exception:
+            del sys.modules[name]
+            raise
 
 
 def import_file(filepath, config_dir = None, xvars = None):
@@ -63,7 +82,7 @@ def load_conf(xfile, options = None, envvar = None):
     for x in ('module', 'plugin'):
         path = conf['general'].get('%ss_path' % x)
         if path and os.path.isdir(path):
-            DwhoLibLoader.load_dir(x, path)
+            load_extensions(x, path)
 
     if not conf.get('endpoints'):
         raise AutonConfigurationError("Missing 'endpoints' section in configuration")

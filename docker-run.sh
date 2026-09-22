@@ -12,4 +12,4 @@ then
     echo -e "${AUTOND_CONFIG}" > "${AUTOND_CONFFILE}"
 fi
 
-exec autond -f ${AUTOND_EXTRA_OPTS}
+exec autond -f -c "${AUTOND_CONFFILE}" ${AUTOND_EXTRA_OPTS}

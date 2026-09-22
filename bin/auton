@@ -14,6 +14,8 @@ import time
 import uuid
 
 import logging
+import math
+import json
 from logging.handlers import WatchedFileHandler
 
 from dotenv.main import dotenv_values
@@ -22,6 +24,7 @@ from sonicprobe.libs import urisup
 
 import requests
 from requests import exceptions
+from urllib3.exceptions import NewConnectionError
 
 import six
 
@@ -95,6 +98,8 @@ def argv_parse_check():
                         type      = float,
                         default   = DEFAULT_DELAY,
                         help      = "Delay between requests instead of %(default)s")
+    parser.add_argument('--http-timeout', type=float, default=30,
+                        help='HTTP connect/read timeout in seconds (default: 30)')
     parser.add_argument("--mode",
                         dest      = 'mode',
                         default   = 'autorun',
@@ -149,6 +154,9 @@ def argv_parse_check():
 
     options, args = parser.parse_known_args() # pylint: disable=unused-variable
     options.loglevel = getattr(logging, options.loglevel.upper(), logging.INFO)
+    if (not math.isfinite(options.http_timeout) or options.http_timeout <= 0
+            or not math.isfinite(options.delay) or options.delay < 0):
+        parser.error('http-timeout must be positive and delay non-negative')
 
     if not options.uri and os.environ.get('AUTON_URI'):
         options.uri = [x.strip() for x in os.environ.get('AUTON_URI').split(',')]
@@ -162,6 +170,7 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
         self.envvars  = {}
         self.argfiles = []
         self.uri      = None
+        self.output_offset = 0
 
         if not self.options.uri:
             raise ValueError("missing variable AUTON_URI")
@@ -273,9 +282,27 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
 
         return headers
 
+    @staticmethod
+    def _safe_to_retry(error):
+        # A disconnect after sending a POST may hide an accepted job. Only
+        # fail over when no connection was established, never on a read timeout.
+        pending, seen = [error], set()
+        while pending:
+            exc = pending.pop()
+            if id(exc) in seen:
+                continue
+            seen.add(id(exc))
+            if isinstance(exc, (exceptions.ConnectTimeout, NewConnectionError)):
+                return True
+            pending.extend(x for x in getattr(exc, 'args', ()) if isinstance(x, Exception))
+            pending.extend(x for x in (getattr(exc, 'reason', None),
+                                       getattr(exc, '__cause__', None)) if isinstance(x, Exception))
+        return False
+
     def do_run(self):
         req      = None
         self.uri = None
+        self.output_offset = 0
 
         try:
             for uri in self.options.uri:
@@ -283,13 +310,20 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
                     req  = requests.post(self._build_uri(uri, 'run'),
                                          auth = self._auth,
                                          headers = self._build_headers(),
+                                         timeout = self.options.http_timeout,
+                                         allow_redirects = False,
                                          json = {'args':     self.options.args,
                                                  'argfiles': self.argfiles,
                                                  'env':      self.envvars,
                                                  'envfiles': self.options.envfiles})
                     self.uri = uri
-                except exceptions.ConnectionError:
-                    continue
+                    if not 200 <= req.status_code < 300:
+                        raise exceptions.HTTPError('run request rejected: HTTP %s' % req.status_code,
+                                                   response=req)
+                    break
+                except exceptions.ConnectionError as error:
+                    if not self._safe_to_retry(error):
+                        raise
 
             if not self.uri:
                 raise exceptions.ConnectionError("unable to connect autond")
@@ -305,7 +339,7 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
 
             return self._check_results(rs)
         finally:
-            if req:
+            if req is not None:
                 req.close()
 
     def do_status(self):
@@ -317,8 +351,15 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
                     try:
                         req = requests.get(self._build_uri(uri, 'status'),
                                            auth = self._auth,
-                                           headers = self._build_headers())
+                                           headers = self._build_headers({'X-Auton-Output-Offset': str(self.output_offset)}),
+                                           timeout = self.options.http_timeout,
+                                           allow_redirects = False)
+                        if req.status_code == 404:
+                            req.close()
+                            continue
+                        req.raise_for_status()
                         self.uri = uri
+                        break
                     except exceptions.ConnectionError:
                         continue
 
@@ -327,7 +368,10 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
             else:
                 req = requests.get(self._build_uri(self.uri, 'status'),
                                    auth = self._auth,
-                                   headers = self._build_headers())
+                                   headers = self._build_headers({'X-Auton-Output-Offset': str(self.output_offset)}),
+                                   timeout = self.options.http_timeout,
+                                   allow_redirects = False)
+                req.raise_for_status()
 
             if not req.text:
                 return self._check_results()
@@ -340,15 +384,18 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
 
             return self._check_results(rs)
         finally:
-            if req:
+            if req is not None:
                 req.close()
 
     def do_autorun(self):
         data = self.do_run()
-        while data['status'] != 'complete':
+        while True:
+            self._show_results(data)
+            self.output_offset = data.get('next_offset', self.output_offset)
+            if data['status'] == 'complete':
+                break
             time.sleep(self.options.delay)
             data = self.do_status()
-            self._show_results(data)
 
         if self.options.no_return_code or data['return_code'] is None:
             return int(data['code'] != 200)
@@ -380,6 +427,9 @@ def main(options):
     try:
         auton = AutonClient(options)
         rc    = getattr(auton, "do_%s" % options.mode)()
+        if isinstance(rc, dict):
+            print(json.dumps(rc))
+            rc = int(rc['code'] != 200)
     except (KeyboardInterrupt, SystemExit):
         rc = 2
     except Exception as e:

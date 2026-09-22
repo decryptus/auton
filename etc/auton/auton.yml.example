@@ -5,6 +5,9 @@ general:
   max_requests:  5000
   max_life_time: 3600
   lock_timeout:  60
+  result_ttl:    3600
+  max_jobs:      128
+  max_output_bytes: 1048576
   charset:       utf-8
   content_type:  'application/json; charset=utf-8'
   #auth_basic:      'Restricted'

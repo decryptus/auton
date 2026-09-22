@@ -18,7 +18,7 @@ from dwho.classes.plugins import DWhoPluginBase
 from dwho.config import load_credentials
 
 from auton.classes.target import AutonTarget
-from auton.classes.exceptions import AutonTargetUnauthorized
+from auton.classes.exceptions import AutonTargetUnauthorized, AutonTargetFailed
 
 LOG                   = logging.getLogger('auton.plugins')
 
@@ -72,6 +72,10 @@ class AutonEPTObject(object): # pylint: disable=useless-object-inheritance
         self.prv_pos     = 0
         self.cur_pos     = 0
         self.errors      = []
+        self.output_lock = threading.RLock()
+        self.output_size = 0
+        self.max_output_bytes = 1048576
+        self.owner       = request.get_server_vars().get('HTTP_AUTH_USER')
         self.started_at  = None
         self.ended_at    = None
         self.vars        = {'_env_':    os.environ.copy(),
@@ -84,8 +88,16 @@ class AutonEPTObject(object): # pylint: disable=useless-object-inheritance
         return self.uid
 
     def add_error(self, error):
-        self.errors.append(error)
+        self._append_output(self.errors, error)
         return self
+
+    def _append_output(self, destination, value):
+        with self.output_lock:
+            size = len(value.encode('utf-8'))
+            if self.output_size + size > self.max_output_bytes:
+                raise AutonTargetFailed('job output limit exceeded', code=1)
+            destination.append(value)
+            self.output_size += size
 
     def has_error(self):
         return len(self.errors) != 0
@@ -101,18 +113,20 @@ class AutonEPTObject(object): # pylint: disable=useless-object-inheritance
         return self.return_code
 
     def add_result(self, result):
-        self.result.append(result)
+        self._append_output(self.result, result)
 
         return self
 
     def get_result(self):
         return self.result
 
-    def get_last_result(self):
-        self.prv_pos = self.cur_pos
-        self.cur_pos = len(self.result)
-
-        return self.result[self.prv_pos:self.cur_pos]
+    def get_last_result(self, offset=None):
+        with self.output_lock:
+            if offset is not None:
+                return self.result[offset:]
+            self.prv_pos = self.cur_pos
+            self.cur_pos = len(self.result)
+            return self.result[self.prv_pos:self.cur_pos]
 
     def get_endpoint(self):
         return self.endpoint
@@ -228,10 +242,12 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
         return become
 
     def run(self):
-        while True:
+        while not getattr(self, '_killed', False):
             try:
-                obj  = EPTS_SYNC[self.name].qget(True)
-
+                obj = EPTS_SYNC[self.name].qget(True, 0.1)
+            except _queue.Empty:
+                continue
+            try:
                 if self.users:
                     user = obj.get_request().get_server_vars().get('HTTP_AUTH_USER')
                     if user is None or not self.users.get(user):
@@ -247,15 +263,19 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 getattr(self, func)(obj)
                 obj.set_return_code(0)
             except Exception as e:
-                obj.add_error("ERROR: %s\n" % e)
-                obj.set_return_code(getattr(e, 'code', None))
+                # Preserve an explicit failure even when the output budget is exhausted.
+                with obj.output_lock:
+                    obj.errors.append("ERROR: %s\n" % str(e)[:4096])
+                obj.set_return_code(getattr(e, 'code', None) or 1)
                 LOG.exception(e)
             finally:
-                obj.set_status(STATUS_COMPLETE)
-                obj.set_ended_at()
+                self.terminate()
+                with obj.output_lock:
+                    obj.set_ended_at()
+                    obj.set_status(STATUS_COMPLETE)
+                    obj.request = None
+                    obj.vars = {}
                 obj()
-
-            self.terminate()
 
     def terminate(self):
         func = 'do_terminate'
