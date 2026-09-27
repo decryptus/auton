@@ -1,7 +1,8 @@
 # Architecture review — 2026-09-27
 
 Reviewed commit: `502a0dc6ac9e8b8d550685c2ab9b66ec1d893130` on `master`.
-Status: **review and engineering requirements only; runtime findings remain open**.
+Initial status: **review and engineering requirements only**. The follow-up
+implementation described below addresses the runtime findings.
 
 Scope: separation of application logic, interfaces and adapters; callback and
 initialization ownership; fixed validation contracts. Source files were fetched
@@ -57,3 +58,22 @@ composition/lifecycle entry point. The subproc plugin executes configured target
 which is the product's purpose; this is not an API launching its own CLI.
 The existing execution/output limits, safe retry rules and authorization must
 remain intact during extraction. No live job was submitted during this review.
+
+## Follow-up implementation
+
+The application extraction following this review addresses A1–A3:
+
+- `classes/job.py`, `classes/jobs.py` and `classes/job_schema.py` contain job values,
+  validation and service policy. HTTP status translation stays in `modules/job.py`.
+- Plugins consume detached payload/principal values and recheck execution ACLs.
+  The legacy object constructor is a documented snapshot facade.
+- `auton_client.RemoteClient` owns remote transport and result iteration; terminal
+  input/output and exit policy remain in the CLI executable.
+- Fixed validation patterns use full matching. Initialized HTTP modules own their
+  locks, while existing daemon endpoint/queue registries remain composition inputs.
+
+Behavioral tests block HTTP, DWho and CLI imports while admitting, executing a fake
+job, checking ownership, polling and expiring it. Other tests exercise detached
+legacy input, real subprocess execution and ACL rechecks, concurrency/capacity,
+queue failure, client offsets and the existing real daemon/CLI integration suite.
+See README for the precise compatibility surface and remaining lifecycle limits.

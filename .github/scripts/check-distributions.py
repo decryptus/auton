@@ -26,6 +26,7 @@ for name in sys.argv[1:]:
         assert scripts == [name], scripts
         if name == 'auton':
             assert not any(f.startswith('auton/') for f in files), 'Client contains daemon modules'
+            assert 'auton_client/__init__.py' in files, 'Client library missing'
         else:
             module = 'auton' if name == 'autond' else name
             assert module + '/__init__.py' in files
@@ -63,3 +64,4 @@ for name in sys.argv[1:]:
         assert script.is_file()
         compile(script.read_bytes(), str(script), 'exec')
     print('Validated', name, version)
+

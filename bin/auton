@@ -10,7 +10,6 @@ import argparse
 import os
 import shlex
 import sys
-import time
 import uuid
 
 import logging
@@ -20,11 +19,9 @@ from logging.handlers import WatchedFileHandler
 
 from dotenv.main import dotenv_values
 from sonicprobe import helpers
-from sonicprobe.libs import urisup
 
-import requests
-from requests import exceptions
-from urllib3.exceptions import NewConnectionError
+import requests  # Compatibility for clients patching the historical transport.
+from auton_client import RemoteClient
 
 import six
 
@@ -164,46 +161,28 @@ def argv_parse_check():
     return options
 
 
-class AutonClient(object): # pylint: disable=useless-object-inheritance
+class AutonClient(RemoteClient):
     def __init__(self, options):
-        self.options  = options
-        self.envvars  = {}
+        self.options = options
+        self.envvars = {}
         self.argfiles = []
-        self.uri      = None
-        self.output_offset = 0
-
-        if not self.options.uri:
-            raise ValueError("missing variable AUTON_URI")
-
-        if not self.options.uid:
-            raise ValueError("missing variable AUTON_UID")
-
-        if not self.options.endpoint:
-            raise ValueError("missing variable AUTON_ENDPOINT")
-
+        if not options.uri:
+            raise ValueError('missing variable AUTON_URI')
+        if not options.uid:
+            raise ValueError('missing variable AUTON_UID')
+        if not options.endpoint:
+            raise ValueError('missing variable AUTON_ENDPOINT')
         self._parse_multi_args()
         self._parse_multi_argsfiles()
         self._import_envvars()
         self._load_envfiles()
         self._parse_envvars()
         self._parse_argfiles()
-        self._auth = None
-        if self.options.auth_user:
-            self._auth = (self.options.auth_user,
-                          self.options.auth_passwd or '')
-
-    @staticmethod
-    def _check_results(res = None):
-        if not res:
-            raise LookupError("unknown error")
-
-        if res.get('message'):
-            raise LookupError("invalid request, message: %s" % res['message'])
-
-        if res.get('code'):
-            return res
-
-        raise LookupError("errors occurred: %r" % res)
+        auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+        RemoteClient.__init__(self, options.uri, options.endpoint, options.uid,
+                              payload={'args': options.args, 'argfiles': self.argfiles,
+                                       'env': self.envvars, 'envfiles': options.envfiles},
+                              auth=auth, http_timeout=options.http_timeout)
 
     @staticmethod
     def _show_results(data):
@@ -267,139 +246,11 @@ class AutonClient(object): # pylint: disable=useless-object-inheritance
                                       'content': helpers.base64_encode_file(arg[1]),
                                       'filename': os.path.basename(arg[1])})
 
-    def _build_uri(self, uri, method):
-        r    = list(urisup.uri_help_split(uri))
-        r[2] = "/%s/%s/%s" % (method, self.options.endpoint, self.options.uid)
-
-        return urisup.uri_help_unsplit(r)
-
-    @staticmethod
-    def _build_headers(headers = None):
-        if not headers:
-            headers = {}
-
-        headers['User-Agent'] = ("%s/%s" % (SYSLOG_NAME, __version__))
-
-        return headers
-
-    @staticmethod
-    def _safe_to_retry(error):
-        # A disconnect after sending a POST may hide an accepted job. Only
-        # fail over when no connection was established, never on a read timeout.
-        pending, seen = [error], set()
-        while pending:
-            exc = pending.pop()
-            if id(exc) in seen:
-                continue
-            seen.add(id(exc))
-            if isinstance(exc, (exceptions.ConnectTimeout, NewConnectionError)):
-                return True
-            pending.extend(x for x in getattr(exc, 'args', ()) if isinstance(x, Exception))
-            pending.extend(x for x in (getattr(exc, 'reason', None),
-                                       getattr(exc, '__cause__', None)) if isinstance(x, Exception))
-        return False
-
-    def do_run(self):
-        req      = None
-        self.uri = None
-        self.output_offset = 0
-
-        try:
-            for uri in self.options.uri:
-                try:
-                    req  = requests.post(self._build_uri(uri, 'run'),
-                                         auth = self._auth,
-                                         headers = self._build_headers(),
-                                         timeout = self.options.http_timeout,
-                                         allow_redirects = False,
-                                         json = {'args':     self.options.args,
-                                                 'argfiles': self.argfiles,
-                                                 'env':      self.envvars,
-                                                 'envfiles': self.options.envfiles})
-                    self.uri = uri
-                    if not 200 <= req.status_code < 300:
-                        raise exceptions.HTTPError('run request rejected: HTTP %s' % req.status_code,
-                                                   response=req)
-                    break
-                except exceptions.ConnectionError as error:
-                    if not self._safe_to_retry(error):
-                        raise
-
-            if not self.uri:
-                raise exceptions.ConnectionError("unable to connect autond")
-
-            if not req.text:
-                return self._check_results()
-
-            try:
-                rs = req.json()
-            except ValueError:
-                req.raise_for_status()
-                return self._check_results()
-
-            return self._check_results(rs)
-        finally:
-            if req is not None:
-                req.close()
-
-    def do_status(self):
-        req = None
-
-        try:
-            if not self.uri:
-                for uri in self.options.uri:
-                    try:
-                        req = requests.get(self._build_uri(uri, 'status'),
-                                           auth = self._auth,
-                                           headers = self._build_headers({'X-Auton-Output-Offset': str(self.output_offset)}),
-                                           timeout = self.options.http_timeout,
-                                           allow_redirects = False)
-                        if req.status_code == 404:
-                            req.close()
-                            continue
-                        req.raise_for_status()
-                        self.uri = uri
-                        break
-                    except exceptions.ConnectionError:
-                        continue
-
-                if not self.uri:
-                    raise exceptions.ConnectionError("unable to connect autond")
-            else:
-                req = requests.get(self._build_uri(self.uri, 'status'),
-                                   auth = self._auth,
-                                   headers = self._build_headers({'X-Auton-Output-Offset': str(self.output_offset)}),
-                                   timeout = self.options.http_timeout,
-                                   allow_redirects = False)
-                req.raise_for_status()
-
-            if not req.text:
-                return self._check_results()
-
-            try:
-                rs = req.json()
-            except ValueError:
-                req.raise_for_status()
-                return self._check_results()
-
-            return self._check_results(rs)
-        finally:
-            if req is not None:
-                req.close()
-
     def do_autorun(self):
-        data = self.do_run()
-        while True:
+        for data in self.iter_results(delay=self.options.delay):
             self._show_results(data)
-            self.output_offset = data.get('next_offset', self.output_offset)
-            if data['status'] == 'complete':
-                break
-            time.sleep(self.options.delay)
-            data = self.do_status()
-
         if self.options.no_return_code or data['return_code'] is None:
             return int(data['code'] != 200)
-
         return data['return_code']
 
 
@@ -442,3 +293,4 @@ def main(options):
 
 if __name__ == '__main__':
     main(argv_parse_check())
+

@@ -5,18 +5,15 @@
 
 import abc
 import logging
-import os
+import copy
 import threading
-import time
-import uuid
-
-from datetime import datetime
 
 from six.moves import queue as _queue
 
 from dwho.classes.plugins import DWhoPluginBase
 from dwho.config import load_credentials
 
+from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE
 from auton.classes.target import AutonTarget
 from auton.classes.exceptions import AutonTargetUnauthorized, AutonTargetFailed
 
@@ -25,11 +22,6 @@ LOG                   = logging.getLogger('auton.plugins')
 DEFAULT_BECOME_METHOD = 'sudo'
 DEFAULT_BECOME_USER   = 'root'
 DEFAULT_BECOME_OPTS   = {'sudo': ['-H', '-E']}
-
-STATUS_NEW            = 'new'
-STATUS_PROCESSING     = 'processing'
-STATUS_COMPLETE       = 'complete'
-
 
 class AutonPlugins(dict):
     def register(self, plugin):
@@ -58,111 +50,49 @@ class AutonEPTsSync(dict):
 EPTS_SYNC = AutonEPTsSync()
 
 
-class AutonEPTObject(object): # pylint: disable=useless-object-inheritance
-    def __init__(self, name, uid, endpoint, method, request, callback = None):
-        self.name        = name
-        self.uid         = uid
-        self.endpoint    = endpoint
-        self.method      = method
-        self.request     = request
-        self.result      = []
-        self.callback    = callback
-        self.status      = STATUS_NEW
-        self.return_code = None
-        self.prv_pos     = 0
-        self.cur_pos     = 0
-        self.errors      = []
-        self.output_lock = threading.RLock()
-        self.output_size = 0
-        self.max_output_bytes = 1048576
-        self.owner       = request.get_server_vars().get('HTTP_AUTH_USER')
-        self.started_at  = None
-        self.ended_at    = None
-        self.vars        = {'_env_':    os.environ.copy(),
-                            '_time_':   datetime.now(),
-                            '_gmtime_': datetime.utcnow(),
-                            '_uid_':    uid,
-                            '_uuid_':   "%s" % uuid.uuid4()}
+class _RequestSnapshot(object):
+    """Legacy plugin view containing detached values, never a live request."""
+    def __init__(self, payload, principal, headers=None, params=None):
+        self.payload = payload
+        self.principal = principal
+        self.headers = copy.deepcopy(headers or {})
+        self.params = copy.deepcopy(params or {})
 
-    def get_uid(self):
-        return self.uid
+    def payload_params(self):
+        return self.payload
 
-    def add_error(self, error):
-        self._append_output(self.errors, error)
-        return self
+    def get_server_vars(self):
+        return {'HTTP_AUTH_USER': self.principal}
 
-    def _append_output(self, destination, value):
-        with self.output_lock:
-            size = len(value.encode('utf-8'))
-            if self.output_size + size > self.max_output_bytes:
-                raise AutonTargetFailed('job output limit exceeded', code=1)
-            destination.append(value)
-            self.output_size += size
+    def get_headers(self):
+        return self.headers
 
-    def has_error(self):
-        return len(self.errors) != 0
+    def query_params(self):
+        return self.params
 
-    def get_errors(self):
-        return self.errors
 
-    def set_return_code(self, rc):
-        self.return_code = rc
-        return self
-
-    def get_return_code(self):
-        return self.return_code
-
-    def add_result(self, result):
-        self._append_output(self.result, result)
-
-        return self
-
-    def get_result(self):
-        return self.result
-
-    def get_last_result(self, offset=None):
-        with self.output_lock:
-            if offset is not None:
-                return self.result[offset:]
-            self.prv_pos = self.cur_pos
-            self.cur_pos = len(self.result)
-            return self.result[self.prv_pos:self.cur_pos]
-
-    def get_endpoint(self):
-        return self.endpoint
-
-    def get_method(self):
-        return self.method
+class AutonEPTObject(JobObject):
+    """Compatibility constructor for plugins using the old request argument."""
+    def __init__(self, name, uid, endpoint, method, request=None, callback=None,
+                 payload=None, principal=None):
+        headers, params = None, None
+        if request is not None:
+            payload = request.payload_params()
+            principal = request.get_server_vars().get('HTTP_AUTH_USER')
+            if hasattr(request, 'get_headers'):
+                headers = request.get_headers()
+            if hasattr(request, 'query_params'):
+                params = request.query_params()
+        JobObject.__init__(self, name, uid, endpoint, method,
+                           payload=payload, principal=principal, callback=callback)
+        self.request = _RequestSnapshot(self.payload, self.owner, headers, params)
 
     def get_request(self):
         return self.request
 
-    def set_status(self, status):
-        self.status = status
-
-        return self
-
-    def get_status(self):
-        return self.status
-
-    def set_started_at(self):
-        self.started_at = time.time()
-
-    def get_started_at(self):
-        return self.started_at
-
-    def set_ended_at(self):
-        self.ended_at = time.time()
-
-    def get_ended_at(self):
-        return self.ended_at
-
-    def get_vars(self):
-        return self.vars
-
-    def __call__(self):
-        if self.callback:
-            self.callback(self)
+    def clear_input(self):
+        JobObject.clear_input(self)
+        self.request = None
 
 
 class AutonEPTSync(object): # pylint: disable=useless-object-inheritance
@@ -249,7 +179,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 continue
             try:
                 if self.users:
-                    user = obj.get_request().get_server_vars().get('HTTP_AUTH_USER')
+                    user = obj.owner
                     if user is None or not self.users.get(user):
                         raise AutonTargetUnauthorized("unauthorized user: %r" % user)
 
@@ -273,8 +203,7 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 with obj.output_lock:
                     obj.set_ended_at()
                     obj.set_status(STATUS_COMPLETE)
-                    obj.request = None
-                    obj.vars = {}
+                    obj.clear_input()
                 obj()
 
     def terminate(self):
@@ -291,3 +220,4 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
     def __call__(self):
         self.start()
         return self
+

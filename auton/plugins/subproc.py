@@ -246,7 +246,7 @@ class AutonSubProcPlugin(AutonPlugBase):
 
     def do_run(self, obj):
         cfg       = self.target.config
-        payload   = obj.get_request().payload_params()
+        payload   = obj.get_payload()
         ovars     = obj.get_vars()
         pargs     = None
         pargfiles = None
@@ -350,3 +350,4 @@ if __name__ != "__main__":
     def _start():
         PLUGINS.register(AutonSubProcPlugin)
     _start()
+

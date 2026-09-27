@@ -459,3 +459,67 @@ and tests it before uploading. Published tags are versioned; `latest` is not cha
 ## Publishing to PyPI
 
 See [PyPI publishing](docs/pypi.md) for Trusted Publisher setup and automated releases.
+
+
+### Application services and remote client
+
+`auton.classes.jobs.JobService` owns admission, endpoint ACLs, job ownership,
+capacity, completed-result expiry and output cursors. It accepts explicit job
+values and an authenticated principal, plus injected endpoint/queue mappings,
+clock, lock and object factory. It does not import the HTTP module, CLI or DWho.
+The principal must come from a trusted authentication adapter; it is not a field
+accepted from a remote job payload. HTTP continues to use the existing routes,
+schemas, response fields and status codes.
+
+Workers read `JobObject.owner` and `get_payload()`, recheck the endpoint ACL before
+execution, and release input data on completion. Submitted payloads are copied so
+later mutation of the request cannot change a queued command. Command timeouts,
+process-group cleanup, bounded output, retention defaults and legacy/explicit
+output cursors are unchanged.
+
+The historical `auton.classes.plugins.AutonEPTObject` import, constructor and
+callback remain available. For older plugins, `get_request()` returns a detached
+compatibility snapshot exposing `payload_params()`, `get_server_vars()` (the
+`HTTP_AUTH_USER` value), `get_headers()` and `query_params()`. It is **not** a live
+HTTP request: socket access, request identity and arbitrary server variables are
+not retained. Headers/query values are copied when the old constructor receives
+a request; service-created jobs supply only execution payload and principal.
+New plugins should use `owner` and `get_payload()`. Input views are cleared when
+a worker completes a job, as the old request reference was.
+
+`JobModule` retains its helper names, result builder and mutable limit/object
+attributes as compatibility delegates. Its HTTP handlers now call `JobService`
+directly; overriding a private helper no longer intercepts admission. Customize
+the service or its adapters instead. Direct calls to the old submission helper
+now also enforce admission policy. Each initialized module owns its lock.
+Environment names and output offsets must match the complete value, including
+rejecting a trailing newline.
+
+The `auton` client distribution now provides `auton_client.RemoteClient`:
+
+```python
+from auton_client import RemoteClient
+
+client = RemoteClient(
+    uris=['https://autond.example'],
+    endpoint='backup',
+    uid='backup-123',
+    payload={'args': ['--verify']},
+    auth=('alice', 'password'),
+    http_timeout=30,
+)
+for result in client.iter_results(delay=0.5):
+    consume(result)  # Your application decides how to present/store the result.
+```
+
+The client accepts an optional requests-compatible `session` and `sleep` callable.
+It never reads stdin, prints output or selects a process exit code. Each yielded
+batch advances the output cursor; resuming a status request uses that cursor.
+`do_run()` and `do_status()` remain available for one-shot operations. An ambiguous
+POST failure is never replayed on another daemon. The command-line options,
+file/environment preparation, terminal output and exit-code behavior remain in
+`bin/auton`. Install the `auton` distribution to use the remote client; `autond`
+continues to package the daemon separately.
+
+Job expiry remains lazy on service operations; this change does not introduce a
+background expiry thread, durable job storage or a total client polling deadline.
