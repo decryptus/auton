@@ -49,7 +49,7 @@ if requirements_auton and package in (None, 'auton'):
         license                       = setup_cfg['license'],
         url                           = setup_cfg['url'],
         scripts                       = ['bin/auton'],
-        packages                      = [],
+        packages                      = ['auton_client'],
         options                       = {'build': {'build_base': 'build/auton'}},
         install_requires              = requirements_auton,
         python_requires               = ', '.join(setup_cfg['python_requires']),
@@ -69,10 +69,11 @@ if requirements_autond and package in (None, 'autond'):
         url                           = setup_cfg['url'],
         scripts                       = ['bin/autond'],
         options                       = {'build': {'build_base': 'build/autond'}},
-        packages                      = find_packages(),
+        packages                      = find_packages(exclude=('auton_client',)),
         install_requires              = requirements_autond,
         python_requires               = ', '.join(setup_cfg['python_requires']),
         classifiers                   = setup_cfg['common']['classifiers'] + setup_cfg['autond'].get('classifiers', []),
         long_description              = long_desc,
         long_description_content_type = long_desc_content_type
     )
+

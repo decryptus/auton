@@ -1,239 +1,157 @@
 # -*- coding: utf-8 -*-
 # Copyright (C) 2018-2022 fjord-technologies
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""auton.modules.job"""
+"""HTTP decoding and compatibility facade for the job application service."""
 
-import copy
 import logging
-import math
 import re
-import time
 
 from dwho.classes.modules import DWhoModuleBase, MODULES
 from httpdis.ext.httpdis_json import HttpReqErrJson
-from sonicprobe.libs import xys
 from sonicprobe.libs.moresynchro import RWLock
 
-# pylint: disable=unused-import
-from auton.classes.plugins import (AutonEPTObject,
-                                   EPTS_SYNC,
-                                   ENDPOINTS,
-                                   STATUS_NEW,
-                                   STATUS_PROCESSING,
-                                   STATUS_COMPLETE)
+from auton.classes.plugins import (AutonEPTObject, EPTS_SYNC, ENDPOINTS,
+                                   STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE)
+from auton.classes.job_schema import (RUN_QSCHEMA, RUN_PSCHEMA, validate_input,
+                                      InvalidArguments, InvalidArgumentsType)
+from auton.classes.jobs import (JobService, job_result, UnknownEndpoint, UnknownJob,
+                                AccessDenied, DuplicateJob, JobUnavailable, InvalidOffset,
+                                DEFAULT_RESULT_TTL, DEFAULT_MAX_JOBS,
+                                DEFAULT_MAX_OUTPUT_BYTES)
 
 LOG = logging.getLogger('auton.modules.job')
-xys.add_regex('job.envname', re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]{0,63}$').match)
+OUTPUT_OFFSET_PATTERN = re.compile(r'[0-9]{1,12}')
+HTTP_ERROR_CODES = {UnknownEndpoint: 404, UnknownJob: 404, AccessDenied: 403,
+                    DuplicateJob: 415, JobUnavailable: 503, InvalidOffset: 400,
+                    InvalidArgumentsType: 400, InvalidArguments: 415}
+HTTP_ERRORS = tuple(HTTP_ERROR_CODES)
+
+
+def _http_call(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except HTTP_ERRORS as error:
+        raise HttpReqErrJson(HTTP_ERROR_CODES[type(error)], str(error))
+
+
+def _service_property(name):
+    return property(lambda self: getattr(self.service, name),
+                    lambda self, value: setattr(self.service, name, value))
+
+
+class _WriteLock(object):
+    def __init__(self, module):
+        self.module = module
+
+    def acquire(self, timeout):
+        return self.module.LOCK.acquire_write(timeout)
+
+    def release(self):
+        self.module.LOCK.release()
 
 
 class JobModule(DWhoModuleBase):
     MODULE_NAME = 'job'
+    LOCK = RWLock()  # Legacy class attribute; initialized instances own their lock.
+    RUN_QSCHEMA = RUN_QSCHEMA
+    RUN_PSCHEMA = RUN_PSCHEMA
+    STATUS_QSCHEMA = RUN_QSCHEMA
 
-    LOCK        = RWLock()
+    objs = _service_property('objs')
+    lock_timeout = _service_property('lock_timeout')
+    result_ttl = _service_property('result_ttl')
+    max_jobs = _service_property('max_jobs')
+    max_output_bytes = _service_property('max_output_bytes')
 
-    # pylint: disable=attribute-defined-outside-init
     def safe_init(self, options):
-        self.objs         = {}
-        self.lock_timeout = self.config['general']['lock_timeout']
-        self.result_ttl = float(self.config['general'].get('result_ttl', 3600))
-        self.max_jobs = int(self.config['general'].get('max_jobs', 128))
-        self.max_output_bytes = int(self.config['general'].get('max_output_bytes', 1048576))
-        if (not math.isfinite(self.result_ttl) or self.result_ttl <= 0
-                or self.max_jobs <= 0 or self.max_output_bytes <= 0):
-            raise ValueError('job limits must be positive')
+        general = self.config['general']
+        self.LOCK = RWLock()
+        self.service = JobService(ENDPOINTS, EPTS_SYNC, object_factory=AutonEPTObject,
+                                  lock=_WriteLock(self),
+                                  lock_timeout=general['lock_timeout'],
+                                  result_ttl=general.get('result_ttl', DEFAULT_RESULT_TTL),
+                                  max_jobs=general.get('max_jobs', DEFAULT_MAX_JOBS),
+                                  max_output_bytes=general.get('max_output_bytes', DEFAULT_MAX_OUTPUT_BYTES))
 
     def _expire_results(self):
-        cutoff = time.time() - self.result_ttl
-        for uid, obj in list(self.objs.items()):
-            if obj.get_status() == STATUS_COMPLETE and obj.get_ended_at() <= cutoff:
-                del self.objs[uid]
+        return self.service.expire_results()
 
     def _make_capacity(self):
-        if len(self.objs) < self.max_jobs:
-            return
-        completed = [(obj.get_ended_at(), uid) for uid, obj in self.objs.items()
-                     if obj.get_status() == STATUS_COMPLETE]
-        if not completed:
-            raise HttpReqErrJson(503, 'job capacity reached; retry later')
-        del self.objs[min(completed)[1]]
+        return _http_call(self.service.make_capacity)
 
     @staticmethod
     def _authorize(endpoint, request, obj=None):
-        plugin = ENDPOINTS.get(endpoint)
-        if plugin is None:
-            raise HttpReqErrJson(404, 'unknown endpoint')
-        user = request.get_server_vars().get('HTTP_AUTH_USER')
-        if plugin.users and not plugin.users.get(user):
-            raise HttpReqErrJson(403, 'endpoint access denied')
-        if obj is not None and obj.owner != user:
-            raise HttpReqErrJson(403, 'job access denied')
+        return _http_call(JobService(ENDPOINTS, EPTS_SYNC).authorize, endpoint,
+                          request.get_server_vars().get('HTTP_AUTH_USER'), obj)
 
     @staticmethod
     def _output_offset(request):
         headers = {key.lower(): value for key, value in request.get_headers().items()}
         value = headers.get('x-auton-output-offset')
         if value is None:
-            return None  # Compatibility with clients using the legacy cursor.
-        if not re.match(r'^[0-9]{1,12}$', value):
+            return None
+        if not isinstance(value, str) or not OUTPUT_OFFSET_PATTERN.fullmatch(value):
             raise HttpReqErrJson(400, 'invalid output offset')
         return int(value)
 
     @staticmethod
     def _get_ept_sync(endpoint):
-        if endpoint not in EPTS_SYNC:
-            raise HttpReqErrJson(404, "unable to find endpoint: %r" % endpoint)
+        return _http_call(JobService(ENDPOINTS, EPTS_SYNC).get_queue, endpoint)
 
-        return EPTS_SYNC[endpoint]
-
-    @staticmethod
-    def _get_uid(endpoint, xid):
-        return "%s:%s" % (endpoint, xid)
+    _get_uid = staticmethod(JobService.uid)
 
     def _get_obj(self, endpoint, xid):
-        uid      = self._get_uid(endpoint, xid)
-
-        if uid not in self.objs:
-            raise HttpReqErrJson(404, "unable to find object with uid: %r" % uid)
-
-        return self.objs[uid]
+        return _http_call(self.service.get_object, endpoint, xid)
 
     def _clear_obj(self, endpoint, xid):
-        uid = self._get_uid(endpoint, xid)
-
-        if uid in self.objs:
-            del self.objs[uid]
+        return self.service.clear_object(endpoint, xid)
 
     def _push_epts_sync(self, endpoint, xid, method, request):
-        ept_sync = self._get_ept_sync(endpoint)
-        uid      = self._get_uid(endpoint, xid)
+        # Kept for callers of the historical helper. Admission still checks ACLs,
+        # capacity and duplicates through the same service as the HTTP endpoint.
+        _http_call(self.service.submit, endpoint, xid, request.payload_params() or {},
+                   request.get_server_vars().get('HTTP_AUTH_USER'), offset=0, method=method)
+        return self._get_obj(endpoint, xid)
 
-        if uid in self.objs:
-            raise HttpReqErrJson(415, "uid already exists: %r" % uid)
-
-        obj      = AutonEPTObject(ept_sync.name,
-                                  uid,
-                                  endpoint,
-                                  method,
-                                  request)
-        self.objs[uid] = obj
-        obj.max_output_bytes = self.max_output_bytes
-        ept_sync.qput(obj)
-
-        return obj
+    @staticmethod
+    def _http_result(result):
+        result['code'] = 400 if result.get('errors') else 200
+        return result
 
     @staticmethod
     def _build_result(obj, offset=None):
-        with obj.output_lock:
-            return JobModule._build_result_locked(obj, offset)
+        return JobModule._http_result(job_result(obj, offset))
 
-    @staticmethod
-    def _build_result_locked(obj, offset=None):
-        r = {'code':        200,
-             'uid':         obj.get_uid(),
-             'status':      obj.get_status(),
-             'return_code': obj.get_return_code(),
-             'started_at':  obj.get_started_at(),
-             'stream':      obj.get_last_result(offset),
-             'next_offset': len(obj.result),
-             'ended_at':    obj.get_ended_at()}
+    _build_result_locked = _build_result
 
-        if obj.has_error():
-            r['code']   = 400
-            r['errors'] = list(obj.get_errors())
-
-        return r
-
-    RUN_QSCHEMA = xys.load("""
-    endpoint: !!str
-    id: !!str
-    """)
-
-    RUN_PSCHEMA = xys.load("""
-    env*:
-      !~~regex? (0,64) job.envname: !!str
-    envfiles*: !~~seqlen(0,64) [ !!str ]
-    args*: !~~seqlen(0,64) [ !!str ]
-    argfiles*: !~~seqlen(0,64)
-      - arg: !!str
-        content: !!str
-        filename: !!str
-    """)
+    def _handle(self, request, submit=False):
+        params = request.query_params()
+        if submit:
+            params = params or {}
+        payload = (request.payload_params() or {}) if submit else None
+        _http_call(validate_input, params, payload)
+        offset = self._output_offset(request)
+        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        try:
+            if submit:
+                result = _http_call(self.service.submit, params['endpoint'], params['id'],
+                                    payload, principal, offset)
+            else:
+                result = _http_call(self.service.status, params['endpoint'], params['id'],
+                                    principal, offset)
+            return self._http_result(result)
+        except HttpReqErrJson:
+            raise
+        except Exception as error:
+            LOG.exception(error)
+            raise HttpReqErrJson(503, repr(error))
 
     def job_run(self, request):
-        params  = request.query_params() or {}
-        payload = request.payload_params() or {}
-
-        if not isinstance(params, dict):
-            raise HttpReqErrJson(400, "invalid arguments type")
-
-        if not xys.validate(params, self.RUN_QSCHEMA):
-            raise HttpReqErrJson(415, "invalid arguments for command")
-
-        if not isinstance(payload, dict):
-            raise HttpReqErrJson(400, "invalid arguments type")
-
-        if not xys.validate(payload, self.RUN_PSCHEMA):
-            raise HttpReqErrJson(415, "invalid arguments for command")
-
-        offset = self._output_offset(request)
-        if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
-
-        try:
-            self._authorize(params['endpoint'], request)
-            self._expire_results()
-            # Reject duplicate IDs before capacity eviction could discard them.
-            if self._get_uid(params['endpoint'], params['id']) in self.objs:
-                raise HttpReqErrJson(415, 'uid already exists')
-            self._make_capacity()
-            obj = self._push_epts_sync(params['endpoint'],
-                                       params['id'],
-                                       'run',
-                                       copy.copy(request))
-
-            return self._build_result(obj, offset)
-        except HttpReqErrJson:
-            raise
-        except Exception as e:
-            LOG.exception(e)
-            raise HttpReqErrJson(503, repr(e))
-        finally:
-            self.LOCK.release()
-
-
-    STATUS_QSCHEMA = xys.load("""
-    endpoint: !!str
-    id: !!str
-    """)
+        return self._handle(request, submit=True)
 
     def job_status(self, request):
-        params = request.query_params()
-
-        if not isinstance(params, dict):
-            raise HttpReqErrJson(400, "invalid arguments type")
-
-        if not xys.validate(params, self.STATUS_QSCHEMA):
-            raise HttpReqErrJson(415, "invalid arguments for command")
-
-        offset = self._output_offset(request)
-        if not self.LOCK.acquire_write(self.lock_timeout):
-            raise HttpReqErrJson(503, "unable to take LOCK for writing after %s seconds" % self.lock_timeout)
-
-        try:
-            self._expire_results()
-            obj = self._get_obj(params['endpoint'], params['id'])
-            self._authorize(params['endpoint'], request, obj)
-            return self._build_result(obj, offset)
-        except HttpReqErrJson:
-            raise
-        except Exception as e:
-            LOG.exception(e)
-            raise HttpReqErrJson(503, repr(e))
-        finally:
-            self.LOCK.release()
+        return self._handle(request)
 
 
-if __name__ != "__main__":
-    def _start():
-        MODULES.register(JobModule())
-    _start()
+if __name__ != '__main__':
+    MODULES.register(JobModule())
