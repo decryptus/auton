@@ -1,3 +1,12 @@
+auton (0.3.2) unstable; urgency=medium
+
+  * Extract job admission, ownership, capacity and result retention into a neutral service.
+  * Pass explicit job data and caller identity to workers without retained HTTP requests.
+  * Add a reusable auton_client remote client independent of the command interface.
+  * Preserve CLI behavior, request snapshots, retries and output cursor semantics.
+
+ -- Codex <codex@openai.com>  Mon, 28 Sep 2026 01:40:00 +0200
+
 auton (0.3.1) unstable; urgency=medium
 
   * Publish validated Python distributions to PyPI with Trusted Publishing.
