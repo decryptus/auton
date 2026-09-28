@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/svg/logo-horizontal-dark.svg">
+    <img src="assets/brand/svg/logo-horizontal.svg" alt="Auton" width="520">
+  </picture>
+</p>
+
 ## auton project
 
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/auton.svg)](https://pypi.org/project/auton/)
