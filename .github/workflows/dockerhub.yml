@@ -31,7 +31,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Test release selection
-        run: python3 -m unittest discover -s .github/tests -v
+        run: |
+          python3 .github/scripts/check-test-collection.py --runner unittest .github/tests
+          python3 -m unittest discover -s .github/tests -v
       - name: Select release
         id: release
         env:
@@ -53,6 +55,7 @@ jobs:
       - name: Test image before publication
         run: |
           docker run --rm --entrypoint autond auton:test -d
+          docker run --rm --entrypoint python -v "$PWD/.github/scripts:/collection:ro" auton:test /collection/check-test-collection.py --runner unittest tests
           docker run --rm --entrypoint python auton:test -m unittest discover -s tests -v
           docker run --rm --entrypoint python -e EXPECTED_VERSION="$(cat VERSION)" auton:test -c 'import os; from importlib.metadata import version; assert version("autond") == os.environ["EXPECTED_VERSION"]; assert os.getuid() != 0'
       - uses: actions/setup-python@v5
