@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
-from auton_client.connections import normalize_origin, validate_connection_name
+from auton_client.connections import resolve_targets, validate_connection_name
 
 MAX_CONFIG_BYTES = 65536
 MAX_CONFIG_TARGETS = 128
@@ -117,12 +117,8 @@ def load_inventory(path):
         entries = sections['targets']
         if not 1 <= len(entries) <= MAX_CONFIG_TARGETS:
             raise ValueError('client config must declare 1-128 targets')
-        targets = {}
-        for name, value in entries.items():
-            validate_connection_name(name)
-            if not isinstance(value, ScalarNode) or value.tag != STRING_TAG:
-                raise ValueError('target URI must be a string')
-            targets[name] = normalize_origin(value.value)
+        node_budget = [MAX_SCENARIO_NODES]
+        targets = resolve_targets({name: _plain_scenario(value, node_budget) for name, value in entries.items()})
         groups = {}
         entries = sections['groups']
         if len(entries) > MAX_CONFIG_GROUPS:
@@ -143,7 +139,6 @@ def load_inventory(path):
                     members.append(member.value)
             groups[name] = members
         from auton_client.scenarios import validate_scenarios, validate_scenario_groups
-        node_budget = [MAX_SCENARIO_NODES]
         scenarios = validate_scenarios({name: _plain_scenario(node, node_budget)
                                        for name, node in sections['scenarios'].items()})
         scenario_groups = validate_scenario_groups({name: _plain_scenario(node, node_budget)

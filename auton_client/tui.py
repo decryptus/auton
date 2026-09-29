@@ -62,6 +62,7 @@ class OperatorView:
         self.preparing = False
         self.preparation_wrapped = None
         self.preparation_wrap_key = None
+        self.primary_only = False
 
     @property
     def daemon(self):
@@ -322,7 +323,8 @@ class OperatorView:
                         value = item['daemon'] + ' / ' + value
                 line(6 + i - start, value, curses.A_REVERSE if i == self.index else 0)
         line(height - 2, 'Tab view | Enter open | j/k move | / search | s state | c clear')
-        line(height - 1, 'e prepare | r refresh | p pause | v stdout/stderr | q quit')
+        line(height - 1, ('Primary origins monitored | ' if self.primary_only else '') +
+             'e prepare | r refresh | p pause | v stdout/stderr | q quit')
         screen.refresh()
 
 
@@ -335,7 +337,8 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     connections = daemon_specs(specs, uris, configured) if selected is None else selected
     if not connections:
         raise ValueError("selection contains no targets")
-    clients = {name: DaemonClient(uri, auth, http_timeout)
+    from auton_client.connections import target_origins
+    clients = {name: DaemonClient(target_origins(uri)[0], auth, http_timeout)
                for name, uri in connections.items()}
     monitor = FleetMonitor(clients)
     from auton_client.preparation import PreparationView
@@ -344,6 +347,7 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     preparation = PreparationView(connections, groups or {}, scenarios or {}, scenario_groups or {},
                                   session, dict(auth=auth, http_timeout=http_timeout))
     view = OperatorView(monitor, refresh, preparation=preparation)
+    view.primary_only = any(len(target_origins(value)) > 1 for value in connections.values())
     def display(screen):
         screen.keypad(True)
         screen.timeout(100)

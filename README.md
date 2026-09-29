@@ -324,6 +324,61 @@ error diagnostics as well as captured stderr. Duration measures client observati
 not exclusively remote process runtime. This initial mode prints its result at
 the end; live operation views remain follow-up work.
 
+### Ordered failover origins per target
+
+A logical target can define ordered replacement daemons while preserving the
+existing `name: URI` form:
+
+```yaml
+targets:
+  node-01: https://autond-01.example.com
+  node-02: https://autond-02.example.com
+  deployment:
+    uris:
+      - {target: node-01}
+      - {target: node-02}
+      - https://autond-03.example.com
+```
+
+`auton -c client.yml -t deployment --endpoint deploy` executes on **one** eligible
+origin. Selecting multiple targets still executes on each distinct target.
+There is no new flag and no implicit broadcast of replacement origins.
+
+Each `uris` list contains 1–16 literal origins or explicit `{target: name}`
+references. References may resolve another target's chain, up to 16 levels;
+missing targets and cycles are rejected. **Target-group references are forbidden.**
+Normalized duplicates inside a chain collapse in first-occurrence order; expansion
+must retain at most 16 origins. Overlapping origins across separately selected
+execution targets are rejected before submission to avoid duplicate execution.
+The complete inventory is validated, including unselected definitions.
+File imports remain separate and one level deep; target references do not import files.
+
+The next origin is considered only after maintenance refusal, an unavailable
+health check before any POST, or a connection-establishment failure proving that
+the POST was not accepted. TLS validation errors, authorization failures, generic
+HTTP 503 responses, ambiguous POSTs and lost/read-timeout responses do not permit
+replacement submission. Every attempt uses the remaining operation budget.
+
+After admission, status and output reads stay on that daemon. For scenarios,
+the first successful step pins the origin for **all remaining steps and scenarios**
+in that invocation. If it later becomes unavailable or enters maintenance,
+that target stops; the sequence never silently moves daemon-local state elsewhere.
+A replacement daemon must perform equivalent work with the same permissions and
+dependencies; a different machine is not automatically a substitute for a host-local command.
+
+Results include the contacted/accepting `uri` and ordered `attempts`, with
+`not_admitted`, `responded`, `admitted` or `unknown` states and explicit reasons.
+`responded` alone does not establish admission: the returned job must validate.
+Final target/step status remains authoritative, and an unknown outcome requires
+manual inspection before any new invocation.
+
+The TUI execution preview shows the ordered chain and results show attempted
+origins. **Monitoring remains pinned to each target's primary origin**, labelled
+in the footer when replacement chains are present. It does not aggregate or
+silently switch the jobs of replacement daemons. Select their physical target
+names separately for inspection, or open the result's actual origin explicitly.
+The operation result already contains the outputs from the accepting daemon.
+
 ### Local daemon maintenance
 
 Maintenance pauses new execution while keeping health, job lists and outputs
@@ -374,8 +429,8 @@ automatic expiry and does not evict admitted jobs; they count against capacity.
 The client observation deadline may expire while a job waits, producing an
 unknown result; inspect its recorded job ID before deciding to resubmit.
 Enabling/disabling maintenance is recorded as `daemon.maintenance` when JSONL
-journaling is configured. Ordered replacement origins per target remain a
-separate roadmap item; this feature does not add automatic replay or failover.
+journaling is configured. Ordered replacement origins use the safe refusal rules above; maintenance
+never authorizes replay of an already admitted or ambiguous job.
 
 ### Scenarios and scenario groups (client)
 
@@ -439,8 +494,7 @@ across targets. Failure, explicit rejection or an unknown result stops that
 target's sequence; later steps and scenarios are reported as `skipped` without
 job IDs. Independent targets continue. The observation deadline applies to the
 whole invocation; reaching it or interrupting the client prevents further work
-but does not cancel a running remote job. No automatic retry, rollback or resume
-is performed. An ambiguous POST is never replayed.
+but does not cancel a running remote job. Accepted jobs are never automatically retried; no rollback or resume is performed. An ambiguous POST is never replayed.
 
 The final JSON has `kind: "scenario"`, `operation_id`, selected `scenarios`,
 aggregate `status` and a `targets` array. Each target contains ordered scenario

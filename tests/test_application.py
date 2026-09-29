@@ -383,6 +383,9 @@ steps = operation['targets'][0]['scenarios'][0]['steps']
 assert len(steps) == 2 and steps[0]['job_id'] != steps[1]['job_id']
 assert steps[1]['stdout'] == ['done']
 from auton_client.session import ExecutionSession
+from auton_client.connections import resolve_targets
+targets = resolve_targets({'local': 'http://localhost', 'deployment': {'uris': [{'target': 'local'}, 'http://backup']}})
+assert OperationService({'deployment': targets['deployment']}, 'fake', client_factory=FakeRemote).run()['status'] == 'completed'
 session = ExecutionSession()
 try:
     session.start(ScenarioService(selected, plan, client_factory=FakeRemote))

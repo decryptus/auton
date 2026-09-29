@@ -112,6 +112,7 @@ class ScenarioService:
                   'scenarios': [], 'output_truncated': False}
         remaining_output = MAX_RETAINED_OUTPUT_BYTES
         blocked = None
+        origin = None
         current = None
         for scenario, step_name, service in self.steps:
             if current is None or current['name'] != scenario:
@@ -124,7 +125,10 @@ class ScenarioService:
                           'output_truncated': False, 'duration_ms': 0}
             else:
                 result = service.execute_target(name, str(uuid.uuid4()), deadline, stopped,
-                                                output_limit=remaining_output)
+                                                output_limit=remaining_output, origin=origin)
+                if result['status'] == 'completed':
+                    origin = result['uri']
+                target['uri'] = result['uri']
                 remaining_output -= sum(len(chunk.encode('utf-8')) for field in OUTPUT_FIELDS
                                         for chunk in result[field])
                 target['output_truncated'] |= result['output_truncated']

@@ -228,6 +228,23 @@ class HTTPIntegrationTests(unittest.TestCase):
                         break
                     time.sleep(0.02)
                 self.assertEqual(''.join(queued['stream']), 'resumed\n')
+                requests.post(maintenance_url, auth=auth, json={'enabled': True}, timeout=2).raise_for_status()
+                with imported_targets.open('a') as stream:
+                    stream.write('\ndeployment: {uris: [{target: one}, {target: two}]}\n')
+                before = {name: len(clients[name].jobs()) for name in ('one', 'two')}
+                fallback = subprocess.run([sys.executable, str(ROOT / 'bin/auton'), '-c', str(client_config),
+                    '-t', 'deployment', '-s', 'check', '--auth-user', 'alice', '--auth-passwd', 'secret',
+                    '--delay', '0.01'], env=dict(os.environ, PYTHONPATH=str(ROOT)),
+                    capture_output=True, text=True, timeout=10)
+                self.assertEqual(fallback.returncode, 0, fallback.stderr)
+                target = json.loads(fallback.stdout)['targets'][0]
+                self.assertEqual(target['uri'], clients['two'].uri)
+                steps = target['scenarios'][0]['steps']
+                self.assertEqual([attempt['status'] for attempt in steps[0]['attempts']], ['not_admitted', 'admitted'])
+                self.assertEqual(len(steps[1]['attempts']), 1)
+                self.assertEqual(steps[1]['uri'], clients['two'].uri)
+                self.assertEqual(len(clients['one'].jobs()), before['one'])
+                self.assertEqual(len(clients['two'].jobs()), before['two'] + 2)
             finally:
                 if monitor is not None:
                     monitor.close()

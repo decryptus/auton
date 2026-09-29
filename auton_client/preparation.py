@@ -6,7 +6,7 @@ import json
 
 from auton_client.operations import OperationService
 from auton_client.scenarios import ScenarioService, select_scenarios
-from auton_client.connections import select_connections
+from auton_client.connections import select_connections, target_origins
 
 SECTIONS = ('Targets', 'Target groups', 'Scenarios', 'Scenario groups', 'Endpoints')
 MAX_INPUT = 4096
@@ -58,7 +58,13 @@ class PreparationView:
         targets = select_connections(self.selected[0], self.selected[1], self.connections, self.groups)
         if not targets:
             raise ValueError('Select at least one target or target group')
-        preview = ['Targets:'] + ['  %s = %s' % item for item in targets.items()]
+        preview = ['Targets:']
+        for name, value in targets.items():
+            origins = target_origins(value)
+            preview.append('  %s = %s' % (name, origins[0]))
+            if len(origins) > 1:
+                preview.append('    Ordered failover (one destination, no broadcast):')
+                preview.extend('      %s' % origin for origin in origins[1:])
         if self.selected[2] or self.selected[3]:
             scenarios = select_scenarios(self.selected[2], self.selected[3], self.scenarios, self.scenario_groups)
             service = ScenarioService(targets, scenarios, **self.settings)
@@ -185,6 +191,7 @@ class PreparationView:
             lines.append('%s | %s' % (self.result['operation_id'], self.result['status']))
             for target in self.result['targets']:
                 lines.append('%s | %s | %sms' % (target['target'], target['status'], target['duration_ms']))
+                lines.append('  Origin: ' + target['uri'])
                 steps = [(scenario['name'], step) for scenario in target.get('scenarios', [])
                          for step in scenario['steps']] if 'scenarios' in target else [('', target)]
                 for scenario, step in steps:
@@ -193,6 +200,9 @@ class PreparationView:
                          step['status'], step['return_code'], step['job_id']))
                     if step.get('error'):
                         lines.append('    error: ' + step['error'])
+                    for attempt in step.get('attempts', []):
+                        lines.append('    %s: %s%s' % (attempt['uri'], attempt['status'],
+                            ' - ' + attempt['reason'] if attempt['reason'] else ''))
                     if step['output_truncated']:
                         lines.append('    OUTPUT TRUNCATED')
                     for field in ('stdout', 'stderr'):
