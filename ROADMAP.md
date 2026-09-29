@@ -1037,6 +1037,26 @@ A target group selects where to execute; a scenario group selects what to run.
 This is a roadmap item, not an available command. Development remains focused
 on Auton; shared terminology does not require a shared execution framework.
 
+### Local daemon maintenance and pre-execution checks (planned)
+
+- Add an explicit local daemon maintenance state, separate from daemon health.
+  Expose availability and an optional operator reason through the visibility API.
+- Clients check maintenance before submission and show affected targets in CLI,
+  TUI and scenario results. Never infer maintenance from a network failure.
+- Enforce maintenance atomically at server-side admission, not only in the
+  client: a direct POST or a race after the client check must still be refused
+  with a stable, machine-readable maintenance reason.
+- Running jobs continue by default; visibility and output reads remain available.
+  Define the policy for already admitted queued jobs and recheck availability
+  before process launch; do not silently discard jobs or report them as running.
+- A maintenance refusal prevents scenario progression on that target, with an
+  explicit blocked/skipped reason; independent targets may continue. Do not
+  automatically retry or confuse a confirmed refusal with an ambiguous POST.
+- Restrict maintenance changes to explicitly authorized operators. Keep state
+  local to each daemon, without Centrex or mandatory central coordination.
+- Test admission races, queued/running behavior, direct HTTP enforcement,
+  authorization and partial multi-target outcomes before delivering the feature.
+
 ## Milestone 6 — Reliability and lifecycle
 
 Continue product hardening:
