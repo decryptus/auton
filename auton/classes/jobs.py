@@ -3,6 +3,7 @@
 """Job admission, access and retention, independent of transport interfaces."""
 
 import math
+import logging
 import threading
 import time
 from contextlib import contextmanager
@@ -11,6 +12,9 @@ from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_C
 from auton.classes.job_schema import validate_input
 from auton.classes.journal import record_event
 from auton.classes.availability import Availability, MaintenanceActive
+from auton.classes.job_store import JobStoreUnavailable, snapshot, restore
+
+LOG = logging.getLogger(__name__)
 
 DEFAULT_RESULT_TTL = 3600
 DEFAULT_MAX_JOBS = 128
@@ -61,6 +65,8 @@ def validate_offset(offset):
 def job_result(obj, offset=None):
     validate_offset(offset)
     with obj.output_lock:
+        if obj.persistence_error:
+            raise JobUnavailable('job completion could not be persisted; inspect daemon storage')
         result = {'uid': obj.get_uid(),
                   'status': obj.get_status(),
                   'return_code': obj.get_return_code(),
@@ -68,6 +74,9 @@ def job_result(obj, offset=None):
                   'stream': obj.get_last_result(offset),
                   'next_offset': len(obj.result),
                   'ended_at': obj.get_ended_at()}
+        if obj.outcome == 'job.interrupted':
+            result.update(outcome=obj.outcome, outcome_reason=obj.outcome_reason,
+                          execution_uncertain=obj.execution_uncertain)
         if obj.has_error():
             result['errors'] = list(obj.get_errors())
         return result
@@ -86,6 +95,10 @@ def job_summary(obj):
             'owner': obj.owner,
             'output_chunks': len(obj.result),
             'error_chunks': len(obj.errors),
+            'outcome': obj.outcome,
+            'outcome_reason': obj.outcome_reason,
+            'execution_uncertain': obj.execution_uncertain,
+            'storage_error': obj.persistence_error,
         }
 
 
@@ -94,13 +107,15 @@ class JobService(object):
                  clock=time.time, lock=None, lock_timeout=DEFAULT_LOCK_TIMEOUT,
                  result_ttl=DEFAULT_RESULT_TTL, max_jobs=DEFAULT_MAX_JOBS,
                  max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES, journal=None, availability=None,
-                 maintenance_operators=()):
+                 maintenance_operators=(), store=None):
         self.endpoints = endpoints
         self.queues = queues
         self.objs = {} if objects is None else objects
         self.object_factory = object_factory
         self.clock = clock
         self.journal = journal
+        self.store = store
+        self.persistence_failed = False
         self.availability = Availability() if availability is None else availability
         if (not isinstance(maintenance_operators, (list, tuple)) or
                 any(not isinstance(name, str) or not name.strip() for name in maintenance_operators)):
@@ -114,6 +129,45 @@ class JobService(object):
         if (not math.isfinite(self.result_ttl) or self.result_ttl <= 0
                 or self.max_jobs <= 0 or self.max_output_bytes <= 0):
             raise ValueError('job limits must be positive')
+
+        if self.store is not None:
+            if self.objs:
+                raise ValueError('cannot recover durable jobs into an existing object collection')
+            try:
+                for record in self.store.recover(self.clock(), self.result_ttl, self.max_jobs):
+                    obj = restore(record, self.max_output_bytes)
+                    self.objs[obj.uid] = obj
+            except JobStoreUnavailable:
+                raise JobUnavailable('cannot recover durable jobs') from None
+
+    def _save_job(self, obj):
+        try:
+            self.store.save(snapshot(obj))
+        except Exception:
+            self.persistence_failed = True
+            obj.persistence_error = True
+            LOG.error('job persistence failed; new admissions are disabled')
+            if obj.get_status() != STATUS_COMPLETE:
+                raise JobUnavailable('job storage unavailable; command not launched') from None
+            # Keep the worker alive after final-write failure. Results fail closed,
+            # health is degraded, and the last durable state recovers as interrupted.
+
+    def _delete_job(self, uid):
+        obj = self.objs.get(uid)
+        if obj is None:
+            return
+        # A terminal status is assigned before its durable write. Wait for that
+        # write before deleting, so expiry/eviction cannot resurrect the row.
+        with obj.output_lock:
+            if self.store is not None:
+                if obj.get_status() != STATUS_COMPLETE:
+                    raise JobUnavailable('cannot remove an unfinished durable job')
+                try:
+                    self.store.delete(uid)
+                except Exception:
+                    self.persistence_failed = True
+                    raise JobUnavailable('job storage unavailable') from None
+            self.objs.pop(uid, None)
 
     @contextmanager
     def _locked(self):
@@ -142,7 +196,7 @@ class JobService(object):
         cutoff = self.clock() - self.result_ttl
         for uid, obj in list(self.objs.items()):
             if obj.get_status() == STATUS_COMPLETE and obj.get_ended_at() <= cutoff:
-                del self.objs[uid]
+                self._delete_job(uid)
 
     def make_capacity(self):
         if len(self.objs) < self.max_jobs:
@@ -151,7 +205,7 @@ class JobService(object):
                      if obj.get_status() == STATUS_COMPLETE]
         if not completed:
             raise JobUnavailable('job capacity reached; retry later')
-        del self.objs[min(completed)[1]]
+        self._delete_job(min(completed)[1])
 
     def get_queue(self, endpoint):
         if endpoint not in self.queues:
@@ -165,7 +219,7 @@ class JobService(object):
         return self.objs[uid]
 
     def clear_object(self, endpoint, xid):
-        self.objs.pop(self.uid(endpoint, xid), None)
+        self._delete_job(self.uid(endpoint, xid))
 
     def _enqueue(self, endpoint, xid, method, payload, principal):
         queue = self.get_queue(endpoint)
@@ -177,13 +231,28 @@ class JobService(object):
         obj.max_output_bytes = self.max_output_bytes
         obj.journal = self.journal
         obj.availability = self.availability
+        obj.admitted_at = self.clock()
+        if self.store is not None:
+            obj.persistence = self._save_job
+            self._save_job(obj)
         self.objs[uid] = obj
         record_event(self.journal, 'job.admitted', uid=uid, endpoint=endpoint,
                      principal=principal, execution_id=obj.execution_id)
         try:
             queue.qput(obj)
         except Exception:
-            del self.objs[uid]
+            if self.store is None:
+                del self.objs[uid]
+            else:
+                with obj.output_lock:
+                    if obj.get_status() == STATUS_NEW:
+                        obj.launch_cancelled = True
+                        obj.outcome = 'job.rejected'
+                        obj.outcome_reason = 'queue_unavailable'
+                        obj.set_return_code(1)
+                        obj.set_ended_at()
+                        obj.set_status(STATUS_COMPLETE)
+                        obj.clear_input()
             record_event(self.journal, 'job.rejected', uid=uid, endpoint=endpoint,
                          principal=principal, reason='queue_unavailable', execution_id=obj.execution_id)
             raise
@@ -195,6 +264,8 @@ class JobService(object):
         with self._locked():
             try:
                 self.authorize(endpoint, principal)
+                if self.persistence_failed:
+                    raise JobUnavailable('job storage unavailable; new admissions disabled until restart')
                 with self.availability.admission():
                     self.expire_results()
                     if self.uid(endpoint, xid) in self.objs:
@@ -271,8 +342,11 @@ class JobService(object):
         """Report local service availability without exposing job data."""
         with self._locked():
             maintenance = self.availability.snapshot()
-            return {'status': 'ok', 'maintenance': maintenance,
-                    'accepting_jobs': not maintenance['enabled']}
+            result = {'status': 'degraded' if self.persistence_failed else 'ok', 'maintenance': maintenance,
+                      'accepting_jobs': not maintenance['enabled'] and not self.persistence_failed}
+            if self.store is not None:
+                result['storage'] = {'durable': True, 'available': not self.persistence_failed}
+            return result
 
     def set_maintenance(self, principal, enabled, reason=''):
         if principal is None or principal not in self.maintenance_operators:

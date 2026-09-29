@@ -46,9 +46,9 @@ class Availability:
     @contextmanager
     def launch(self, obj, stopped=lambda: False):
         with self.condition:
-            while self.enabled and not stopped():
+            while self.enabled and not stopped() and getattr(obj, 'launch_cancelled', False) is not True:
                 self.condition.wait(LAUNCH_WAIT_INTERVAL)
-            if stopped():
+            if stopped() or getattr(obj, 'launch_cancelled', False) is True:
                 raise LaunchStopped('daemon stopped before execution')
             # Transition and adapter launch share the gate with maintenance changes.
             obj.set_started_at()

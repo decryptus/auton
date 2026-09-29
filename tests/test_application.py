@@ -358,6 +358,18 @@ from auton_client.connections import select_connections
 import tempfile
 from pathlib import Path
 with tempfile.TemporaryDirectory() as directory:
+    from auton.classes.job_store import SQLiteJobStore
+    path = str(Path(directory) / 'jobs.db')
+    store = SQLiteJobStore(path)
+    durable = JobService({'fake': SimpleNamespace(users={'alice': True})}, {'fake': FakeQueue()},
+                         store=store, clock=lambda: 10)
+    durable.submit('fake', 'persisted', {'args': ['durable']}, 'alice', 0)
+    store.close()
+    store = SQLiteJobStore(path)
+    restored = JobService(durable.endpoints, {}, store=store, clock=lambda: 10)
+    assert restored.detail('fake', 'persisted', 'alice')['stream'] == ['durable']
+    assert restored.list_jobs('bob') == []
+    store.close()
     config_path = Path(directory) / 'targets.yml'
     config_path.write_text('targets: {local: http://localhost}\ngroups: {web: [local]}')
     assert load_targets(config_path) == {'local': 'http://localhost'}

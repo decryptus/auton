@@ -106,17 +106,17 @@ ownership. Counts do not include other users' jobs; shared queue depths are not
 exposed. Detail returns HTTP 200 even when the inspected command failed: inspect
 `status`, `return_code` and `errors`. Missing/expired jobs return 404, access denial
 returns 403, and a service lock timeout returns 503. Listing, statistics and detail
-requests also clean expired results. There is no persistent history.
+requests also clean expired results. Optional local SQLite history survives restart
+(see [Durable local jobs](#durable-local-jobs)); memory remains the default.
 
 These reads never advance the legacy `/status` output cursor. Detail uses the
 existing output format (`stream` for stdout, `errors` for stderr/diagnostics).
 The existing `/run` and `/status` contracts are unchanged.
 
-The example configuration is an unauthenticated local demo: anonymous clients
-share one identity. Before remote use, set `auth: true` on **all seven routes**
-in `etc/auton/modules/job.yml`, configure Basic authentication and endpoint users,
-and serve behind HTTPS. Apply the same protection when adding these routes to an
-existing installation; keep the existing `run` route's `safe_init: true` setting.
+The example configuration uses `auth_mode: required`: configure Basic or SQLite
+credentials before starting it. Current endpoint ACLs and job ownership still
+apply. Use HTTPS for remote access. Keep the existing `run` route's
+`safe_init: true` setting when migrating route configuration.
 
 ### Explicit multi-target execution (development branch)
 
@@ -855,7 +855,7 @@ general:
 
 The daemon owns the configuration and storage location. A relative database path
 is resolved beside the main YAML file; environment-only configuration requires an
-absolute path. Authentication and future job-history storage are independent.
+absolute path. Authentication and job-history storage are independent.
 The database is opened after daemonization and privilege drop. It is local to this
 daemon deployment, not a shared multi-node authentication server.
 
@@ -1297,4 +1297,79 @@ file/environment preparation, terminal output and exit-code behavior remain in
 continues to package the daemon separately.
 
 Job expiry remains lazy on service operations; this change does not introduce a
-background expiry thread, durable job storage or a total client polling deadline.
+background expiry thread or a total client polling deadline. Durable local storage
+is available separately through `general.job_storage`.
+
+
+### Durable local jobs
+
+Opt in independently of authentication, in the daemon configuration:
+
+```yaml
+general:
+  job_storage:
+    backend: sqlite
+    path: /var/lib/autond/jobs/jobs.db
+    timeout: 5
+  result_ttl: 3600
+  max_jobs: 128
+  max_output_bytes: 1048576
+```
+
+Create the parent directory under the daemon account before starting Autond
+(for example `install -d -m 0700 -o auton -g auton /var/lib/autond/jobs`).
+Relative paths resolve against the main configuration file's directory. The
+file is created with mode `0600`; its parent must be owned by the daemon user
+and not writable by group/others. Existing files must be private, regular and
+owned by that user. Use a local filesystem supporting SQLite and file locks.
+One daemon owns each history file; a second daemon using it refuses to start.
+The Docker image provides `/var/lib/autond/jobs`; mount persistent storage there
+with suitable ownership if history must survive container replacement.
+
+The SQLite adapter reuses Sonicprobe AnySQL with automatic reconnection/replay
+disabled. Authentication and job history require **separate database files**;
+Basic authentication also works with SQLite jobs. With no `job_storage` section,
+the historical in-memory behavior is unchanged. Redis and mixed backends are
+future extensions; no Redis configuration is accepted yet.
+
+Jobs are committed at admission, before execution, and at completion. Terminal
+stdout/stderr chunks, result codes, timestamps, execution identity and ownership
+survive restart. Request payloads, uploaded files and environment variables are
+not persisted. Output itself can contain sensitive data. Live output is retained
+in memory until completion, not checkpointed line by line.
+
+After restart, unfinished jobs are **never enqueued or replayed**:
+
+| Last durable state | Recovered result |
+| --- | --- |
+| `new` | `complete`, return code `130`, `outcome: job.interrupted`, `outcome_reason: restart_before_launch`, `execution_uncertain: false`. The command did not launch. |
+| `processing` | `complete`, return code `130`, `outcome: job.interrupted`, `outcome_reason: daemon_restart`, `execution_uncertain: true`. Its actual outcome is unknown. |
+| `complete` | Original retained result and output. |
+
+The pre-launch snapshot is conservative: a crash can happen before process creation
+or after execution but before the final commit. Abrupt daemon death can also leave
+an already launched process alive. Recovery does not reattach to or kill such a
+process by stored PID. Verify its effects before manually executing again.
+The existing `complete` state keeps legacy clients from polling interrupted jobs
+forever; a completion state does not mean success. Current endpoint ACLs and job
+ownership apply to restored results, including endpoints removed from configuration.
+
+Storage failures disable new admissions and report `status: degraded` with
+`storage.available: false` through `/health`. A failed admission/pre-launch commit
+prevents launch. A failed final commit leaves the worker alive but result reads
+return 503; job listings expose `storage_error: true`. There is no silent memory
+fallback or automatic retry. Repair storage and restart the daemon. Requests
+already accepted remain subject to the same pre-launch persistence check.
+
+Retention uses the existing TTL and capacity rules, both in memory and on disk.
+Cleanup runs at recovery and on service reads/admissions; there is no background
+expiry thread. Completed jobs are evicted first during normal admission. Lowering
+capacity on restart keeps only the newest retained snapshots. SQLite files may
+retain their allocated size after deletion; this is bounded retained history,
+not an indefinitely growing audit archive. Durable mode supports at most 10,000
+retained jobs and 16 MiB of configured output per job. Reducing the output limit
+below retained output can prevent recovery: keep the old limit until those results
+expire. Back up the database with the daemon stopped.
+
+The optional JSONL journal remains a separate metadata log. It neither restores
+jobs nor guarantees transactional agreement with the SQLite history.

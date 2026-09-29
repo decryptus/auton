@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system auton \
     && useradd --system --gid auton --home-dir /etc/auton auton \
-    && mkdir -p /run/auton /var/log/autond /etc/auton /var/lib/autond/auth \
+    && mkdir -p /run/auton /var/log/autond /etc/auton /var/lib/autond/auth /var/lib/autond/jobs \
     && chown -R auton:auton /run/auton /var/log/autond /etc/auton /var/lib/autond
 
 WORKDIR /opt/auton
