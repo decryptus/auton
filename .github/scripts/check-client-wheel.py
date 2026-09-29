@@ -32,6 +32,12 @@ inventory = load_inventory("targets.yml")
 assert select_connections(["loc*"], ["~web$"], **dict(configured=inventory["targets"], groups=inventory["groups"])) == inventory["targets"]
 from auton_client.operations import OperationService
 assert OperationService({"local": "http://localhost"}, "example").parallel == 4
+from auton_client.scenarios import ScenarioService, select_scenarios
+Path("scenarios.yml").write_text("check: {version: 1, steps: [{name: check, endpoint: example}]}")
+Path("targets.yml").write_text("targets: {local: http://localhost}\nimport_scenarios: scenarios.yml\nscenario_groups: {checks: [check]}")
+inventory = load_inventory("targets.yml")
+scenarios = select_scenarios([], ["ch*"], inventory["scenarios"], inventory["scenario_groups"])
+assert len(ScenarioService(inventory["targets"], scenarios).steps) == 1
 from auton_client.visibility import DaemonClient
 from auton_client.monitor import FleetMonitor
 from auton_client.tui import OperatorView, daemon_specs

@@ -15,3 +15,9 @@ groups:
 #import_groups: groups.yml
 # Only the main file may import. Imported files have no targets/groups wrapper.
 # Imported and inline names must not overlap.
+
+# Scenario catalogues also import only from this main file:
+#import_scenarios: scenarios/deploy.yml.example
+#scenario_groups:
+#  release: [deploy]
+#import_scenario_groups: scenario-groups.yml

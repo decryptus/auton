@@ -48,6 +48,10 @@ def argv_parse_check():
                         help='Target name/glob/~regex from --config or NAME=URI')
     parser.add_argument('-g', '--target-group', action='append', default=[], metavar='SELECTOR',
                         help='Select YAML groups by name, glob or ~regex; repeat to combine')
+    parser.add_argument('-s', '--scenario', action='append', default=[], metavar='SELECTOR',
+                        help='Execute named YAML scenarios, selected by name/glob/~regex')
+    parser.add_argument('-S', '--scenario-group', action='append', default=[], metavar='SELECTOR',
+                        help='Execute ordered YAML scenario groups, selected by name/glob/~regex')
     parser.add_argument('--parallel', type=int, default=4, help='Maximum concurrent targets (1-32)')
     parser.add_argument('--operation-timeout', type=float, default=300,
                         help='Stop observing after this many seconds; does not cancel remote jobs')
@@ -194,6 +198,16 @@ def argv_parse_check():
                 or options.imp_envvars or options.load_envfiles):
             parser.error('--tui is read-only and cannot be combined with execution options')
 
+    scenario_mode = bool(options.scenario or options.scenario_group)
+    if scenario_mode:
+        if not options.config or not (options.target or options.target_group):
+            parser.error('scenario execution requires --config and explicit target selections')
+        if (options.tui or options.endpoint or options.mode != 'autorun' or options.args
+                or options.argfiles or options.margs or options.margsfiles or options.envvars
+                or options.envfiles or options.imp_envvars or options.load_envfiles):
+            parser.error('scenario definitions own endpoints and inputs; incompatible execution/TUI options')
+
+    options.selected_scenarios = None
     options.configured_targets = {}
     options.configured_groups = {}
     if options.target_group and not options.config:
@@ -206,6 +220,10 @@ def argv_parse_check():
             inventory = load_inventory(options.config)
             options.configured_targets = inventory['targets']
             options.configured_groups = inventory['groups']
+            if scenario_mode:
+                from auton_client.scenarios import select_scenarios
+                options.selected_scenarios = select_scenarios(options.scenario, options.scenario_group,
+                    inventory['scenarios'], inventory['scenario_groups'])
         except ValueError as error:
             parser.error(str(error))
     options.selected_targets = None
@@ -358,10 +376,14 @@ def main(options):
         if options.target or options.target_group:
             from auton_client.operations import OperationService
             auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
-            operation = OperationService(options.selected_targets, options.endpoint,
-                                         payload=PayloadBuilder(options).payload, auth=auth,
-                                         http_timeout=options.http_timeout, parallel=options.parallel,
-                                         timeout=options.operation_timeout, delay=options.delay)
+            settings = dict(auth=auth, http_timeout=options.http_timeout, parallel=options.parallel,
+                            timeout=options.operation_timeout, delay=options.delay)
+            if options.selected_scenarios:
+                from auton_client.scenarios import ScenarioService
+                operation = ScenarioService(options.selected_targets, options.selected_scenarios, **settings)
+            else:
+                operation = OperationService(options.selected_targets, options.endpoint,
+                                             payload=PayloadBuilder(options).payload, **settings)
             result = operation.run(options.operation_id)
             print(json.dumps(result))
             rc = int(result['status'] != 'completed')

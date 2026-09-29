@@ -254,7 +254,8 @@ across files/inline sections, missing files and malformed sections are errors;
 there is no silent override. The aggregate UTF-8 input is limited to 64 KiB and
 16 imported files. URL imports, custom `!include` tags, YAML merge keys and
 nested groups are not supported. All sections are loaded and validated before
-selection or network access. Scenario imports remain planned with scenario support.
+selection or network access. The same rules apply to `import_scenarios` and
+`import_scenario_groups`, described below.
 
 The same prepared arguments, argument files and environment are sent to every
 selected target. Authentication options apply to every target, so use origins
@@ -321,7 +322,85 @@ separately per target, with a combined 1 MiB retained stdout/stderr limit per
 target and an explicit truncation flag. The stderr array includes the daemon's
 error diagnostics as well as captured stderr. Duration measures client observation,
 not exclusively remote process runtime. This initial mode prints its result at
-the end; live operation views and ordered job sequences remain follow-up work.
+the end; live operation views remain follow-up work.
+
+### Scenarios and scenario groups (client)
+
+A scenario runs ordered steps on each explicitly selected target. Each step
+creates a separate remote job. Define scenarios in the client inventory:
+
+```yaml
+targets:
+  web-01: https://autond-01.example.com
+  web-02: https://autond-02.example.com
+groups:
+  production: [web-01, web-02]
+scenarios:
+  deploy:
+    version: 1
+    description: Check, deploy and verify the application
+    steps:
+      - name: preflight
+        endpoint: preflight
+      - name: deploy
+        endpoint: deploy
+        args: ["release-42"]
+        env: {DEPLOY_ENV: "production"}
+      - name: verify
+        endpoint: verify
+scenario_groups:
+  release: [deploy]
+```
+
+The referenced endpoints must already be configured and authorized on every
+daemon. Client YAML cannot install commands or change endpoint ACLs.
+
+```sh
+auton -c client.yml -g production -s deploy
+auton -c client.yml -t 'web-*' -S 'rel*' > operation.json
+# Long aliases: --scenario and --scenario-group
+```
+
+Scenario and group selectors share target glob/`~regex` syntax and limits.
+Every selector must match; a missing match rejects the entire selection, even
+when other selectors match. Direct scenarios are selected first, then groups;
+each category preserves option order, patterns expand in declaration order,
+and groups preserve member order. Overlaps are deduplicated at first occurrence.
+Scenario groups contain exact scenario names, never other groups.
+
+To split the inventory, use `import_scenarios: scenarios/deploy.yml` and
+`import_scenario_groups: scenario-groups.yml` in the main file. Imported files
+contain entries directly (for example `deploy: {version: 1, steps: ...}`), without
+section wrappers. Imports stay one level deep. See the [example scenario](etc/auton-client/scenarios/deploy.yml.example).
+
+Names for scenarios, groups and steps follow `[a-z0-9-]+`, 1–32 characters.
+A step has a unique `name` within its scenario, an `endpoint`, optional `args`
+(list of strings) and optional `env` (string-to-string mapping). Quote numeric or
+YAML-reserved values. Version must be integer `1`. Unknown fields are rejected.
+There are at most 128 scenarios and 128 groups, 32 steps per scenario and 128
+steps per invocation. The shared 64 KiB configuration limit also includes imports.
+All definitions and references are validated before any submission.
+
+Steps and scenarios run sequentially **per target**, with `--parallel` workers
+across targets. Failure, explicit rejection or an unknown result stops that
+target's sequence; later steps and scenarios are reported as `skipped` without
+job IDs. Independent targets continue. The observation deadline applies to the
+whole invocation; reaching it or interrupting the client prevents further work
+but does not cancel a running remote job. No automatic retry, rollback or resume
+is performed. An ambiguous POST is never replayed.
+
+The final JSON has `kind: "scenario"`, `operation_id`, selected `scenarios`,
+aggregate `status` and a `targets` array. Each target contains ordered scenario
+results, each with ordered step results: name (`step`), endpoint, job ID, state,
+exit code, stdout, stderr and duration. Retained output is limited to 1 MiB
+combined across all steps of each target; truncation is explicit. Exit status is
+zero only when every step on every target completes successfully. Save the JSON
+for the job mapping; progression requires the client to remain running.
+
+Scenario steps own their inputs: `--endpoint` (including `AUTON_ENDPOINT`), CLI
+argument/environment options, legacy `run`/`status` modes and `--tui` cannot be
+combined with scenario execution. Interactive scenario preparation is planned.
+Existing single-command and legacy failover invocations remain available.
 
 ### Operator TUI (client)
 

@@ -143,6 +143,45 @@ class HTTPIntegrationTests(unittest.TestCase):
                 self.assertEqual([t['status'] for t in json.loads(denied.stdout)['targets']], ['rejected', 'rejected'])
                 self.assertEqual(len(clients['one'].jobs()), 3)
                 self.assertEqual(len(clients['two'].jobs()), 3)
+                # Imported scenarios use the same real admission/ownership checks.
+                plan = {
+                    'check': {'version': 1, 'steps': [
+                        {'name': 'first', 'endpoint': 'test', 'args': ['-c', 'print("first")']},
+                        {'name': 'second', 'endpoint': 'test', 'args': ['-c', 'print("second")']}]},
+                    'verify': {'version': 1, 'steps': [
+                        {'name': 'verify', 'endpoint': 'test', 'args': ['-c', 'print("verified")']}]}}
+                scenario_path = Path(tmp) / 'scenarios.yml'
+                scenario_path.write_text(yaml.safe_dump(plan))
+                with client_config.open('a') as config_stream:
+                    config_stream.write('\nimport_scenarios: scenarios.yml\nscenario_groups: {release: [check, verify]}\n')
+                for password, expected, added in [('secret', 'completed', 3), ('wrong', 'failed', 0),
+                                                   ('secret', 'failed', 1)]:
+                    if expected == 'failed' and password == 'secret':
+                        plan['check']['steps'][0]['args'] = ['-c', 'raise SystemExit(7)']
+                        scenario_path.write_text(yaml.safe_dump(plan))
+                    before = {name: len(clients[name].jobs()) for name in ('one', 'two')}
+                    execution = subprocess.run([sys.executable, str(ROOT / 'bin/auton'),
+                        '--auth-user', 'alice', '--auth-passwd', password, '--delay', '0.01',
+                        '-s', 'ch*', '-S', '~release$'] + target_args,
+                        env=dict(os.environ, PYTHONPATH=str(ROOT)), capture_output=True, text=True, timeout=10)
+                    self.assertEqual(execution.returncode, int(expected != 'completed'), execution.stderr)
+                    operation = json.loads(execution.stdout)
+                    self.assertEqual(operation['status'], expected)
+                    self.assertEqual(operation['scenarios'], ['check', 'verify'])
+                    for target in operation['targets']:
+                        steps = [step for item in target['scenarios'] for step in item['steps']]
+                        if expected == 'completed':
+                            self.assertEqual([''.join(step['stdout']) for step in steps],
+                                             ['first\n', 'second\n', 'verified\n'])
+                            self.assertEqual(len({step['job_id'] for step in steps}), 3)
+                            uri = clients[target['target']].uri
+                            for step in steps:
+                                self.assertEqual(requests.get(uri + '/jobs/test/' + step['job_id'],
+                                    auth=('bob', 'secret'), timeout=2).status_code, 403)
+                        else:
+                            self.assertEqual([step['status'] for step in steps],
+                                ['rejected' if password == 'wrong' else 'failed', 'skipped', 'skipped'])
+                        self.assertEqual(len(clients[target['target']].jobs()), before[target['target']] + added)
             finally:
                 if monitor is not None:
                     monitor.close()

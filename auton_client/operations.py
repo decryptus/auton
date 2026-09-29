@@ -25,6 +25,27 @@ OUTPUT_FIELDS = ('stream', 'errors')
 MAX_OPERATION_ID = 128
 
 
+def validate_endpoint(endpoint):
+    if (not isinstance(endpoint, str) or not endpoint or
+            any(char in endpoint for char in '/?#\r\n')):
+        raise ValueError('endpoint must be a nonempty URL path segment')
+    return endpoint
+
+
+def operation_identity(operation_id):
+    operation_id = str(uuid.uuid4()) if operation_id is None else operation_id
+    if not isinstance(operation_id, str) or not operation_id or len(operation_id) > MAX_OPERATION_ID:
+        raise ValueError('operation_id must contain 1 to 128 characters')
+    return operation_id
+
+
+def operation_status(results):
+    if all(result['status'] == 'completed' for result in results):
+        return 'completed'
+    return 'incomplete' if any(result['status'] in ('unknown', 'not_submitted')
+                               for result in results) else 'failed'
+
+
 class OperationService:
     def __init__(self, targets, endpoint, payload=None, auth=None,
                  http_timeout=DEFAULT_HTTP_TIMEOUT, parallel=DEFAULT_PARALLEL,
@@ -32,9 +53,7 @@ class OperationService:
                  client_factory=ExecutionClient, clock=time.monotonic, sleep=time.sleep):
         if not isinstance(targets, dict) or not 1 <= len(targets) <= MAX_TARGETS:
             raise ValueError('provide between 1 and %s explicit targets' % MAX_TARGETS)
-        if (not isinstance(endpoint, str) or not endpoint or
-                any(char in endpoint for char in '/?#\r\n')):
-            raise ValueError('endpoint must be a nonempty URL path segment')
+        validate_endpoint(endpoint)
         if isinstance(parallel, bool) or not isinstance(parallel, int) or not 1 <= parallel <= MAX_PARALLEL:
             raise ValueError('parallel must be between 1 and %s' % MAX_PARALLEL)
         if (not math.isfinite(timeout) or timeout <= 0 or
@@ -62,7 +81,7 @@ class OperationService:
     @staticmethod
     def _retain(result, field, chunks):
         for chunk in chunks:
-            remaining = MAX_RETAINED_OUTPUT_BYTES - result['_output_bytes']
+            remaining = result['_output_limit'] - result['_output_bytes']
             encoded = chunk.encode('utf-8')
             if len(encoded) > remaining:
                 result['output_truncated'] = True
@@ -88,12 +107,14 @@ class OperationService:
                                             or not isinstance(data.get('return_code'), int)):
             raise ValueError('missing final exit code')
 
-    def _target(self, name, job_id, deadline, stopped):
+    def execute_target(self, name, job_id, deadline, stopped, output_limit=MAX_RETAINED_OUTPUT_BYTES):
+        if type(output_limit) is not int or not 0 <= output_limit <= MAX_RETAINED_OUTPUT_BYTES:
+            raise ValueError("invalid retained output limit")
         started = self.clock()
         result = {'target': name, 'uri': self.targets[name], 'job_id': job_id,
                   'uid': self.endpoint + ':' + job_id, 'status': 'not_submitted',
                   'return_code': None, 'stdout': [], 'stderr': [], 'error': None,
-                  'output_truncated': False, '_output_bytes': 0}
+                  'output_truncated': False, '_output_bytes': 0, '_output_limit': output_limit}
         client = None
         submitted = False
         try:
@@ -144,24 +165,20 @@ class OperationService:
         finally:
             result['duration_ms'] = round(max(0, self.clock() - started) * 1000, 3)
             result.pop('_output_bytes', None)
+            result.pop('_output_limit', None)
         return result
 
     def run(self, operation_id=None):
-        operation_id = str(uuid.uuid4()) if operation_id is None else operation_id
-        if not isinstance(operation_id, str) or not operation_id or len(operation_id) > MAX_OPERATION_ID:
-            raise ValueError('operation_id must contain 1 to 128 characters')
+        operation_id = operation_identity(operation_id)
         jobs = {name: str(uuid.uuid4()) for name in self.targets}
         deadline = self.clock() + self.timeout
         stopped = threading.Event()
         with ThreadPoolExecutor(max_workers=self.parallel) as pool:
-            futures = [pool.submit(self._target, name, jobs[name], deadline, stopped) for name in self.targets]
+            futures = [pool.submit(self.execute_target, name, jobs[name], deadline, stopped) for name in self.targets]
             try:
                 results = [future.result() for future in futures]
             except KeyboardInterrupt:
                 stopped.set()
                 results = [future.result() for future in futures]
-        success = all(result['status'] == 'completed' for result in results)
         return {'operation_id': operation_id, 'endpoint': self.endpoint,
-                'status': 'completed' if success else 'incomplete' if any(
-                    result['status'] in ('unknown', 'not_submitted') for result in results) else 'failed',
-                'targets': results}
+                'status': operation_status(results), 'targets': results}
