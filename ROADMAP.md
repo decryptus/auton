@@ -180,9 +180,9 @@ Improve distributed-operation ergonomics:
 - show elapsed time and completion state per job;
 - add filtering and grouping in TUI.
 
-### Named scenarios and job sequences (next development milestone)
+### Named scenarios and job sequences (implemented in CLI)
 
-Keep one job as one command on one daemon. An operation may later describe
+Keep one job as one command on one daemon. An operation can describe
 several ordered steps, each producing a distinct job per selected target.
 
 Provide named, declarative scenarios, initially described in a versioned YAML
@@ -198,8 +198,9 @@ Python/shell evaluation in the scenario format, a generic DAG engine, implicit
 rollback, or a permanent scheduler. An endpoint may still execute a configured
 remote script under its normal daemon authorization rules.
 
-This is a planned capability: scenario files and a scenario CLI option are not
-yet implemented. Multi-target execution currently runs one job per target.
+Implemented: version-1 scenario YAML, `-s/--scenario`, `-S/--scenario-group`,
+validated flat imports and a neutral ScenarioService. One command per target
+remains available without a scenario. Interactive preparation is the next step.
 
 Configuration layout:
 
@@ -242,11 +243,11 @@ the explicit long forms for readable scripts and backwards compatibility.
 | `--config` | `-c` implemented |
 | `--target` | `-t` implemented |
 | `--target-group` | `-g` implemented |
-| `--scenario` | `-s` planned |
-| `--scenario-group` | `-S` planned |
+| `--scenario` | `-s` implemented |
+| `--scenario-group` | `-S` implemented |
 
 Example of intended usage: `auton --tui -c targets.yml -g 'prod-*' -S 'maintenance-*'`.
-Scenario aliases remain planned. Check the parser before assigning
+Scenario aliases work in CLI; the TUI example remains planned. Check the parser before assigning
 short flags; do not repurpose existing options such as `-a`, `-A`, `-e` or `-l`.
 Short and long forms must share validation, repeated-selection and pattern
 semantics. Cover equivalence in CLI tests and show both forms in `--help` and docs.
@@ -255,12 +256,12 @@ semantics. Cover equivalence in CLI tests and show both forms in `--help` and do
 
 - Implemented: named target groups select an explicit, deduplicated union of destinations.
   Keep this separate from ordered failover; a group is not a replacement chain.
-- Add `--scenario NAME` and `--scenario-group NAME` after individual scenarios.
+- Implemented in CLI: `--scenario NAME` and `--scenario-group NAME`.
   TUI startup selectors prepare the view and never submit jobs automatically.
 - Implemented patterns follow monit-docker: `web-01` (literal), `web-*` (glob),
   `~web-[0-9]+$` (regex). No `glob:` or `regex:` prefixes. Quote shell arguments.
   Preserve inline `NAME=URI`. Match declared names, not URI strings or paths.
-- Apply patterns to targets and target groups now; extend to scenarios and scenario groups when available.
+- Patterns apply to targets, target groups, scenarios and scenario groups.
   Match group names before expanding members. Use case-sensitive whole-name
   globs and start-of-name regex matching; `$` anchors the regex end. Identifier
   validation remains a separate full-match contract.
@@ -270,29 +271,28 @@ semantics. Cover equivalence in CLI tests and show both forms in `--help` and do
 - Display the selected destinations and active filters in the TUI; scope changes
   must be explicit. Scenario filters initially restrict the catalogue, not jobs
   without scenario/operation metadata. Server authorization remains authoritative.
-- CLI and TUI share application services. Scenario selection and TUI execution
-  remain planned; YAML group members remain exact target names.
+- CLI and TUI use shared application services. Scenario selection within the TUI
+  and TUI execution remain planned; YAML group members remain exact names.
 
 ### Single-level section imports
 
-Implemented for client inventories: `import_targets` and `import_groups` follow
+Implemented for client inventories: all four section imports follow
 DWho's section-import naming convention. Local files contain the section mapping
 itself; relative paths resolve from the main configuration directory. Only the
 main file may import: no inclusion inside an inclusion, no silent overrides,
 no remote URLs, and no custom `!include` tag. Bound file count and aggregate
 input size, reject repeated files, and validate all definitions before selection.
 
-When scenarios arrive, apply the same one-level contract to `import_scenarios`
-and `import_scenario_groups`, with complete reference validation. Those two keys
-are planned, not accepted by the current loader. Imports organize configuration;
+Supported keys: `import_targets`, `import_groups`, `import_scenarios` and
+`import_scenario_groups`, with complete reference validation. Imports organize configuration;
 they do not select targets, submit work or change failover semantics.
 
-### Scenario Group (planned, after individual scenarios)
+### Scenario Group (implemented in CLI)
 
 Add named, ordered groups of existing scenarios, distinct from target groups.
 A target group selects where to execute; a scenario group selects what to run.
 
-- Proposed CLI: `--scenario-group maintenance`, combined with explicit targets
+- CLI: `--scenario-group maintenance`, combined with explicit targets
   or a target group; preserve single-scenario and existing execution commands.
 - Validate every scenario reference before submitting any job. Start with flat
   groups; reject duplicate members and nested group references.
@@ -304,8 +304,8 @@ A target group selects where to execute; a scenario group selects what to run.
 - Never replay an ambiguous POST, imply rollback or cancel running jobs.
 - Keep execution in application services shared by CLI and TUI.
 
-This is a roadmap item, not an available command. Development remains focused
-on Auton; shared terminology does not require a shared execution framework.
+Interactive selection remains planned. Development remains focused on Auton;
+shared terminology does not require a shared execution framework.
 
 ### Local daemon maintenance and pre-execution checks (planned)
 

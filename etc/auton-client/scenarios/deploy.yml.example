@@ -1,0 +1,14 @@
+# Raw scenario mapping for import_scenarios in the main client file.
+# Endpoints must already exist on the selected daemons.
+deploy:
+  version: 1
+  description: Preflight, deploy and verify
+  steps:
+    - name: preflight
+      endpoint: preflight
+    - name: deploy
+      endpoint: deploy
+      args: ["release-42"]
+      env: {DEPLOY_ENV: "production"}
+    - name: verify
+      endpoint: verify

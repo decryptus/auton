@@ -12,8 +12,11 @@ MAX_CONFIG_BYTES = 65536
 MAX_CONFIG_TARGETS = 128
 MAX_CONFIG_GROUPS = 128
 MAX_IMPORT_FILES = 16
-CONFIG_SECTIONS = ('targets', 'groups')
-CONFIG_FIELDS = frozenset(('targets', 'groups', 'import_targets', 'import_groups'))
+CONFIG_SECTIONS = ('targets', 'groups', 'scenarios', 'scenario_groups')
+CONFIG_FIELDS = frozenset(CONFIG_SECTIONS + tuple('import_' + section for section in CONFIG_SECTIONS))
+MAX_SCENARIO_NODES = 8192
+MAX_SCENARIO_DEPTH = 8
+INTEGER_TAG = 'tag:yaml.org,2002:int'
 STRING_TAG = 'tag:yaml.org,2002:str'
 MAPPING_TAG = 'tag:yaml.org,2002:map'
 SEQUENCE_TAG = 'tag:yaml.org,2002:seq'
@@ -52,6 +55,25 @@ def _import_paths(node):
             raise ValueError('imports require local file paths')
         paths.append(item.value)
     return paths
+
+
+def _plain_scenario(node, budget, depth=0):
+    budget[0] -= 1
+    if budget[0] < 0 or depth > MAX_SCENARIO_DEPTH:
+        raise ValueError('scenario YAML is too large or deeply nested')
+    if isinstance(node, ScalarNode):
+        if node.tag == STRING_TAG:
+            return node.value
+        if node.tag == INTEGER_TAG:
+            try:
+                return int(node.value)
+            except ValueError:
+                pass
+    elif isinstance(node, SequenceNode) and node.tag == SEQUENCE_TAG:
+        return [_plain_scenario(value, budget, depth + 1) for value in node.value]
+    elif isinstance(node, MappingNode) and node.tag == MAPPING_TAG:
+        return {key: _plain_scenario(value, budget, depth + 1) for key, value in _mapping(node).items()}
+    raise ValueError('scenario YAML supports only mappings, lists, strings and integer versions')
 
 
 def load_inventory(path):
@@ -120,7 +142,14 @@ def load_inventory(path):
                 if member.value not in members:
                     members.append(member.value)
             groups[name] = members
-        return {'targets': targets, 'groups': groups}
+        from auton_client.scenarios import validate_scenarios, validate_scenario_groups
+        node_budget = [MAX_SCENARIO_NODES]
+        scenarios = validate_scenarios({name: _plain_scenario(node, node_budget)
+                                       for name, node in sections['scenarios'].items()})
+        scenario_groups = validate_scenario_groups({name: _plain_scenario(node, node_budget)
+                                                   for name, node in sections['scenario_groups'].items()}, scenarios)
+        return {'targets': targets, 'groups': groups,
+                'scenarios': scenarios, 'scenario_groups': scenario_groups}
     except (OSError, UnicodeError):
         raise ValueError('unable to read UTF-8 client config or import') from None
     except (yaml.YAMLError, RecursionError, RuntimeError):

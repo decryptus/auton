@@ -370,6 +370,14 @@ class FakeRemote:
 operation = OperationService(selected, 'fake', client_factory=FakeRemote).run()
 assert operation['status'] == 'completed'
 assert operation['targets'][0]['stdout'] == ['done']
+from auton_client.scenarios import ScenarioService
+plan = {'check': {'version': 1, 'steps': [
+    {'name': 'first', 'endpoint': 'fake'}, {'name': 'second', 'endpoint': 'fake'}]}}
+operation = ScenarioService(selected, plan, client_factory=FakeRemote).run()
+assert operation['status'] == 'completed'
+steps = operation['targets'][0]['scenarios'][0]['steps']
+assert len(steps) == 2 and steps[0]['job_id'] != steps[1]['job_id']
+assert steps[1]['stdout'] == ['done']
 '''
         result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
                                 env=dict(os.environ, PYTHONPATH=str(ROOT)),
