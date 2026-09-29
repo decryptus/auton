@@ -315,8 +315,10 @@ selection or network access. The same rules apply to `import_scenarios` and
 `import_scenario_groups`, described below.
 
 The same prepared arguments, argument files and environment are sent to every
-selected target. Authentication options apply to every target, so use origins
-that trust the same credentials and HTTPS outside a trusted local network.
+selected target. Use origin-bound credential profiles for independent daemon accounts. A single
+`-k` token or legacy Basic identity applies to every explicitly selected target;
+only use that mode where all selected origins trust that credential. Use HTTPS
+for remote connections.
 All target origins are validated before the first POST (hostname/IPv4/IPv6,
 port 1–65535, no whitespace or control characters). Redirects are never followed. Each daemon still enforces its authentication,
 endpoint ACLs and job ownership. Duplicate normalized origins are rejected;
@@ -582,7 +584,8 @@ auton --tui --daemon prod=https://autond-01.example.net \
 
 Authentication uses `-k` / `--token-file` for a bearer token, or the existing `--auth-user` / `--auth-passwd` options or
 `AUTON_AUTH_USER` / `AUTON_AUTH_PASSWD`. These credentials apply to all explicitly
-listed daemons; select only trusted servers sharing that identity. URIs must be
+listed daemons; select only trusted servers sharing that identity, or configure
+separate origin-bound profiles below. URIs must be
 HTTP(S) origins without embedded credentials, paths, queries or fragments.
 Use HTTPS for remote connections. Redirects are rejected and failures are not
 silently retried against another daemon.
@@ -954,10 +957,60 @@ sudo -u auton autond-auth -c /etc/auton/auton.yml token revoke -i CREDENTIAL_ID
 sudo -u auton autond-auth -c /etc/auton/auton.yml user disable -u alice
 ```
 
-The supplied token is used for every selected origin, including failover origins.
-Independent daemon databases issue independent tokens: use separate invocations
-with their matching token files for now. Per-target credential profiles are not
-implemented; selecting a target group does not copy or synchronize credentials.
+#### Origin-bound client credential profiles
+
+Independent daemon databases issue independent tokens. Declare named profiles in
+the client inventory, binding private token files to explicit origins:
+
+```yaml
+targets:
+  primary: https://autond-01.example.net
+  backup: https://autond-02.example.net
+  deployment:
+    uris:
+      - {target: primary}
+      - {target: backup}
+credentials:
+  primary-operator:
+    origins: [https://autond-01.example.net]
+    token_file: tokens/primary.token
+  backup-operator:
+    origins: [https://autond-02.example.net]
+    token_file: tokens/backup.token
+```
+
+```sh
+auton -c inventory.yml -t deployment --endpoint check
+auton -c inventory.yml -t primary -t backup -s diagnostics
+auton --tui -c inventory.yml -t primary -t backup
+```
+
+Profile names use the existing `[a-z0-9-]+` grammar (1–32 characters). Each profile
+accepts only `origins` (1–16 HTTP(S) origins) and `token_file`; at most 128 profiles
+are allowed. Tokens require HTTPS, except literal loopback IPs for local use.
+Origins use the shared URI normalization, including default ports, IDNA and IPv6.
+Duplicate equivalent origins are rejected even across different profiles. There
+are no hostname patterns, target-group expansion or default credentials.
+
+All selected origins, including every failover candidate, must have a profile
+before any job or monitor request starts. An absent mapping or unreadable selected
+token file fails the selection; it never falls back to another token, Basic or
+anonymous access. Only selected files are read. Existing file ownership, mode,
+regular-file and symlink protections apply. A profile may intentionally share one
+token among several explicitly listed origins; it does not synchronize accounts.
+
+`import_credentials: auth/profiles.yml` uses the same flat, bounded import rules
+as other inventory sections. The imported file contains the profile mapping,
+without a `credentials` wrapper. Token paths are relative to the file declaring
+the profile; absolute paths are also accepted. Never put token contents in YAML.
+
+Profiles cannot be combined with `-k`, `AUTON_TOKEN_FILE` or Basic options/environment
+variables. Without profiles, existing `-k` usage remains available: that token is
+bound to the explicitly selected origins, including their failover candidates.
+The CLI, TUI, RemoteClient, visibility adapter, operations and scenarios enforce
+the same binding. Redirects remain disabled; an authentication refusal does not
+trigger failover, and an ambiguous POST is never replayed. Legacy Basic behavior
+is unchanged.
 
 Revocation, disabling and password replacement take effect on subsequent requests
 without restarting. They do not cancel jobs already admitted. Accounts, sessions,

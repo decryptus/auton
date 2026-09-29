@@ -12,7 +12,7 @@ MAX_CONFIG_BYTES = 65536
 MAX_CONFIG_TARGETS = 128
 MAX_CONFIG_GROUPS = 128
 MAX_IMPORT_FILES = 16
-CONFIG_SECTIONS = ('targets', 'groups', 'scenarios', 'scenario_groups')
+CONFIG_SECTIONS = ('targets', 'groups', 'scenarios', 'scenario_groups', 'credentials')
 CONFIG_FIELDS = frozenset(CONFIG_SECTIONS + tuple('import_' + section for section in CONFIG_SECTIONS))
 MAX_SCENARIO_NODES = 8192
 MAX_SCENARIO_DEPTH = 8
@@ -90,6 +90,7 @@ def load_inventory(path):
         if not set(root) <= CONFIG_FIELDS or not ('targets' in root or 'import_targets' in root):
             raise ValueError('client config requires targets or import_targets; unknown fields are rejected')
         sections = {}
+        credential_directories = {}
         seen = {path}
         for section in CONFIG_SECTIONS:
             merged = {}
@@ -108,11 +109,15 @@ def load_inventory(path):
                     if merged.keys() & values.keys():
                         raise ValueError('duplicate entry across imported files')
                     merged.update(values)
+                    if section == 'credentials':
+                        credential_directories.update({name: imported_path.parent for name in values})
             if section in root:
                 values = _mapping(root[section])
                 if merged.keys() & values.keys():
                     raise ValueError('inline entry duplicates an imported entry')
                 merged.update(values)
+                if section == 'credentials':
+                    credential_directories.update({name: path.parent for name in values})
             sections[section] = merged
         entries = sections['targets']
         if not 1 <= len(entries) <= MAX_CONFIG_TARGETS:
@@ -143,7 +148,13 @@ def load_inventory(path):
                                        for name, node in sections['scenarios'].items()})
         scenario_groups = validate_scenario_groups({name: _plain_scenario(node, node_budget)
                                                    for name, node in sections['scenario_groups'].items()}, scenarios)
-        return {'targets': targets, 'groups': groups,
+        from auton_client.credentials import validate_profiles
+        credentials = {}
+        if 'credentials' in root or 'import_credentials' in root:
+            credentials = validate_profiles(
+                {name: _plain_scenario(node, node_budget)
+                 for name, node in sections['credentials'].items()}, credential_directories)
+        return {'targets': targets, 'groups': groups, 'credentials': credentials,
                 'scenarios': scenarios, 'scenario_groups': scenario_groups}
     except (OSError, UnicodeError):
         raise ValueError('unable to read UTF-8 client config or import') from None

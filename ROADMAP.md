@@ -434,7 +434,9 @@ as the HTTP API. No central service is required.
 - Safe local defaults and an explicit migration from historical route-based auth.
 - Protect all configured routes in required mode; retain endpoint ACLs and ownership.
 - Verify modern password hashing across supported packages and images.
-- HTTPS guidance, client credential profiles and safe secret input.
+- Implemented: HTTPS guidance, private token files and origin-bound client
+  credential profiles, including failover, CLI/TUI and scenarios. Missing mappings
+  fail before network access; profiles never fall back to another credential.
 - Bound failed authentication attempts and audit refusals without credentials.
 - Implemented: optional HTTPdis browser sessions with cookie rotation/revocation,
   same-origin JSON/CSRF policy, safe output rendering and security headers.
@@ -526,8 +528,8 @@ Visibility, the TUI, multi-daemon reads, explicit operations/scenarios, SQLite
 storage and the optional daemon web console are implemented on master. Published
 packages are still 0.3.2; implementation does not imply release readiness.
 
-1. Close the remaining authentication gates: credentials bound to each selected
-   origin, and sanitized refusal auditing wired into the daemon.
+1. Close the remaining authentication gate: sanitized refusal auditing wired
+   into the daemon. Origin-bound client credential profiles are implemented.
 2. Validate the authenticated Docker quickstart and reconcile migration docs.
 3. Build auton.run with release-aware documentation and existing local captures.
 4. Configure website hosting/DNS and contact delivery.

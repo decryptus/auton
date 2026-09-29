@@ -215,6 +215,7 @@ def argv_parse_check():
 
     options.selected_scenarios = None
     options.configured_targets = {}
+    options.configured_credentials = {}
     options.configured_groups = {}
     options.configured_scenarios = {}
     options.configured_scenario_groups = {}
@@ -227,6 +228,7 @@ def argv_parse_check():
             from auton_client.config import load_inventory
             inventory = load_inventory(options.config)
             options.configured_targets = inventory['targets']
+            options.configured_credentials = inventory['credentials']
             options.configured_groups = inventory['groups']
             options.configured_scenarios = inventory['scenarios']
             options.configured_scenario_groups = inventory['scenario_groups']

@@ -29,3 +29,16 @@ groups:
 #      - {target: autond-01}
 #      - {target: autond-02}
 # Individual target references are allowed; group references are forbidden.
+
+# Independent daemon token stores: optional explicit origin-bound profiles.
+# Token paths are relative to this file (or the imported profile file).
+# Files must be owned by the client user and private (mode 0600).
+#credentials:
+#  production-one:
+#    origins: [https://autond-01.example.com]
+#    token_file: tokens/one.token
+#  production-two:
+#    origins: [https://autond-02.example.com]
+#    token_file: tokens/two.token
+#import_credentials: auth/profiles.yml
+# No nested imports, duplicate origins or mixing profiles with -k / Basic.
