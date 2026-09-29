@@ -4,6 +4,7 @@
 Requires Docker Compose and the already built auton:local image. Never uses the
 operator's normal Compose project/volume. The password is a disposable test value.
 """
+import http.client
 import http.cookiejar
 import json
 import os
@@ -37,7 +38,7 @@ def wait_ready():
             with urllib.request.urlopen(URI + '/ui/', timeout=1) as response:
                 if response.status == 200:
                     return
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, OSError, http.client.HTTPException):
             pass
         time.sleep(0.1)
     raise RuntimeError('Compose daemon did not become ready')
