@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auton · Daemon console</title>
+  <link rel="icon" href="/ui/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/ui/style.css"><script src="/ui/app.js" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/ui/" aria-label="Auton home"><img src="/ui/logo.svg" alt="Auton" width="154" height="46"></a><span class="product">DAEMON CONSOLE</span><span id="release" class="version" hidden></span><div class="account"><span id="principal"></span><button id="logout" class="quiet" hidden>Sign out</button></div></header>
+<main>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <section id="login-panel" class="login-layout">
+    <div class="intro"><p class="eyebrow">YOUR COMMANDS. YOUR INFRASTRUCTURE.</p><h1>A clear view.<br>A deliberate action.</h1><p>Inspect this daemon, follow your jobs and run an endpoint with confidence.</p><div class="intro-note"><span class="dot"></span> Local control, from your browser.</div></div>
+    <form id="login-form" class="card login-card"><p class="eyebrow">AUTOND</p><h2>Sign in to your daemon</h2><p class="muted">Use the account created by your administrator.</p><label for="username">Username</label><input id="username" name="username" autocomplete="username" maxlength="256" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="1024" required><button id="login-button" class="primary" type="submit">Sign in <span aria-hidden="true">→</span></button><p class="small muted">Your access is limited to your permitted endpoints and your own jobs.</p></form>
+  </section>
+  <section id="console" hidden>
+    <div class="page-heading"><div><p class="eyebrow">LOCAL DAEMON</p><h1>Operations overview</h1><p id="origin" class="muted"></p></div><div class="refresh"><span id="updated" class="small muted">Not refreshed yet</span><label class="check"><input id="auto-refresh" type="checkbox" checked> Auto refresh</label><button id="refresh" class="secondary">Refresh</button></div></div>
+    <div class="metrics"><article class="card metric"><span class="metric-label">Daemon</span><strong id="health-value">Connecting</strong><span id="health-note" class="small muted">Checking availability</span></article><article class="card metric"><span class="metric-label">Running</span><strong id="running-value">—</strong><span class="small muted">Your active jobs</span></article><article class="card metric"><span class="metric-label">Queued</span><strong id="queued-value">—</strong><span class="small muted">Waiting to execute</span></article><article class="card metric"><span class="metric-label">Completed</span><strong id="complete-value">—</strong><span class="small muted">Retained results</span></article></div>
+    <div id="maintenance-banner" class="maintenance-banner" hidden></div>
+    <div class="workspace">
+      <section class="card jobs-card"><div class="section-heading"><div><p class="eyebrow">EXECUTION HISTORY</p><h2>Your jobs <span id="job-count" class="count">0</span></h2></div><button id="new-job" class="primary" disabled>+ Run endpoint</button></div><div class="filters"><label class="search-label" for="search">Search jobs<input id="search" type="search" placeholder="Job ID or endpoint…"></label><label for="status-filter">State<select id="status-filter"><option value="">All states</option><option value="processing">Running</option><option value="new">Queued</option><option value="complete">Completed</option></select></label></div><div class="table-wrap"><table><thead><tr><th scope="col">Job / endpoint</th><th scope="col">State</th><th scope="col">Duration</th><th scope="col">Result</th></tr></thead><tbody id="jobs"></tbody></table></div><p id="empty" class="empty">No jobs yet. Run an allowed endpoint to get started.</p></section>
+      <aside class="card endpoints-card"><p class="eyebrow">AVAILABLE TO YOU</p><h2>Endpoints <span id="endpoint-count" class="count">0</span></h2><p class="small muted">Commands configured on this daemon.</p><ul id="endpoints" class="endpoint-list"></ul><div id="maintenance-controls" class="maintenance-controls" hidden><h3>Maintenance</h3><p class="small muted">Pause admission and queued jobs. Running jobs continue.</p><button id="maintenance" class="secondary">Enable maintenance</button></div></aside>
+    </div>
+    <section id="detail" class="card detail-card" hidden><div class="section-heading"><div><p class="eyebrow">JOB DETAILS</p><h2 id="detail-title"></h2><p id="detail-meta" class="small muted"></p></div><button id="close-detail" class="quiet">Close details</button></div><p id="detail-warning" class="notice" hidden></p><div class="output-grid"><div><h3>Standard output</h3><pre id="stdout" tabindex="0"></pre></div><div><h3>Standard error / diagnostics</h3><pre id="stderr" tabindex="0"></pre></div></div></section>
+  </section>
+</main>
+<footer>Auton <span aria-hidden="true">/</span> Remote execution, under your control. <span class="footer-right">One daemon · Your permitted actions</span></footer>
+<dialog id="run-dialog"><form id="run-form"><p class="eyebrow">EXPLICIT EXECUTION</p><h2>Run an endpoint</h2><p class="muted">This submits one job to this daemon.</p><label for="run-endpoint">Endpoint</label><select id="run-endpoint" required></select><label for="run-args">Arguments <span class="muted">— one per line, passed literally</span></label><textarea id="run-args" rows="5" placeholder="--verbose"></textarea><p id="run-preview" class="small muted"></p><label class="check confirm"><input id="run-confirm" type="checkbox" required> I confirm this execution on the daemon shown above.</label><div class="dialog-actions"><button id="cancel-run" type="button" class="quiet">Cancel</button><button id="submit-run" class="primary" type="submit">Run job</button></div></form></dialog>
+</body></html>

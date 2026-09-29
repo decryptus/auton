@@ -430,14 +430,16 @@ as the HTTP API. No central service is required.
 - Verify modern password hashing across supported packages and images.
 - HTTPS guidance, client credential profiles and safe secret input.
 - Bound failed authentication attempts and audit refusals without credentials.
-- Browser authentication, CSRF protection, safe output rendering and security headers.
-- Console: daemon state, maintenance, allowed endpoints, jobs, output, search and
+- Implemented: optional HTTPdis browser sessions with cookie rotation/revocation,
+  same-origin JSON/CSRF policy, safe output rendering and security headers.
+- Implemented console: daemon state, maintenance, allowed endpoints, jobs, output, search and
   confirmed single-endpoint execution. Targets and scenario orchestration remain
   client-side for this first console.
 - Test permissions and browser flows before screenshots, recording and publication.
 - Implemented: HTTPdis-backed persistent SQLite authentication, Argon2 accounts,
   expiring/revocable scoped tokens, local `autond-auth` administration and client
-  `-k` token files for CLI/TUI. Required mode protects all routes; endpoint ACLs,
+  `-k` token files for CLI/TUI. Required mode protects application routes; only the
+  fixed optional browser login/assets are public. Endpoint ACLs,
   ownership and maintenance operator checks remain in force. Basic stays available
   as an explicit compatibility mode.
 - Authentication state and optional local job history survive restart in separate

@@ -73,6 +73,7 @@ class JobModule(DWhoModuleBase):
     def __init__(self):
         super().__init__()
         self.history_store = None
+        self.browser_provider = None
 
     def safe_init(self, options):
         general = self.config['general']
@@ -97,6 +98,31 @@ class JobModule(DWhoModuleBase):
         values = request.get_server_vars()
         return _http_call(authorized_principal, values.get('HTTP_AUTH_USER'),
                           values.get('HTTP_AUTH_IDENTITY'), scope)
+
+    def _web(self):
+        from auton.classes.web import WebConsole
+        return WebConsole(self.browser_provider, self.service)
+
+    def web_console(self, request):
+        return self._web().asset('index.html', 'text/html')
+
+    def web_script(self, request):
+        return self._web().asset('app.js', 'text/javascript')
+
+    def web_style(self, request):
+        return self._web().asset('style.css', 'text/css')
+
+    def web_logo(self, request):
+        return self._web().asset('logo.svg', 'image/svg+xml')
+
+    def web_login(self, request):
+        return self._web().login(request)
+
+    def web_session(self, request):
+        return self._web().session(request)
+
+    def web_logout(self, request):
+        return self._web().logout(request)
 
     def _expire_results(self):
         return self.service.expire_results()

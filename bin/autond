@@ -157,6 +157,11 @@ def main(options):
         if settings:
             authentication = PersistentAuthentication(settings)
             options.auth_provider = authentication.provider
+            if options.configuration['general'].get('web_enabled'):
+                from httpdis.auth_browser import BrowserAuthProvider
+                options.auth_provider = BrowserAuthProvider(authentication.service,
+                    options.configuration['general']['web_origin'], cookie_prefix='autond')
+                MODULES['job'].browser_provider = options.auth_provider
         storage = options.configuration['general'].get('job_storage')
         if storage:
             history = SQLiteJobStore(storage['path'], timeout=storage['timeout'],
