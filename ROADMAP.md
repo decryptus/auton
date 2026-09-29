@@ -232,26 +232,6 @@ A remote script can already group commands into one job, but Auton then sees
 the script's overall result rather than separate step results. This milestone
 does not introduce a central scheduler or a generic workflow engine.
 
-### Scenario Group (planned, after individual scenarios)
-
-Add named, ordered groups of existing scenarios, distinct from target groups.
-A target group selects where to execute; a scenario group selects what to run.
-
-- Proposed CLI: `--scenario-group maintenance`, combined with explicit targets
-  or a target group; preserve single-scenario and existing execution commands.
-- Validate every scenario reference before submitting any job. Start with flat
-  groups; reject duplicate members and nested group references.
-- Run scenarios in declared order on each target, with bounded concurrency
-  across targets. Stop the remaining scenarios on that target on failure or
-  unknown outcome; independent targets may continue.
-- Retain operation, target, scenario, step and job identities, with separate
-  outputs, exit codes and explicit skipped/unknown states.
-- Never replay an ambiguous POST, imply rollback or cancel running jobs.
-- Keep execution in application services shared by CLI and TUI.
-
-This is a roadmap item, not an available command. Development remains focused
-on Auton; shared terminology does not require a shared execution framework.
-
 ## Milestone 6 — Reliability and lifecycle
 
 Continue product hardening:
