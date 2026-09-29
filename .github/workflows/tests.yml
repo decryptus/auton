@@ -27,8 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t auton:test .
+      - run: docker build -t auton:test -t auton:local .
       - run: docker run --rm --entrypoint autond auton:test -d
+      - name: Check authenticated Compose quickstart and durable volume
+        run: python3 scripts/check_compose_quickstart.py
 
   browser:
     runs-on: ubuntu-latest
@@ -55,3 +57,25 @@ jobs:
           name: web-console-captures
           path: docs/screenshots/web-*.png
           if-no-files-found: warn
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'Sphinx>=8,<10' -r docs/requirements.txt
+      - run: python -m sphinx -W -b html docs /tmp/auton-docs
+      - name: Check full-size screenshot links
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('/tmp/auton-docs')
+          html = (root / 'index.html').read_text()
+          links = re.findall(r'href="((?:images|screenshots)/[^"<>]+\.png)"', html)
+          assert len(set(links)) >= 9, links
+          for link in links:
+              assert (root / link).is_file(), link
+          PY

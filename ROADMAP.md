@@ -44,7 +44,7 @@ autond
 
 Extend `autond` so clients can inspect its state without changing the current execution model.
 
-Planned capabilities:
+Implemented capabilities:
 
 - list jobs;
 - filter jobs by state and endpoint, with visibility restricted to the caller's own jobs;
@@ -55,7 +55,7 @@ Planned capabilities:
 - preserve current authentication and ACL checks;
 - keep existing `run` and `status` behavior backward compatible.
 
-Suggested API capabilities:
+Implemented API routes:
 
 ```text
 GET /jobs
@@ -136,7 +136,7 @@ The implementation is client-side and stateless, with no central persistence.
 
 ## Milestone 4 — Explicit multi-target execution
 
-Implemented on the development branch: `OperationService` submits one independent
+Implemented on master (not yet released): `OperationService` submits one independent
 job per explicitly named target, with bounded parallelism and per-target results.
 The CLI emits a final JSON operation summary, including output, exit codes,
 observation duration, refusal and unknown outcomes. POST requests are not replayed.
@@ -516,10 +516,15 @@ Before a future major stable release:
 
 ## Current priorities
 
-1. Local `autond` visibility API.
-2. Auton ncurses/TUI.
-3. Multi-`autond` aggregated view.
-4. Explicit multi-target operations.
-5. Reliability and integration tests.
-6. Dedicated Auton website.
-7. Documentation and release polish.
+Visibility, the TUI, multi-daemon reads, explicit operations/scenarios, SQLite
+storage and the optional daemon web console are implemented on master. Published
+packages are still 0.3.2; implementation does not imply release readiness.
+
+1. Close the remaining authentication gates: credentials bound to each selected
+   origin, and sanitized refusal auditing wired into the daemon.
+2. Validate the authenticated Docker quickstart and reconcile migration docs.
+3. Build auton.run with release-aware documentation and existing local captures.
+4. Configure website hosting/DNS and contact delivery.
+5. Complete release review and publish matching client/daemon artifacts.
+
+See [the 1.0 readiness review](docs/1.0-readiness.md) for evidence and open gates.

@@ -18,7 +18,7 @@
 import os
 import yaml
 
-root_dir     = os.path.abspath('..')
+root_dir     = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 setup_config = os.path.join(root_dir, 'setup.yml')
 setup_cfg    = yaml.safe_load(open(setup_config, 'r').read())
 
@@ -66,7 +66,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -185,9 +185,10 @@ def copy_screenshot_links(app, exception):
     if exception is None and app.builder.format == 'html':
         import shutil
         from pathlib import Path
-        source = Path(app.srcdir) / 'images'
-        if source.is_dir():
-            shutil.copytree(source, Path(app.outdir) / 'images', dirs_exist_ok=True)
+        for directory in ('images', 'screenshots'):
+            source = Path(app.srcdir) / directory
+            if source.is_dir():
+                shutil.copytree(source, Path(app.outdir) / directory, dirs_exist_ok=True)
 
 
 def setup(app):

@@ -1,10 +1,11 @@
-version: '3.2'
 services:
   auton:
     build: .
     image: auton:local
-    container_name: autond
     ports:
       - '127.0.0.1:8666:8666'
     volumes:
-      - './etc/auton/auton.yml.example:/etc/auton/auton.yml:ro'
+      - './etc/auton/docker.yml.example:/etc/auton/auton.yml:ro'
+      - 'autond-data:/var/lib/autond'
+volumes:
+  autond-data:
