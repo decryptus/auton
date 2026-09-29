@@ -188,8 +188,12 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                     LOG.warning("unknown method %r for endpoint %r", func, self.name)
                     continue
 
-                obj.set_started_at()
-                obj.set_status(STATUS_PROCESSING)
+                if not getattr(self, 'DEFER_LAUNCH_GATE', False):
+                    from auton.classes.availability import Availability
+                    gate = getattr(obj, 'availability', None) or Availability()
+                    with gate.launch(obj, lambda: getattr(self, '_killed', False)):
+                        if self.users and not self.users.get(obj.owner):
+                            raise AutonTargetUnauthorized('endpoint access denied before execution')
                 getattr(self, func)(obj)
                 obj.set_return_code(0)
             except Exception as e:

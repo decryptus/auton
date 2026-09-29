@@ -324,6 +324,59 @@ error diagnostics as well as captured stderr. Duration measures client observati
 not exclusively remote process runtime. This initial mode prints its result at
 the end; live operation views remain follow-up work.
 
+### Local daemon maintenance
+
+Maintenance pauses new execution while keeping health, job lists and outputs
+readable. Configure authorized administrators on the daemon:
+
+```yaml
+general:
+  # Keep the existing general settings and enable HTTP authentication.
+  maintenance_operators: [operator]
+  maintenance: false
+  maintenance_reason: ""
+```
+
+The new route in `etc/auton/modules/job.yml` requires authentication; an empty
+operator list (the default) allows nobody to change maintenance. Being allowed
+to run an endpoint does not grant maintenance rights. Update existing route
+configuration to include `POST /maintenance` when upgrading.
+
+```sh
+curl --user operator --header 'Content-Type: application/json' \
+  --data '{"enabled":true,"reason":"Planned upgrade"}' \
+  https://autond.example.com/maintenance
+curl --user operator --header 'Content-Type: application/json' \
+  --data '{"enabled":false}' https://autond.example.com/maintenance
+```
+
+The boolean `enabled` is required; optional `reason` is at most 512 characters.
+Health remains `status: "ok"`, with `maintenance: {enabled, reason}` and
+`accepting_jobs`. Keep the reason suitable for everyone allowed to read health.
+The TUI shows maintenance separately from connection/health errors.
+
+- Jobs already running finish normally.
+- Admitted jobs still waiting remain `new` (queued), with no start timestamp.
+  They resume when maintenance ends, even if their submitting client has left.
+  Endpoint authorization is checked again before launching the process.
+- New submissions receive HTTP **503**, JSON `message: "daemon_maintenance"`
+  and `X-Auton-Admission: not-admitted`. Admission and process launch share an
+  atomic gate with maintenance changes; checking health alone is insufficient.
+- Modern multi-target/scenario/TUI execution checks health before submission and
+  reports maintenance as an explicit rejection. Older daemons returning 404 on
+  health retain compatibility. A generic 503 or an ambiguous POST is never
+  treated as permission to replay a command. Legacy clients are protected by
+  server admission even when they do not perform the precheck.
+
+Maintenance and queued jobs are local, in-memory state. Restart uses the YAML
+initial maintenance value and does not restore queued work. Pause itself has no
+automatic expiry and does not evict admitted jobs; they count against capacity.
+The client observation deadline may expire while a job waits, producing an
+unknown result; inspect its recorded job ID before deciding to resubmit.
+Enabling/disabling maintenance is recorded as `daemon.maintenance` when JSONL
+journaling is configured. Ordered replacement origins per target remain a
+separate roadmap item; this feature does not add automatic replay or failover.
+
 ### Scenarios and scenario groups (client)
 
 A scenario runs ordered steps on each explicitly selected target. Each step

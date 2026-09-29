@@ -175,7 +175,10 @@ class ExecutionTransportTests(unittest.TestCase):
         session = Mock()
         response = Mock(status_code=400)
         response.json.return_value = result('example-job', rc=7, errors=['oops'])
-        session.post.return_value = session.get.return_value = response
+        session.post.return_value = response
+        health = Mock(status_code=200)
+        health.json.return_value = {'status': 'ok'}
+        session.get.side_effect = [health, response]
         client = ExecutionClient(['https://a'], 'test', 'example-job', session=session, auth=('a', 'b'))
         self.assertEqual(client.do_run()['return_code'], 7)
         client.output_offset = 3
@@ -191,10 +194,11 @@ class ExecutionTransportTests(unittest.TestCase):
                 session.post.side_effect = requests.exceptions.ReadTimeout('SECRET')
             else:
                 session.post.return_value = Mock(status_code=code)
+            session.get.return_value = Mock(status_code=404)
             client = ExecutionClient(['https://a'], 'test', 'example-job', session=session)
             with self.assertRaises(ExecutionError) as caught:
                 client.do_run()
             self.assertEqual(caught.exception.rejected, code == 403)
             self.assertNotIn('SECRET', str(caught.exception))
             session.post.assert_called_once()
-            session.get.assert_not_called()
+            session.get.assert_called_once()

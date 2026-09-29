@@ -27,10 +27,11 @@ def aggregate_snapshots(names, snapshots, selected_job=None):
         errors = data.get('errors', {})
         for operation, error in errors.items():
             result['errors']['%s/%s' % (name, operation)] = error
-        state = 'error' if errors else 'ok'
+        maintenance = data.get('health', {}).get('maintenance', {})
+        state = 'error' if errors else 'maintenance' if maintenance.get('enabled') else 'ok'
         result['daemons'].append({'name': name, 'state': state,
                                   'jobs': len(data['jobs']) if 'jobs' in data else None,
-                                  'error': '; '.join('%s: %s' % item for item in errors.items())})
+                                  'error': '; '.join('%s: %s' % item for item in errors.items()) or maintenance.get('reason', '')})
         if 'jobs' in data:
             responding += 1
         for job in data.get('jobs', []):
@@ -42,7 +43,7 @@ def aggregate_snapshots(names, snapshots, selected_job=None):
             result['detail'] = dict(data['detail'], daemon=name)
     result['stats'] = {'jobs': len(result['jobs']), 'endpoints': len(result['endpoints']),
                        'jobs_by_status': counts, 'responding': responding, 'total': len(names)}
-    result['partial'] = any(item['state'] != 'ok' for item in result['daemons'])
+    result['partial'] = any(item['state'] not in ('ok', 'maintenance') for item in result['daemons'])
     return result
 
 

@@ -315,7 +315,7 @@ A target group selects where to execute; a scenario group selects what to run.
 Interactive selection and explicit confirmation are implemented. Development remains focused on Auton;
 shared terminology does not require a shared execution framework.
 
-### Local daemon maintenance and pre-execution checks (planned)
+### Local daemon maintenance and pre-execution checks (implemented)
 
 - Add an explicit local daemon maintenance state, separate from daemon health.
   Expose availability and an optional operator reason through the visibility API.
@@ -325,12 +325,16 @@ shared terminology does not require a shared execution framework.
   client: a direct POST or a race after the client check must still be refused
   with a stable, machine-readable maintenance reason.
 - Running jobs continue by default; visibility and output reads remain available.
-  Define the policy for already admitted queued jobs and recheck availability
-  before process launch; do not silently discard jobs or report them as running.
+  Agreed policy: already admitted queued jobs wait and resume when maintenance
+  ends, even if the client has left. Recheck availability and authorization
+  before process launch; waiting jobs remain queued with no start timestamp.
 - If no eligible configured failover origin remains, a maintenance refusal
   prevents scenario progression on that target, with an explicit blocked/skipped
   reason; independent targets may continue. Only the safe pre-admission failover
   rules below permit another submission; never replay an ambiguous POST.
+- Implemented: authenticated `POST /maintenance`, explicit `maintenance_operators`,
+  health availability metadata, client precheck and typed HTTP 503 refusal.
+  State is in memory and initializes from YAML on restart.
 - Restrict maintenance changes to explicitly authorized operators. Keep state
   local to each daemon, without Centrex or mandatory central coordination.
 - Test admission races, queued/running behavior, direct HTTP enforcement,

@@ -264,6 +264,9 @@ class OperatorView:
         line(0, 'AUTON %s | READ ONLY | %s' % (__version__, 'PAUSED' if self.paused else 'LIVE'), curses.A_BOLD)
         health = ('unchecked' if not self.data else 'partial' if self.data.get('partial')
                   else 'error' if self.data.get('errors') else 'ok')
+        maintenance = self.data.get('health', {}).get('maintenance', {})
+        if maintenance.get('enabled'):
+            health = 'maintenance: ' + maintenance.get('reason', '')
         line(1, 'Daemon %s (%s/%s) [%s]   [ / ] switch | a all' %
              (self.daemon or 'ALL', self.daemon_index + 1, len(self.names), health))
         counts = self.data.get('stats', {}).get('jobs_by_status', {})

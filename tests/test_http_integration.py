@@ -42,7 +42,7 @@ class HTTPIntegrationTests(unittest.TestCase):
                     config = yaml.safe_load((ROOT / 'etc/auton/auton.yml.example').read_text())
                     config['general'].update(listen_addr='127.0.0.1', listen_port=port,
                                              max_life_time=0, max_requests=0,
-                                             auth_basic='Test', auth_basic_file=str(passwd))
+                                             auth_basic='Test', auth_basic_file=str(passwd), maintenance_operators=['alice'])
                     config.pop('import_modules', None)
                     config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
                     for route in config['modules']['job']['routes'].values():
@@ -188,6 +188,46 @@ class HTTPIntegrationTests(unittest.TestCase):
                 self.run_tui_execution(['-c', str(client_config), '-t', 'one', '-s', 'ch*'], scenario=True)
                 self.assertEqual(len(clients['one'].jobs()), 10)
                 self.assertEqual(len(clients['two'].jobs()), 7)
+                uri = clients['one'].uri
+                auth = ('alice', 'secret')
+                maintenance_url = uri + '/maintenance'
+                self.assertEqual(requests.post(maintenance_url, auth=('bob', 'secret'),
+                    json={'enabled': True}, timeout=2).status_code, 403)
+                self.assertEqual(requests.post(uri + '/run/test/maint-running', auth=auth,
+                    json={'args': ['-c', 'import time; time.sleep(1); print("finished")']}, timeout=2).status_code, 200)
+                for _ in range(100):
+                    if clients['one'].detail('test', 'test:maint-running')['status'] == 'processing':
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail('maintenance test job did not start')
+                self.assertEqual(requests.post(uri + '/run/test/maint-queued', auth=auth,
+                    json={'args': ['-c', 'print("resumed")']}, timeout=2).status_code, 200)
+                changed = requests.post(maintenance_url, auth=auth,
+                    json={'enabled': True, 'reason': 'integration'}, timeout=2)
+                self.assertEqual(changed.status_code, 200, changed.text)
+                rejected = requests.post(uri + '/run/test/maint-refused', auth=auth, json={}, timeout=2)
+                self.assertEqual(rejected.status_code, 503, rejected.text)
+                self.assertEqual(rejected.json()['message'], 'daemon_maintenance')
+                self.assertEqual(rejected.headers['X-Auton-Admission'], 'not-admitted')
+                for _ in range(100):
+                    running = clients['one'].detail('test', 'test:maint-running')
+                    if running['status'] == 'complete':
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(running['status'], 'complete')
+                queued = clients['one'].detail('test', 'test:maint-queued')
+                self.assertEqual(queued['status'], 'new')
+                self.assertIsNone(queued['started_at'])
+                self.assertFalse(clients['one'].health()['accepting_jobs'])
+                changed = requests.post(maintenance_url, auth=auth, json={'enabled': False}, timeout=2)
+                self.assertEqual(changed.status_code, 200)
+                for _ in range(100):
+                    queued = clients['one'].detail('test', 'test:maint-queued')
+                    if queued['status'] == 'complete':
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(''.join(queued['stream']), 'resumed\n')
             finally:
                 if monitor is not None:
                     monitor.close()

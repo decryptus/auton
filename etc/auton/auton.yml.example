@@ -8,6 +8,11 @@ general:
   result_ttl:    3600
   max_jobs:      128
   max_output_bytes: 1048576
+  # Local maintenance: queued jobs wait; running jobs finish. Not persisted.
+  maintenance: false
+  maintenance_reason: ""
+  # Requires configured HTTP authentication; empty list denies all changes.
+  maintenance_operators: []
   # Optional job lifecycle journal; parent directory must exist and be writable
   # by the daemon user. One daemon process per journal path.
   #journal_path: /var/log/auton/jobs.jsonl

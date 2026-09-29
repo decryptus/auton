@@ -26,15 +26,18 @@ from dotenv.main import dotenv_values
 
 from sonicprobe import helpers
 from auton.classes.exceptions import (AutonConfigurationError,
+                                      AutonTargetUnauthorized,
                                       AutonTargetFailed,
                                       AutonTargetTimeout)
 from auton.classes.plugins import AutonPlugBase, PLUGINS
+from auton.classes.availability import Availability, LaunchStopped
 
 LOG = logging.getLogger('auton.plugins.subproc')
 
 
 class AutonSubProcPlugin(AutonPlugBase):
     PLUGIN_NAME = 'subproc'
+    DEFER_LAUNCH_GATE = True
 
     def __init__(self, name):
         AutonPlugBase.__init__(self, name)
@@ -305,18 +308,24 @@ class AutonSubProcPlugin(AutonPlugBase):
         LOG.debug("cmd line: %r", bargs + args)
 
         try:
-            proc  = subprocess.Popen(bargs + args,
-                                     stdout = subprocess.PIPE,
-                                     stderr = subprocess.PIPE,
-                                     env    = env,
-                                     cwd    = cfg.get('workdir'),
-                                     start_new_session = True)
+            gate = getattr(obj, 'availability', None) or Availability()
+            with gate.launch(obj, lambda: self._killed):
+                if self.users and not self.users.get(obj.owner):
+                    raise AutonTargetUnauthorized('endpoint access denied before launch')
+                proc  = subprocess.Popen(bargs + args,
+                                         stdout = subprocess.PIPE,
+                                         stderr = subprocess.PIPE,
+                                         env    = env,
+                                         cwd    = cfg.get('workdir'),
+                                         start_new_session = True)
 
             self._collect(obj, proc, cfg['timeout'])
 
             if proc.returncode:
                 raise subprocess.CalledProcessError(proc.returncode, args[0])
-        except (AutonTargetFailed, AutonTargetTimeout):
+        except LaunchStopped:
+            raise AutonTargetFailed('daemon stopped before execution', code=130) from None
+        except (AutonTargetFailed, AutonTargetTimeout, AutonTargetUnauthorized):
             raise
         except subprocess.CalledProcessError as e:
             raise AutonTargetFailed("error on target: %r. exception: %s"
@@ -350,4 +359,3 @@ if __name__ != "__main__":
     def _start():
         PLUGINS.register(AutonSubProcPlugin)
     _start()
-
