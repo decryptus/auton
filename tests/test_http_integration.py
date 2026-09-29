@@ -108,13 +108,14 @@ class HTTPIntegrationTests(unittest.TestCase):
                 self.assertEqual(len(clients['one'].jobs()), 1)
                 self.assertEqual(len(clients['two'].jobs()), 1)
                 client_config = Path(tmp) / 'client-targets.yml'
-                client_config.write_text(yaml.safe_dump({'targets': {'one': clients['one'].uri}}))
-                target_args = ['--config', str(client_config), '--target', 'one',
-                               '--target', 'two=' + clients['two'].uri]
+                imported_targets = Path(tmp) / 'targets.yml'
+                imported_targets.write_text(yaml.safe_dump({name: clients[name].uri for name in ('one', 'two')}))
+                client_config.write_text(yaml.safe_dump({'import_targets': 'targets.yml',
+                                                       'groups': {'both': ['one', 'two'], 'second': ['two']}}))
+                target_args = ['-c', str(client_config), '-t', 'one', '-g', 'both', '-g', 'second']
                 self.run_tui(None, ['--auth-user', 'alice', '--auth-passwd', 'secret'],
                              dict(os.environ, PYTHONPATH=str(ROOT)),
-                             daemon_args=['--config', str(client_config), '--daemon', 'one',
-                                          '--daemon', 'two=' + clients['two'].uri],
+                             daemon_args=['--tui', '-c', str(client_config), '-t', 'one', '-g', 'both'],
                              expected_job=b'shared-job', expected_output=b'one')
                 for exit_code in (0, 7):
                     execution = subprocess.run([sys.executable, str(ROOT / 'bin/auton'),

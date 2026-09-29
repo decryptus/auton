@@ -72,3 +72,23 @@ def normalize_origin(uri):
         return urlunsplit((parsed.scheme, authority, '', '', ''))
     except (ValueError, TypeError, AttributeError):
         raise ValueError('daemon URI must be a valid HTTP(S) origin: host and optional port, without credentials, path, query or fragment') from None
+
+
+def select_connections(specs, group_names=(), configured=None, groups=None):
+    """Resolve exact selections as a stable union, without network or execution."""
+    configured = {} if configured is None else configured
+    groups = {} if groups is None else groups
+    result = named_connections(specs, configured)
+    for name in group_names:
+        validate_connection_name(name)
+        if name not in groups:
+            raise ValueError('unknown target group: ' + name)
+        for member in groups[name]:
+            validate_connection_name(member)
+            if member not in configured:
+                raise ValueError('group references an unknown target: ' + member)
+            uri = normalize_origin(configured[member])
+            if member in result and result[member] != uri:
+                raise ValueError('conflicting target selection: ' + member)
+            result.setdefault(member, uri)
+    return result

@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory() as directory:
     python = str(Path(directory) / 'bin/python')
     subprocess.run([python, '-m', 'pip', 'install', str(wheels[0].resolve())],
                    cwd=directory, check=True)
-    subprocess.run([python, '-I', '-c', '''
+    subprocess.run([python, '-I', '-c', r'''
 import importlib.abc
 import sys
 class BlockDaemon(importlib.abc.MetaPathFinder):
@@ -22,10 +22,14 @@ class BlockDaemon(importlib.abc.MetaPathFinder):
 sys.meta_path.insert(0, BlockDaemon())
 from auton_client import RemoteClient
 assert RemoteClient(['http://localhost'], 'example', 'one').output_offset == 0
-from auton_client.config import load_targets
+from auton_client.config import load_targets, load_inventory
+from auton_client.connections import select_connections
 from pathlib import Path
-Path("targets.yml").write_text("targets: {local: http://localhost}")
+Path("origins.yml").write_text("local: http://localhost")
+Path("targets.yml").write_text("import_targets: origins.yml\ngroups: {web: [local]}")
 assert load_targets("targets.yml") == {"local": "http://localhost"}
+inventory = load_inventory("targets.yml")
+assert select_connections([], ["web"], **dict(configured=inventory["targets"], groups=inventory["groups"])) == inventory["targets"]
 from auton_client.operations import OperationService
 assert OperationService({"local": "http://localhost"}, "example").parallel == 4
 from auton_client.visibility import DaemonClient

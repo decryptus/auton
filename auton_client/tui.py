@@ -278,13 +278,16 @@ class OperatorView:
         screen.refresh()
 
 
-def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None):
+def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None, selected=None):
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError('TUI requires an interactive terminal')
     if not math.isfinite(refresh) or refresh < 0.2:
         raise ValueError('refresh must be at least 0.2 seconds')
+    connections = daemon_specs(specs, uris, configured) if selected is None else selected
+    if not connections:
+        raise ValueError("selection contains no targets")
     clients = {name: DaemonClient(uri, auth, http_timeout)
-               for name, uri in daemon_specs(specs, uris, configured).items()}
+               for name, uri in connections.items()}
     monitor = FleetMonitor(clients)
     view = OperatorView(monitor, refresh)
     def display(screen):
