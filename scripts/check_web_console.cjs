@@ -18,6 +18,7 @@ const {chromium} = require('playwright');
     browser = await chromium.launch({headless: true, executablePath: process.env.AUTON_BROWSER_EXECUTABLE || undefined});
     const context = await browser.newContext({viewport: {width: 1440, height: 1100}});
     const page = await context.newPage();
+    page.setDefaultTimeout(15000);
     const errors = [];
     page.on('pageerror', error => errors.push(String(error)));
     await fs.mkdir('docs/screenshots', {recursive: true});
@@ -60,9 +61,23 @@ const {chromium} = require('playwright');
     await page.waitForFunction(() => document.querySelector('#stdout').textContent.includes('browser execution verified'));
     assert.equal(posts, 1);
     await page.locator('#auto-refresh').uncheck();
+    // A mutation overlapping an older refresh must schedule a fresh read even
+    // with automatic refresh off; otherwise stale "Ready" can hide maintenance.
+    let releaseHealth, capturedHealth;
+    const heldHealth = new Promise(resolve => { releaseHealth = resolve; });
+    const healthCaptured = new Promise(resolve => { capturedHealth = resolve; });
+    await page.route('**/health', async route => {
+      const response = await route.fetch(); capturedHealth();
+      await heldHealth; await route.fulfill({response});
+    });
+    await page.locator('#refresh').click();
+    await healthCaptured;
     page.once('dialog', dialog => dialog.accept());
+    const maintenanceChanged = page.waitForResponse(response => response.url().endsWith('/maintenance') && response.status() === 200);
     await page.locator('#maintenance').click();
+    await maintenanceChanged; releaseHealth();
     await page.waitForFunction(() => document.querySelector('#health-value').textContent === 'Maintenance');
+    await page.unroute('**/health');
     assert.equal(await page.locator('#new-job').isDisabled(), true);
     await page.setViewportSize({width: 390, height: 844});
     await page.screenshot({path: 'docs/screenshots/web-mobile.png', fullPage: true});

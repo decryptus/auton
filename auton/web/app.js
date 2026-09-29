@@ -5,7 +5,7 @@
   const REFRESH_MS = 5000;
   const MAX_DISPLAY_CHARS = 200000;
   let identity = null, csrf = '', jobs = [], endpoints = [], health = null;
-  let selected = null, refreshing = false, submitting = false, generation = 0;
+  let selected = null, refreshing = false, refreshAgain = false, submitting = false, generation = 0;
   function savedCSRF() { try { return localStorage.getItem(CSRF_KEY) || csrf; } catch (_) { return csrf; } }
   function saveCSRF(value) { csrf = value; try { value ? localStorage.setItem(CSRF_KEY, value) : localStorage.removeItem(CSRF_KEY); } catch (_) {} }
   function notice(message) { $('notice').textContent = message; $('notice').hidden = !message; }
@@ -100,7 +100,8 @@
   }
   let selectedRunEndpoint = '';
   async function refresh() {
-    if (!identity || refreshing) return;
+    if (!identity) return;
+    if (refreshing) { refreshAgain = true; return; }
     if (!identity.scopes.includes('read')) { notice('The console requires read permission. Ask your administrator to add the read scope.'); return; }
     refreshing = true; $('refresh').disabled = true; const current = generation;
     try {
@@ -111,7 +112,10 @@
       if (selected) await inspect();
     } catch (error) {
       if (current === generation) { notice(error.message); $('health-value').textContent = 'Unavailable'; $('new-job').disabled = true; }
-    } finally { refreshing = false; $('refresh').disabled = false; }
+    } finally {
+      refreshing = false; $('refresh').disabled = false;
+      if (refreshAgain) { refreshAgain = false; queueMicrotask(refresh); }
+    }
   }
   function output(parts) {
     const value = (parts || []).join('');
