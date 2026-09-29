@@ -358,7 +358,7 @@ with tempfile.TemporaryDirectory() as directory:
     config_path.write_text('targets: {local: http://localhost}\ngroups: {web: [local]}')
     assert load_targets(config_path) == {'local': 'http://localhost'}
     inventory = load_inventory(config_path)
-    selected = select_connections([], ['web'], inventory['targets'], inventory['groups'])
+    selected = select_connections(['loc*'], ['~web$'], inventory['targets'], inventory['groups'])
 from auton_client.operations import OperationService
 class FakeRemote:
     def __init__(self, uris, endpoint, uid, **kwargs):

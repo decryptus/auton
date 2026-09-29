@@ -29,7 +29,7 @@ Path("origins.yml").write_text("local: http://localhost")
 Path("targets.yml").write_text("import_targets: origins.yml\ngroups: {web: [local]}")
 assert load_targets("targets.yml") == {"local": "http://localhost"}
 inventory = load_inventory("targets.yml")
-assert select_connections([], ["web"], **dict(configured=inventory["targets"], groups=inventory["groups"])) == inventory["targets"]
+assert select_connections(["loc*"], ["~web$"], **dict(configured=inventory["targets"], groups=inventory["groups"])) == inventory["targets"]
 from auton_client.operations import OperationService
 assert OperationService({"local": "http://localhost"}, "example").parallel == 4
 from auton_client.visibility import DaemonClient

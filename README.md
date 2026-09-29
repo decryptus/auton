@@ -184,7 +184,7 @@ Repeat `-g` to combine groups. Explicit targets are resolved first, then groups
 in option order and members in file order; overlapping members execute once.
 Repeated direct `--target` names remain errors. Separate names pointing at the
 same normalized origin are still rejected for execution. Groups never change
-failover behavior. Glob/regex selection remains planned; current names are exact.
+failover behavior. Targets and group selectors support the patterns described below; YAML group members remain exact names.
 
 Declaring targets never selects them automatically. `--config` requires explicit
 `--target`, `--target-group` or `--daemon` selections and cannot be combined with
@@ -202,6 +202,34 @@ Authentication stays in the existing CLI/environment options, not in the file.
 combined with `--target-group`. For execution, target selections cannot use
 `--uid`/`AUTON_UID`, `--mode run/status` or `--no-return-code`. `AUTON_URI` is
 ignored for explicit named selections. Repeated `--uri` values remain failover.
+
+#### Name, glob and regular-expression selection
+
+The CLI and TUI use the same convention as monit-docker:
+
+```sh
+# Globs match the entire name, case-sensitively.
+auton --tui -c targets.yml -t 'web-*' -g 'prod-*'
+
+# A leading ~ selects a regex; matching starts at the beginning of the name.
+# Add $ to require an end match. Quote patterns to avoid shell expansion.
+auton --tui -c targets.yml --daemon '~web-[0-9]{1,2}$'
+```
+
+`--target`/`-t`, `--target-group`/`-g` and TUI `--daemon` accept selectors.
+Repeat options to combine them; commas belong to the pattern and are never
+split. Patterns only match declared names in the inventory, not URI strings.
+Inline `NAME=URI` still creates an explicit ad hoc connection. Groups expand
+after their names are matched; overlapping selections retain their first position
+and execute once. Repeating an exact direct target name remains an error.
+
+Every selector must match at least one name. Unknown names, invalid expressions,
+regex timeouts and empty matches abort the entire selection before network or
+terminal startup. There is no fallback to all targets. A selection accepts up
+to 128 selectors, 4096 characters each, with a one-second total matching budget
+and a maximum 50 ms per pattern/name comparison. Regex syntax follows Python
+`re`, evaluated by the bounded `regex` VERSION0 matcher. Declared target/group
+names still use the separate `[a-z0-9-]+` validation rule.
 
 #### Single-level section imports
 

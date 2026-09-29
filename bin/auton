@@ -42,12 +42,12 @@ def argv_parse_check():
 
     parser.add_argument('-c', '--config', help='Client YAML inventory; targets must still be selected explicitly')
     parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
-    parser.add_argument('--daemon', action='append', default=[], metavar='NAME[=URI]',
-                        help='Explicit daemon name from --config or NAME=URI for TUI')
-    parser.add_argument('-t', '--target', action='append', default=[], metavar='NAME[=URI]',
-                        help='Explicit target name from --config or NAME=URI; repeat for multiple daemons')
-    parser.add_argument('-g', '--target-group', action='append', default=[], metavar='NAME',
-                        help='Select a named YAML target group; repeat to combine groups')
+    parser.add_argument('--daemon', action='append', default=[], metavar='SELECTOR[=URI]',
+                        help='TUI target name/glob/~regex from --config or NAME=URI')
+    parser.add_argument('-t', '--target', action='append', default=[], metavar='SELECTOR[=URI]',
+                        help='Target name/glob/~regex from --config or NAME=URI')
+    parser.add_argument('-g', '--target-group', action='append', default=[], metavar='SELECTOR',
+                        help='Select YAML groups by name, glob or ~regex; repeat to combine')
     parser.add_argument('--parallel', type=int, default=4, help='Maximum concurrent targets (1-32)')
     parser.add_argument('--operation-timeout', type=float, default=300,
                         help='Stop observing after this many seconds; does not cancel remote jobs')

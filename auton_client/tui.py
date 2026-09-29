@@ -26,14 +26,14 @@ def safe_text(value):
 
 
 def daemon_specs(specs, uris, configured=None):
-    from auton_client.connections import named_connections
+    from auton_client.connections import select_connections
     if specs and uris:
         raise ValueError('use --daemon or a single --uri for TUI, not both')
     if not specs:
         if len(uris) != 1:
             raise ValueError('TUI needs --daemon NAME=URI or one --uri; failover URIs are not targets')
         return {'default': uris[0]}
-    return named_connections(specs, configured)
+    return select_connections(specs, configured=configured)
 
 
 class OperatorView:
