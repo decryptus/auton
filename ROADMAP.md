@@ -246,7 +246,7 @@ the explicit long forms for readable scripts and backwards compatibility.
 | `--scenario-group` | `-S` planned |
 
 Example of intended usage: `auton --tui -c targets.yml -g 'prod-*' -S 'maintenance-*'`.
-Scenario aliases and pattern selection remain planned. Check the parser before assigning
+Scenario aliases remain planned. Check the parser before assigning
 short flags; do not repurpose existing options such as `-a`, `-A`, `-e` or `-l`.
 Short and long forms must share validation, repeated-selection and pattern
 semantics. Cover equivalence in CLI tests and show both forms in `--help` and docs.
@@ -257,10 +257,10 @@ semantics. Cover equivalence in CLI tests and show both forms in `--help` and do
   Keep this separate from ordered failover; a group is not a replacement chain.
 - Add `--scenario NAME` and `--scenario-group NAME` after individual scenarios.
   TUI startup selectors prepare the view and never submit jobs automatically.
-- Planned patterns follow monit-docker: `web-01` (literal), `web-*` (glob),
+- Implemented patterns follow monit-docker: `web-01` (literal), `web-*` (glob),
   `~web-[0-9]+$` (regex). No `glob:` or `regex:` prefixes. Quote shell arguments.
   Preserve inline `NAME=URI`. Match declared names, not URI strings or paths.
-- Apply patterns to targets, target groups, scenarios and scenario groups.
+- Apply patterns to targets and target groups now; extend to scenarios and scenario groups when available.
   Match group names before expanding members. Use case-sensitive whole-name
   globs and start-of-name regex matching; `$` anchors the regex end. Identifier
   validation remains a separate full-match contract.
@@ -270,8 +270,8 @@ semantics. Cover equivalence in CLI tests and show both forms in `--help` and do
 - Display the selected destinations and active filters in the TUI; scope changes
   must be explicit. Scenario filters initially restrict the catalogue, not jobs
   without scenario/operation metadata. Server authorization remains authoritative.
-- CLI and TUI share application services. Scenario selection, patterns and TUI
-  execution remain planned; initial group support uses exact group/member names.
+- CLI and TUI share application services. Scenario selection and TUI execution
+  remain planned; YAML group members remain exact target names.
 
 ### Single-level section imports
 

@@ -75,20 +75,44 @@ def normalize_origin(uri):
 
 
 def select_connections(specs, group_names=(), configured=None, groups=None):
-    """Resolve exact selections as a stable union, without network or execution."""
+    """Resolve exact/glob/~regex selections as a stable union without requests."""
+    from auton_client.selectors import NameSelector, is_pattern, MAX_SELECTORS
     configured = {} if configured is None else configured
     groups = {} if groups is None else groups
-    result = named_connections(specs, configured)
-    for name in group_names:
-        validate_connection_name(name)
-        if name not in groups:
-            raise ValueError('unknown target group: ' + name)
-        for member in groups[name]:
-            validate_connection_name(member)
-            if member not in configured:
-                raise ValueError('group references an unknown target: ' + member)
-            uri = normalize_origin(configured[member])
-            if member in result and result[member] != uri:
-                raise ValueError('conflicting target selection: ' + member)
-            result.setdefault(member, uri)
+    if len(specs) + len(group_names) > MAX_SELECTORS:
+        raise ValueError('too many selectors')
+    selector = NameSelector()
+    result = {}
+    explicit = set()
+    for spec in specs:
+        if not isinstance(spec, str):
+            raise ValueError('selectors must be strings')
+        if not spec.startswith('~') and '=' in spec:
+            connections = named_connections([spec], configured)
+            names = list(connections)
+            exact = True
+        elif not is_pattern(spec):
+            connections = named_connections([spec], configured)
+            names = list(connections)
+            exact = True
+        else:
+            names = selector.select(spec, configured)
+            connections = {name: normalize_origin(configured[name]) for name in names}
+            exact = False
+        for name in names:
+            if exact and name in explicit:
+                raise ValueError('duplicate connection name: ' + name)
+            if exact:
+                explicit.add(name)
+            result.setdefault(name, connections[name])
+    for pattern in group_names:
+        for name in selector.select(pattern, groups):
+            for member in groups[name]:
+                validate_connection_name(member)
+                if member not in configured:
+                    raise ValueError('group references an unknown target: ' + member)
+                uri = normalize_origin(configured[member])
+                if member in result and result[member] != uri:
+                    raise ValueError('conflicting target selection: ' + member)
+                result.setdefault(member, uri)
     return result

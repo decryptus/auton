@@ -112,10 +112,10 @@ class HTTPIntegrationTests(unittest.TestCase):
                 imported_targets.write_text(yaml.safe_dump({name: clients[name].uri for name in ('one', 'two')}))
                 client_config.write_text(yaml.safe_dump({'import_targets': 'targets.yml',
                                                        'groups': {'both': ['one', 'two'], 'second': ['two']}}))
-                target_args = ['-c', str(client_config), '-t', 'one', '-g', 'both', '-g', 'second']
+                target_args = ['-c', str(client_config), '-t', 'o*', '-g', 'b*', '-g', '~second$']
                 self.run_tui(None, ['--auth-user', 'alice', '--auth-passwd', 'secret'],
                              dict(os.environ, PYTHONPATH=str(ROOT)),
-                             daemon_args=['--tui', '-c', str(client_config), '-t', 'one', '-g', 'both'],
+                             daemon_args=['--tui', '-c', str(client_config), '-t', '~one$', '-g', 'b*'],
                              expected_job=b'shared-job', expected_output=b'one')
                 for exit_code in (0, 7):
                     execution = subprocess.run([sys.executable, str(ROOT / 'bin/auton'),
