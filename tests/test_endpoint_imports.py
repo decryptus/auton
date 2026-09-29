@@ -95,6 +95,25 @@ class EndpointImportTests(unittest.TestCase):
                     config.load_conf(str(main))
                 factory.assert_not_called()
 
+    def test_discovery_validation_precedes_endpoint_initialization(self):
+        import yaml
+        with tempfile.TemporaryDirectory() as tmp:
+            main = Path(tmp) / 'main.yml'
+            for discovery in (None, [], {'token': 'PRIVATE'}, {'description': 42},
+                              {'description': 'x' * 513}, {'description': 'bad\nline'}):
+                main.write_text(yaml.safe_dump({'general': {}, 'endpoints': {
+                    'test': {'plugin': 'fake', 'discovery': discovery}}}))
+                factory = Mock()
+                with self.subTest(discovery=discovery), \
+                     patch.object(config, 'parse_conf', side_effect=lambda value: value), \
+                     patch.object(config, 'init_modules'), patch.object(config.signal, 'signal'), \
+                     patch.object(config, 'PLUGINS', {'fake': factory}), \
+                     patch.object(config, 'ENDPOINTS'), patch.object(config, 'DWHO_THREADS', []):
+                    with self.assertRaises(AutonConfigurationError) as caught:
+                        config.load_conf(str(main))
+                    self.assertNotIn('PRIVATE', str(caught.exception))
+                    factory.assert_not_called()
+
     def test_limits_and_missing_files_fail_explicitly(self):
         with tempfile.TemporaryDirectory() as tmp:
             conf = {'_config_directory': tmp, 'import_endpoints': 'missing.yml'}

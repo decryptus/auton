@@ -31,6 +31,8 @@ from auton.classes.endpoint_imports import load_endpoint_imports, load_component
 _TPL_IMPORTS = ('from os import environ as ENV',
                 'from sonicprobe.helpers import to_yaml as my')
 LOG          = logging.getLogger('auton.config')
+DISCOVERY_FIELDS = frozenset(('description',))
+MAX_ENDPOINT_DESCRIPTION = 512
 
 
 def load_extensions(kind, path):
@@ -129,6 +131,16 @@ def load_conf(xfile, options = None, envvar = None):
 
             if x in ept_cfg:
                 cfg[x].update(dict(ept_cfg[x]))
+
+        if 'discovery' in ept_cfg:
+            discovery = ept_cfg['discovery']
+            if not isinstance(discovery, dict) or set(discovery) - DISCOVERY_FIELDS:
+                raise AutonConfigurationError('endpoint discovery accepts only description')
+            description = discovery.get('description', '')
+            if (not isinstance(description, str) or len(description) > MAX_ENDPOINT_DESCRIPTION
+                    or any(not char.isprintable() for char in description)):
+                raise AutonConfigurationError('endpoint discovery.description must be printable text of at most 512 characters')
+            cfg['discovery'] = {'description': description} if description else {}
 
         cfg['credentials'] = None
         if ept_cfg.get('credentials'):

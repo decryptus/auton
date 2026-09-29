@@ -46,6 +46,15 @@ class ServiceTests(unittest.TestCase):
         obj.set_status(STATUS_COMPLETE)
         return obj
 
+    def test_discovery_exposes_only_published_metadata_after_acl_check(self):
+        self.endpoint.discovery = {'description': 'Check service', 'token': 'PRIVATE'}
+        self.endpoint.config = {'prog': '/private/tool', 'env': {'SECRET': 'PRIVATE'}}
+        self.assertEqual(self.service.list_endpoints('alice'),
+                         [{'name': 'test', 'description': 'Check service'}])
+        self.assertEqual(self.service.list_endpoints('bob'), [])
+        self.endpoint.users['alice'] = False
+        self.assertEqual(self.service.list_endpoints('alice'), [])
+
     def test_direct_admission_detaches_input_and_retains_no_request(self):
         payload = {'args': ['original'], 'env': {'NAME': 'before'}}
         self.submit(payload=payload)

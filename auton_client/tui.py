@@ -83,7 +83,7 @@ class OperatorView:
             return [row for row in rows if self.search.casefold() in (row['name'] or '').casefold()]
         if self.view == 1:
             return [item for item in self.data.get('endpoints', [])
-                    if self.search.casefold() in item['name'].casefold()]
+                    if self.search.casefold() in (item['name'] + ' ' + item.get('description', '')).casefold()]
         return [job for job in self.data.get('jobs', [])
                 if (self.state is None or job['status'] == self.state)
                 and (self.endpoint is None or job['endpoint'] == self.endpoint)
@@ -317,8 +317,13 @@ class OperatorView:
                     value = '%-16s %-7s %-5s %s' % (item['name'], item['state'],
                              item['jobs'] if item['jobs'] is not None else '?', item['error'])
                 else:
-                    value = item['name'] if self.view == 1 else '%-11s %-5s %s' % (
-                        STATUS_LABELS[item['status']], item.get('return_code'), item['uid'])
+                    if self.view == 1:
+                        value = item['name']
+                        if item.get('description'):
+                            value += ' — ' + item['description']
+                    else:
+                        value = '%-11s %-5s %s' % (
+                            STATUS_LABELS[item['status']], item.get('return_code'), item['uid'])
                     if self.daemon is None:
                         value = item['daemon'] + ' / ' + value
                 line(6 + i - start, value, curses.A_REVERSE if i == self.index else 0)

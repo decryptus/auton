@@ -34,6 +34,10 @@ const {chromium} = require('playwright');
     }
     await login('operator');
     assert.equal(await page.locator('#principal').textContent(), 'operator');
+    assert((await page.locator('#endpoints').textContent()).includes('<script>discovery()</script> Diagnostic checks'));
+    assert.equal(await page.locator('#endpoints script').count(), 0);
+    assert.equal(await page.locator('#run-endpoint option[value="diagnostic"]').textContent(),
+      'diagnostic — <script>discovery()</script> Diagnostic checks');
     assert.equal(await page.evaluate(() => document.cookie), '');
     const cookies = await context.cookies();
     assert(cookies.some(cookie => cookie.name === 'autond-session' && cookie.httpOnly && cookie.sameSite === 'Strict'));
