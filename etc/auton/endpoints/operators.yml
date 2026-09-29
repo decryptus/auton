@@ -1,0 +1,2 @@
+# Enable authentication in the main daemon configuration.
+alice: true

@@ -23,6 +23,7 @@ from sonicprobe.helpers import load_yaml
 
 from auton.classes.exceptions import AutonConfigurationError
 from auton.classes.plugins import ENDPOINTS, PLUGINS
+from auton.classes.endpoint_imports import load_endpoint_imports, load_component, COMPONENT_SECTIONS
 
 _TPL_IMPORTS = ('from os import environ as ENV',
                 'from sonicprobe.helpers import to_yaml as my')
@@ -75,6 +76,7 @@ def load_conf(xfile, options = None, envvar = None):
         c.close()
         conf['_config_directory'] = None
 
+    conf['endpoints'], endpoint_sources = load_endpoint_imports(conf)
     conf = import_conf_files('modules', conf)
 
     init_modules(conf)
@@ -87,10 +89,13 @@ def load_conf(xfile, options = None, envvar = None):
     if not conf.get('endpoints'):
         raise AutonConfigurationError("Missing 'endpoints' section in configuration")
 
+    prepared = []
     for name, ept_cfg in six.iteritems(conf['endpoints']):
+        source = endpoint_sources.get(name)
+        config_dir = os.path.dirname(source) if source else conf['_config_directory']
         cfg     = {'general':  dict(conf['general']),
                    'auton':    {'endpoint_name': name,
-                                'config_dir':    conf['_config_directory']},
+                                'config_dir':    config_dir},
                    'config':   {},
                    'users' :   {},
                    'vars':     {}}
@@ -99,14 +104,17 @@ def load_conf(xfile, options = None, envvar = None):
             raise AutonConfigurationError("Missing 'plugin' option in endpoint: %r" % name)
 
         if ept_cfg['plugin'] not in PLUGINS:
-            raise AutonConfigurationError("Invalid plugin %r in endpoint: %r"
+            raise AutonConfigurationError("Invalid plugin %r in endpoint: %r%s"
                                           % (ept_cfg['plugin'],
-                                             name))
+                                             name, ' in ' + source if source else ''))
         cfg['auton']['plugin_name'] = ept_cfg['plugin']
 
-        for x in ('vars', 'config', 'users'):
-            if ept_cfg.get("import_%s" % x):
-                cfg[x].update(import_file(ept_cfg["import_%s" % x], conf['_config_directory'], cfg))
+        for x in COMPONENT_SECTIONS:
+            key = 'import_' + x
+            if source and key in ept_cfg:
+                cfg[x].update(load_component(ept_cfg[key], source, cfg))
+            elif ept_cfg.get(key):
+                cfg[x].update(import_file(ept_cfg[key], config_dir, cfg))
 
             if x in ept_cfg:
                 cfg[x].update(dict(ept_cfg[x]))
@@ -115,7 +123,10 @@ def load_conf(xfile, options = None, envvar = None):
         if ept_cfg.get('credentials'):
             cfg['credentials'] = ept_cfg['credentials']
 
-        endpoint = PLUGINS[ept_cfg['plugin']](name)
+        prepared.append((name, ept_cfg['plugin'], cfg))
+
+    for name, plugin, cfg in prepared:
+        endpoint = PLUGINS[plugin](name)
         ENDPOINTS.register(endpoint)
         LOG.info("endpoint init: %r", name)
         endpoint.init(cfg)

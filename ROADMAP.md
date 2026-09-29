@@ -215,8 +215,10 @@ Configuration layout:
 - Client `targets.yml`: named daemon origins, selected explicitly at invocation.
 - Client `scenarios/<name>.yml`: one versioned scenario and its ordered steps.
 - Daemon `endpoints.yml`: optional separate endpoint definitions, command settings
-  and endpoint ACLs, loaded by `autond`; adding this import is future work. Keep
-  existing inline daemon endpoint configuration compatible.
+  and endpoint ACLs, loaded by `autond` through root `import_endpoints` (implemented).
+  Inline endpoints remain compatible. Catalogues cannot import catalogues; their
+  endpoints may import terminal config, vars and users components, with paths
+  relative to the declaring catalogue. Duplicate definitions fail startup.
 
 A scenario references endpoint names, never installs endpoint definitions or
 changes server permissions. Daemon authentication and endpoint authorization
@@ -447,6 +449,10 @@ The site should:
 - keep documentation synchronized with releases;
 - host screenshots locally rather than relying on GitHub image links;
 - use galleries/lightboxes where useful;
+- present real terminal recordings and local screenshots using disposable demo
+  daemons; do not expose a public remote-execution daemon;
+- provide a contact form with spam protection (recipient and delivery configuration
+  to be supplied), alongside GitHub issue links;
 - expose the current project version clearly;
 - be deployable automatically from GitHub;
 - keep the main documentation browsable directly on the site.

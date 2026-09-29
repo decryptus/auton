@@ -787,6 +787,53 @@ endpoints:
       timeout: 3600
 ```
 
+### Import endpoint catalogues
+
+Available on the development branch; not included in the published 0.3.2 release.
+The main daemon configuration can keep inline endpoints and import additional ones:
+
+```yaml
+import_endpoints:
+  - endpoints/diagnostics.yml
+```
+
+An imported catalogue contains endpoint names directly, without an `endpoints:` wrapper:
+
+```yaml
+python-check:
+  plugin: subproc
+  import_vars: python-vars.yml
+  import_config: python-config.yml
+  import_users: operators.yml
+  config:
+    timeout: 10
+```
+
+See the complete [catalogue example](etc/auton/endpoints/diagnostics.yml).
+Catalogue paths resolve relative to the main configuration. Component paths resolve
+relative to the catalogue declaring the endpoint (the real file for symlinks),
+independently of the working directory. Absolute local paths are also accepted.
+A single filename or a list is accepted by `import_endpoints`.
+
+Endpoint catalogues cannot import other catalogues. Their endpoints may use
+`import_vars`, `import_config` and `import_users`; these component files are
+terminal mappings and cannot declare further imports. Components may be shared by
+several endpoints. Processing order is vars, config, users; values written inline
+in each component section override that section's imported values, as before.
+
+Catalogues are plain YAML. Components retain Mako templating and access to the
+endpoint configuration, including previously loaded vars. **Mako configuration
+files are trusted administrator code, not a sandbox.** Never accept them from
+untrusted clients. Imports do not change daemon authentication or endpoint ACLs.
+
+Duplicate endpoint names, repeated catalogue files (including symlinks), duplicate
+YAML keys, missing files, malformed mappings and nested imports fail startup.
+New imported files do not support YAML merge keys or custom include tags, or remote
+URLs. Existing inline endpoints retain their historical component import behavior.
+Limits: 32 catalogue files, 1 MiB combined catalogue source and 1,024 imported
+endpoints; each component source and rendered output is limited to 1 MiB.
+All endpoint components are prepared before endpoint instances are initialized.
+
 ### Authentication
 
 To enable authentication, you must add `auth_basic` and `auth_basic_file` lines in section `general`:
