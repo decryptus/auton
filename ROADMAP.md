@@ -200,6 +200,11 @@ does not introduce a central scheduler or a generic workflow engine.
 
 Continue product hardening:
 
+Implemented: optional per-daemon JSONL lifecycle journal with size-based rotation,
+bounded retention, execution identity and metadata-only records. Journal write
+errors do not change command outcomes. This does not provide job restoration
+or transactional durability. Real terminal captures are included in the README.
+
 - improve cleanup of expired jobs;
 - review persistence requirements for local daemon jobs;
 - improve reproducible builds;

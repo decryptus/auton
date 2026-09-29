@@ -181,6 +181,82 @@ or represented by stale jobs. An endpoint filter in ALL applies to that endpoint
 on its originating daemon. Aggregation is read-only and entirely client-side,
 without persistent central history or any change to execution failover.
 
+### TUI screenshots
+
+These captures come from the real curses UI connected to two disposable local
+daemons. All job names and output are demonstration data. Click a capture to
+open the full-size image; the PNG files are stored in this repository.
+
+**Aggregated jobs**, including successful and failed commands:
+
+[![Auton TUI: jobs from two daemons](docs/images/tui-jobs.png)](docs/images/tui-jobs.png)
+
+**Daemon status** and visible job counts:
+
+[![Auton TUI: daemon status table](docs/images/tui-daemons.png)](docs/images/tui-daemons.png)
+
+**Job output**, pinned to its originating daemon:
+
+[![Auton TUI: retained stdout](docs/images/tui-output.png)](docs/images/tui-output.png)
+
+Regenerate with `python scripts/capture_tui.py` from a development checkout with
+daemon dependencies, `pyte`, `Pillow`, and the DejaVu Sans Mono font installed.
+The script captures an actual pseudo-terminal and renders its terminal cells;
+it does not construct a mock interface or contact production servers.
+
+### Local JSONL job journal
+
+Enable an optional journal on each `autond`:
+
+```yaml
+general:
+  journal_path: /var/log/auton/jobs.jsonl
+  journal_max_bytes: 10485760
+  journal_backup_count: 5
+```
+
+With `journal_path` absent, no journal is created. The absolute path's parent
+directory must already exist and be writable by the daemon's runtime user.
+Use one daemon process per file and a directory controlled by that user.
+New files use mode `0600`; existing file permissions are preserved. Symlinks and
+non-regular files are refused. Files are opened lazily after privilege dropping.
+
+Each line is a JSON object with `schema_version: 1`, a UTC `timestamp`, `event`,
+`job_id` (`endpoint:id`), `execution_id`, `endpoint`, `principal`, `return_code`,
+`duration_ms` and `reason`. A fresh execution UUID distinguishes job IDs reused
+after expiry. Rejections before object creation have no execution UUID.
+Null fields mean not applicable/not yet known; durations use a monotonic clock.
+Identifier fields are capped at 256 characters and truncation is explicitly
+reported in `truncated_fields`.
+
+| Event | Meaning |
+| --- | --- |
+| `job.admitted` | Validation, authorization and capacity checks passed; an object is reserved before queue insertion. |
+| `job.started` | The worker passed its execution-time ACL check and began execution. |
+| `job.completed` | Execution completed with exit code zero. |
+| `job.failed` | Command failure or execution exception. |
+| `job.timeout` | The execution adapter reported a timeout. |
+| `job.rejected` | Admission ACL/endpoint/capacity/duplicate rejection, queue failure, or execution-time ACL rejection. |
+
+The journal records lifecycle metadata only. It does not contain command
+arguments, environment variables, uploaded files, stdout/stderr, credentials,
+or exception messages. It does not journal read/poll requests. HTTP authentication
+failures and malformed requests rejected before admission remain outside this
+lifecycle journal; existing technical logs continue separately.
+
+Rotation occurs before an append would exceed `journal_max_bytes` (minimum
+16384 bytes). `.1` is the newest backup; at most `journal_backup_count` backups
+(1–100, default 5) are retained, in addition to the active file. Writes and
+rotation are serialized within the daemon. Do not share a path between daemons
+or combine this rotation with an external rotate rule for the same file.
+
+Records are flushed/closed after each event, without per-event `fsync`. This is
+a best-effort operational journal, not transactional persistence: a crash may
+leave incomplete history. Write failures are reported in technical logs (at most
+once per minute per journal) and do not fail or retry a command. The journal does
+not restore jobs after restart, replay commands, or extend the API's in-memory
+result retention.
+
 ### Development
 
 ```sh
