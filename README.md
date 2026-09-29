@@ -23,6 +23,10 @@ For example, you can use auton from CI/CD to run on remote servers, you just nee
 You can also use auton if you need to execute a new version of a software but you can't install it on a legacy server
 or tests programs execution.
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including the TUI, multi-autond support, multi-target execution and dedicated website.
+
 ## Quickstart
 
 Using autond in Docker
