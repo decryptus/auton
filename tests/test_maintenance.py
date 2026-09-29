@@ -105,6 +105,12 @@ class MaintenanceTests(unittest.TestCase):
             'status': 'ok', 'maintenance': {'enabled': True, 'reason': 'Upgrade'}}}})
         self.assertEqual(data['daemons'][0]['state'], 'maintenance')
         self.assertFalse(data['partial'])
+        from auton_client.tui import OperatorView
+        view = OperatorView(Mock(clients={'one': Mock()}))
+        view.cache['one'] = {'jobs': [], 'health': {'maintenance': {'enabled': True, 'reason': 'Upgrade'}}}
+        view.view = 3
+        self.assertEqual(view.rows()[0]['state'], 'maintenance')
+        self.assertEqual(view.rows()[0]['error'], 'Upgrade')
 
     def test_invalid_configuration_and_payloads_are_rejected(self):
         for enabled, reason in [(1, ''), (True, 1), (True, 'x' * 513)]:

@@ -73,10 +73,12 @@ class OperatorView:
 
     def rows(self):
         if self.view == 3:
+            maintenance = self.data.get('health', {}).get('maintenance', {})
             rows = self.data.get('daemons', [{'name': self.daemon, 'state':
-                    'unchecked' if not self.data else ('error' if self.data.get('errors') else 'ok'),
+                    'unchecked' if not self.data else ('error' if self.data.get('errors') else
+                    'maintenance' if maintenance.get('enabled') else 'ok'),
                     'jobs': len(self.data['jobs']) if 'jobs' in self.data else None,
-                    'error': '; '.join(self.data.get('errors', {}).values())}])
+                    'error': '; '.join(self.data.get('errors', {}).values()) or maintenance.get('reason', '')}])
             return [row for row in rows if self.search.casefold() in (row['name'] or '').casefold()]
         if self.view == 1:
             return [item for item in self.data.get('endpoints', [])
