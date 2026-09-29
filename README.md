@@ -836,35 +836,60 @@ All endpoint components are prepared before endpoint instances are initialized.
 
 ### Authentication
 
-To enable authentication, you must add `auth_basic` and `auth_basic_file` lines in section `general`:
+New installations should use the centrally enforced policy:
 
 ```yaml
-  auth_basic:      'Restricted'
-  auth_basic_file: '/etc/auton/auton.passwd'
+general:
+  listen_addr: 127.0.0.1
+  auth_mode: required
+  auth_basic: Restricted
+  auth_basic_file: /etc/auton/auton.passwd
 ```
 
-Use `htpasswd` to generate `auth_basic_file`:
+`required` protects **every declared module route**, including health and future
+routes, even when its YAML says `auth: false`. Explicit route user allowlists are
+preserved. Missing, empty, malformed or duplicate-user password files prevent
+startup. Create a bcrypt password file interactively (do not put the password on
+the command line):
 
-`htpasswd -c -s /etc/auton/auton.passwd foo`
-
-And you have to add for each modules route `auth: true`:
-
-```yaml
-modules:
-  job:
-    routes:
-      run:
-        handler:   'job_run'
-        regexp:    '^run/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
-        safe_init: true
-        auth:      true
-        op:        'POST'
-      status:
-        handler:   'job_status'
-        regexp:    '^status/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
-        auth:      true
-        op:        'GET'
+```sh
+htpasswd -c -B /etc/auton/auton.passwd alice
+# For subsequent accounts, omit -c to preserve existing users.
+htpasswd -B /etc/auton/auton.passwd automation
 ```
+
+Make the file readable by the daemon account and inaccessible to unrelated users
+(e.g. owner/group appropriate to your deployment, mode 0640). Treat it as a secret;
+do not commit it. Credential files are loaded at startup: restart the daemon after
+rotation or revocation. Bcrypt verification is tested on the supported Linux/Python
+matrix. Historical SHA-1 entries remain readable for migration, but new credentials
+must use bcrypt. Python 3.13 support remains pending dependency/crypt migration.
+
+Use HTTPS for remote access, normally through a reverse proxy with the daemon
+bound to loopback or an isolated private interface. Basic authentication does not
+encrypt credentials. Client TLS verification stays enabled. Do not expose the
+unencrypted backend publicly or trust forwarded identity headers as authentication.
+
+For disposable local development only, `auth_mode: anonymous` is available with a
+literal loopback listen address and no password file. It retains route-specific
+requirements (maintenance remains protected), but otherwise local callers share
+anonymous identity and job visibility. Loopback is not protection against other
+local users or a reverse proxy: do not publish this mode through a proxy.
+
+#### Authentication migration before 1.0
+
+These policy options are development features, not part of published 0.3.2.
+Existing configurations without `auth_mode` retain historical per-route behavior
+and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
+`auth_basic_file` alone does not protect routes in legacy mode. Set `auth: true`
+on each protected route until migrating to `required`.
+
+The shipped example now listens on loopback and selects `required`. Consequently,
+the default Docker configuration needs a mounted configuration/password file before
+it can start; it no longer starts an anonymously accessible example daemon. For a
+container reverse proxy, explicitly choose the internal listen address and keep
+the backend off public published ports. Existing mounted configurations are not
+rewritten. CLI commands, endpoint ACLs and job ownership semantics are unchanged.
 
 Use section `users` to specify users allowed by endpoint:
 ```yaml

@@ -45,8 +45,6 @@ class HTTPIntegrationTests(unittest.TestCase):
                                              auth_basic='Test', auth_basic_file=str(passwd), maintenance_operators=['alice'])
                     config.pop('import_modules', None)
                     config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
-                    for route in config['modules']['job']['routes'].values():
-                        route['auth'] = True
                     config['endpoints'] = {'test': {'plugin': 'subproc', 'config': {
                         'prog': sys.executable, 'timeout': 2}}}
                     if name == 'two':
@@ -385,6 +383,8 @@ class HTTPIntegrationTests(unittest.TestCase):
                                      journal_path=str(Path(tmp) / 'jobs.jsonl'))
             config.pop('import_modules', None)
             config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
+            if not authenticated:
+                config['general']['auth_mode'] = 'anonymous'
             auth = None
             auth_args = []
             if authenticated:
@@ -392,8 +392,6 @@ class HTTPIntegrationTests(unittest.TestCase):
                 hashed = '{SHA}' + base64.b64encode(hashlib.sha1(b'secret').digest()).decode()
                 passwd.write_text('alice:' + hashed + '\nbob:' + hashed + '\n')
                 config['general'].update(auth_basic='Test', auth_basic_file=str(passwd))
-                for route in config['modules']['job']['routes'].values():
-                    route['auth'] = True
                 auth = ('alice', 'secret')
                 auth_args = ['--auth-user', 'alice', '--auth-passwd', 'secret']
             config['endpoints'] = {'test': {'plugin': 'subproc', 'config': {
