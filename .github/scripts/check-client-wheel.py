@@ -22,6 +22,8 @@ class BlockDaemon(importlib.abc.MetaPathFinder):
 sys.meta_path.insert(0, BlockDaemon())
 from auton_client import RemoteClient
 assert RemoteClient(['http://localhost'], 'example', 'one').output_offset == 0
+from auton_client.operations import OperationService
+assert OperationService({"local": "http://localhost"}, "example").parallel == 4
 from auton_client.visibility import DaemonClient
 from auton_client.monitor import FleetMonitor
 from auton_client.tui import OperatorView, daemon_specs

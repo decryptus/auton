@@ -128,12 +128,16 @@ The implementation is client-side and stateless, with no central persistence.
 
 ## Milestone 4 — Explicit multi-target execution
 
-Add a deliberate way to execute the same logical operation on multiple selected daemons.
+Implemented on the development branch: `OperationService` submits one independent
+job per explicitly named target, with bounded parallelism and per-target results.
+The CLI emits a final JSON operation summary, including output, exit codes,
+observation duration, refusal and unknown outcomes. POST requests are not replayed.
+Two authenticated daemons are exercised by integration tests.
 
-Possible CLI direction:
+Current CLI:
 
 ```text
-auton run --target autond-01 --target autond-02 ...
+auton --endpoint curl --target autond-01=https://node1 --target autond-02=https://node2 -a https://example.com
 ```
 
 Never reinterpret existing failover URIs as broadcast targets.
@@ -173,10 +177,26 @@ Improve distributed-operation ergonomics:
 - show elapsed time and completion state per job;
 - add filtering and grouping in TUI.
 
-### Job sequences (after explicit multi-target execution)
+### Named scenarios and job sequences (next development milestone)
 
 Keep one job as one command on one daemon. An operation may later describe
 several ordered steps, each producing a distinct job per selected target.
+
+Provide named, declarative scenarios, initially described in a versioned YAML
+file. A scenario lists ordered steps with a unique step name, endpoint and
+arguments. Targets remain an explicit selection, with the same name/origin
+validation as multi-target execution. Validate the entire scenario before any
+submission. A typical scenario is `preflight -> deploy -> verify`.
+
+Each invocation receives an operation ID; results retain target, step and job
+identity, including skipped steps and unknown outcomes. Begin with linear
+sequences and bounded concurrency across targets. Do not introduce arbitrary
+Python/shell evaluation in the scenario format, a generic DAG engine, implicit
+rollback, or a permanent scheduler. An endpoint may still execute a configured
+remote script under its normal daemon authorization rules.
+
+This is a planned capability: scenario files and a scenario CLI option are not
+yet implemented. Multi-target execution currently runs one job per target.
 
 - Run steps sequentially on each target; stop that target's sequence on the
   first failed step by default and mark subsequent steps as skipped.
@@ -218,6 +238,8 @@ or transactional durability. Real terminal captures are included in the README.
 Persistent storage is not mandatory for the initial multi-daemon client work. It should only be introduced if product behavior requires it.
 
 ## Milestone 7 — Website
+
+Domain purchased: **auton.run**. DNS and website deployment remain to be configured.
 
 Create a dedicated **Auton website**, following the same product/documentation approach used for monit-docker.
 

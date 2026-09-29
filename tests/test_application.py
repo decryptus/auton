@@ -349,6 +349,17 @@ else:
     raise AssertionError('expiry missing')
 from auton_client import RemoteClient
 assert RemoteClient
+from auton_client.operations import OperationService
+class FakeRemote:
+    def __init__(self, uris, endpoint, uid, **kwargs):
+        self.uid = endpoint + ':' + uid
+        self.output_offset = 0
+    def do_run(self):
+        return {'uid': self.uid, 'status': 'complete', 'return_code': 0,
+                'stream': ['done'], 'next_offset': 1}
+operation = OperationService({'local': 'http://localhost'}, 'fake', client_factory=FakeRemote).run()
+assert operation['status'] == 'completed'
+assert operation['targets'][0]['stdout'] == ['done']
 '''
         result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
                                 env=dict(os.environ, PYTHONPATH=str(ROOT)),

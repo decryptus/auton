@@ -26,22 +26,14 @@ def safe_text(value):
 
 
 def daemon_specs(specs, uris):
+    from auton_client.connections import named_connections
     if specs and uris:
         raise ValueError('use --daemon or a single --uri for TUI, not both')
     if not specs:
         if len(uris) != 1:
             raise ValueError('TUI needs --daemon NAME=URI or one --uri; failover URIs are not targets')
         return {'default': uris[0]}
-    result = {}
-    for spec in specs:
-        name, separator, uri = spec.partition('=')
-        if (not separator or not name or len(name) > 32 or not uri
-                or not all(char.isalnum() or char in '._-' for char in name)):
-            raise ValueError('daemon must use NAME=URI (name: letters, digits, dot, underscore, hyphen)')
-        if name in result:
-            raise ValueError('duplicate daemon name: ' + name)
-        result[name] = uri
-    return result
+    return named_connections(specs)
 
 
 class OperatorView:

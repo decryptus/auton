@@ -3,11 +3,12 @@
 """Read-only HTTP adapter for one explicit daemon; never performs failover."""
 
 import math
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote
 
 import requests
 
 from auton_client import RemoteClient, DEFAULT_HTTP_TIMEOUT
+from auton_client.connections import normalize_origin
 
 READ_ROUTES = {'health': '/health', 'jobs': '/jobs', 'endpoints': '/endpoints',
                'stats': '/stats'}
@@ -21,18 +22,10 @@ class VisibilityError(Exception):
 
 class DaemonClient:
     def __init__(self, uri, auth=None, http_timeout=DEFAULT_HTTP_TIMEOUT, session=None):
-        parsed = urlsplit(uri)
-        if (parsed.scheme not in ('http', 'https') or not parsed.hostname
-                or parsed.username is not None or parsed.password is not None
-                or parsed.query or parsed.fragment or parsed.path not in ('', '/')):
-            raise ValueError('daemon URI must be an HTTP(S) origin without credentials, path or query')
-        try:
-            parsed.port
-        except ValueError:
-            raise ValueError('invalid daemon port') from None
+        origin = normalize_origin(uri)
         if not math.isfinite(http_timeout) or http_timeout <= 0:
             raise ValueError('http-timeout must be positive')
-        self.uri = urlunsplit((parsed.scheme, parsed.netloc, '', '', ''))
+        self.uri = origin
         self.auth = auth
         self.http_timeout = http_timeout
         self.session = requests if session is None else session

@@ -43,6 +43,12 @@ def argv_parse_check():
     parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
     parser.add_argument('--daemon', action='append', default=[], metavar='NAME=URI',
                         help='Explicit daemon for TUI; repeat to enable daemon selection')
+    parser.add_argument('--target', action='append', default=[], metavar='NAME=URI',
+                        help='Explicit execution target; repeat for multiple daemons')
+    parser.add_argument('--parallel', type=int, default=4, help='Maximum concurrent targets (1-32)')
+    parser.add_argument('--operation-timeout', type=float, default=300,
+                        help='Stop observing after this many seconds; does not cancel remote jobs')
+    parser.add_argument('--operation-id', help='Optional operation label (client-side only)')
     parser.add_argument('--refresh', type=float, default=2.0,
                         help='TUI refresh interval in seconds (minimum 0.2, default: 2)')
 
@@ -79,7 +85,7 @@ def argv_parse_check():
     parser.add_argument("--uid",
                         dest      = 'uid',
                         type      = six.ensure_text,
-                        default   = os.environ.get('AUTON_UID') or ("%s" % uuid.uuid4()),
+                        default   = os.environ.get('AUTON_UID') or None,
                         help      = "Auton uid")
     parser.add_argument("--endpoint",
                         dest      = 'endpoint',
@@ -161,8 +167,18 @@ def argv_parse_check():
             or not math.isfinite(options.delay) or options.delay < 0):
         parser.error('http-timeout must be positive and delay non-negative')
 
-    if not options.uri and not options.daemon and os.environ.get('AUTON_URI'):
+    if not options.uri and not options.daemon and not options.target and os.environ.get('AUTON_URI'):
         options.uri = [x.strip() for x in os.environ.get('AUTON_URI').split(',')]
+
+    if options.target:
+        if options.uri or options.daemon or options.tui or options.mode != 'autorun' or options.uid is not None:
+            parser.error('--target cannot be combined with --uri, --daemon, --tui, --uid/AUTON_UID or --mode run/status')
+        if options.no_return_code:
+            parser.error('--no-return-code cannot hide multi-target failures')
+    elif options.operation_id or options.parallel != 4 or options.operation_timeout != 300:
+        parser.error('operation options require --target')
+    if options.uid is None:
+        options.uid = str(uuid.uuid4())
 
     if options.daemon and not options.tui:
         parser.error('--daemon requires --tui; it is not a broadcast execution option')
@@ -177,39 +193,19 @@ def argv_parse_check():
     return options
 
 
-class AutonClient(RemoteClient):
+class PayloadBuilder:
     def __init__(self, options):
         self.options = options
         self.envvars = {}
         self.argfiles = []
-        if not options.uri:
-            raise ValueError('missing variable AUTON_URI')
-        if not options.uid:
-            raise ValueError('missing variable AUTON_UID')
-        if not options.endpoint:
-            raise ValueError('missing variable AUTON_ENDPOINT')
         self._parse_multi_args()
         self._parse_multi_argsfiles()
         self._import_envvars()
         self._load_envfiles()
         self._parse_envvars()
         self._parse_argfiles()
-        auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
-        RemoteClient.__init__(self, options.uri, options.endpoint, options.uid,
-                              payload={'args': options.args, 'argfiles': self.argfiles,
-                                       'env': self.envvars, 'envfiles': options.envfiles},
-                              auth=auth, http_timeout=options.http_timeout)
-
-    @staticmethod
-    def _show_results(data):
-        if data.get('stream'):
-            for x in data['stream']:
-                sys.stdout.write(x)
-
-        if data['status'] == 'complete' \
-           and data.get('errors'):
-            for x in data['errors']:
-                sys.stderr.write(x)
+        self.payload = {'args': options.args, 'argfiles': self.argfiles,
+                        'env': self.envvars, 'envfiles': options.envfiles}
 
     def _import_envvars(self):
         for envvar in self.options.imp_envvars:
@@ -262,6 +258,28 @@ class AutonClient(RemoteClient):
                                       'content': helpers.base64_encode_file(arg[1]),
                                       'filename': os.path.basename(arg[1])})
 
+
+class AutonClient(RemoteClient, PayloadBuilder):
+    def __init__(self, options):
+        if not options.uri:
+            raise ValueError('missing variable AUTON_URI')
+        if not options.uid:
+            raise ValueError('missing variable AUTON_UID')
+        if not options.endpoint:
+            raise ValueError('missing variable AUTON_ENDPOINT')
+        PayloadBuilder.__init__(self, options)
+        auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+        RemoteClient.__init__(self, options.uri, options.endpoint, options.uid,
+                              payload=self.payload, auth=auth, http_timeout=options.http_timeout)
+
+    @staticmethod
+    def _show_results(data):
+        for chunk in data.get('stream') or []:
+            sys.stdout.write(chunk)
+        if data['status'] == 'complete':
+            for chunk in data.get('errors') or []:
+                sys.stderr.write(chunk)
+
     def do_autorun(self):
         for data in self.iter_results(delay=self.options.delay):
             self._show_results(data)
@@ -307,8 +325,19 @@ def main(options):
     rc      = 0
 
     try:
-        auton = AutonClient(options)
-        rc    = getattr(auton, "do_%s" % options.mode)()
+        if options.target:
+            from auton_client.operations import OperationService, named_connections
+            auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+            operation = OperationService(named_connections(options.target), options.endpoint,
+                                         payload=PayloadBuilder(options).payload, auth=auth,
+                                         http_timeout=options.http_timeout, parallel=options.parallel,
+                                         timeout=options.operation_timeout, delay=options.delay)
+            result = operation.run(options.operation_id)
+            print(json.dumps(result))
+            rc = int(result['status'] != 'completed')
+        else:
+            auton = AutonClient(options)
+            rc = getattr(auton, "do_%s" % options.mode)()
         if isinstance(rc, dict):
             print(json.dumps(rc))
             rc = int(rc['code'] != 200)
