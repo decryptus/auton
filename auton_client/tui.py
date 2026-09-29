@@ -25,7 +25,7 @@ def safe_text(value):
     return ''.join(char if char.isprintable() else ' ' for char in str(value))
 
 
-def daemon_specs(specs, uris):
+def daemon_specs(specs, uris, configured=None):
     from auton_client.connections import named_connections
     if specs and uris:
         raise ValueError('use --daemon or a single --uri for TUI, not both')
@@ -33,7 +33,7 @@ def daemon_specs(specs, uris):
         if len(uris) != 1:
             raise ValueError('TUI needs --daemon NAME=URI or one --uri; failover URIs are not targets')
         return {'default': uris[0]}
-    return named_connections(specs)
+    return named_connections(specs, configured)
 
 
 class OperatorView:
@@ -278,13 +278,13 @@ class OperatorView:
         screen.refresh()
 
 
-def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH):
+def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None):
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError('TUI requires an interactive terminal')
     if not math.isfinite(refresh) or refresh < 0.2:
         raise ValueError('refresh must be at least 0.2 seconds')
     clients = {name: DaemonClient(uri, auth, http_timeout)
-               for name, uri in daemon_specs(specs, uris).items()}
+               for name, uri in daemon_specs(specs, uris, configured).items()}
     monitor = FleetMonitor(clients)
     view = OperatorView(monitor, refresh)
     def display(screen):

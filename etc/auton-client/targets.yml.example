@@ -1,0 +1,6 @@
+# Client inventory; not an autond server configuration.
+# A declared target is never selected implicitly.
+# Names: [a-z0-9-]+, 1-32 characters. Quote numeric-only or YAML-reserved names.
+targets:
+  autond-01: https://autond-01.example.com
+  autond-02: https://autond-02.example.com

@@ -22,6 +22,10 @@ class BlockDaemon(importlib.abc.MetaPathFinder):
 sys.meta_path.insert(0, BlockDaemon())
 from auton_client import RemoteClient
 assert RemoteClient(['http://localhost'], 'example', 'one').output_offset == 0
+from auton_client.config import load_targets
+from pathlib import Path
+Path("targets.yml").write_text("targets: {local: http://localhost}")
+assert load_targets("targets.yml") == {"local": "http://localhost"}
 from auton_client.operations import OperationService
 assert OperationService({"local": "http://localhost"}, "example").parallel == 4
 from auton_client.visibility import DaemonClient

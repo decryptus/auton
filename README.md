@@ -129,7 +129,49 @@ auton --target web-01=https://autond-01.example.com \
       -a https://example.com
 ```
 
-`--target NAME=URI` is repeatable (maximum 128 targets). Names for both `--target`
+Targets can also be declared in an explicit **client** YAML inventory, separate
+from the `autond` server configuration. See
+[targets.yml.example](etc/auton-client/targets.yml.example):
+
+```yaml
+targets:
+  autond-01: https://autond-01.example.com
+  autond-02: https://autond-02.example.com
+```
+
+Select one or more configured targets by repeating `--target`:
+
+```sh
+auton --config targets.yml --target autond-01 --target autond-02 \
+      --endpoint curl -a https://example.com
+```
+
+Configured names and ad hoc targets can be mixed:
+
+```sh
+auton --config targets.yml --target autond-01 \
+      --target temporary=https://autond-03.example.com \
+      --endpoint curl -a https://example.com
+```
+
+The same inventory supports read-only TUI selection:
+
+```sh
+auton --config targets.yml --tui --daemon autond-01 --daemon autond-02
+```
+
+Declaring targets never selects them automatically. `--config` requires explicit
+`--target` or `--daemon` selections and cannot be combined with `--uri`. There is
+no implicit inventory path or automatic environment-variable substitution.
+Unknown selected names, duplicate YAML keys, invalid names/URIs (including
+unselected entries), unknown configuration fields and non-string URI values are
+rejected before any request. An inline `NAME=URI` cannot shadow a configured
+name; choose another alias for an ad hoc target. Duplicate selections are errors.
+The file must contain only a `targets` mapping, with 1–128 entries and a maximum
+size of 64 KiB. Quote numeric-only names and YAML-reserved words such as `on`.
+Authentication remains in the existing CLI/environment options, not in this file.
+
+`--target NAME` (from the inventory) or `--target NAME=URI` is repeatable (maximum 128 targets). Names for both `--target`
 and `--daemon` must fully match `[a-z0-9-]+`, with 1–32 characters. It cannot be mixed with
 `--uri`, `--daemon`, `--tui`, `--uid`/`AUTON_UID`, or `--mode run/status`.
 `AUTON_URI` is ignored when explicit targets are supplied. Existing repeated
