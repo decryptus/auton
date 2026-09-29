@@ -37,7 +37,7 @@ def daemon_specs(specs, uris, configured=None):
 
 
 class OperatorView:
-    def __init__(self, monitor, refresh=DEFAULT_REFRESH, clock=time.monotonic):
+    def __init__(self, monitor, refresh=DEFAULT_REFRESH, clock=time.monotonic, preparation=None):
         self.monitor = monitor
         self.names = list(monitor.clients)
         if len(self.names) > 1:
@@ -58,6 +58,10 @@ class OperatorView:
         self.clock = clock
         self.next_refresh = 0
         self.cache = {}
+        self.preparation = preparation
+        self.preparing = False
+        self.preparation_wrapped = None
+        self.preparation_wrap_key = None
 
     @property
     def daemon(self):
@@ -97,6 +101,8 @@ class OperatorView:
         return (job['daemon'],) + identity if self.daemon is None else identity
 
     def tick(self):
+        if self.preparation is not None:
+            self.preparation.update(self.cache)
         result = self.monitor.poll()
         if result is not None:
             daemon, job, data = result
@@ -120,6 +126,9 @@ class OperatorView:
                 self.next_refresh = float('inf')
 
     def handle(self, key):
+        if self.preparing:
+            self.preparing = self.preparation.handle(key)
+            return True
         if self.editing:
             if key in (10, 13, 27):
                 self.editing = False
@@ -129,7 +138,16 @@ class OperatorView:
                 self.search += chr(key)
             self.index = self.output_line = 0
             return True
-        if key == ord('q'):
+        if key == ord('e') and self.preparation is not None:
+            if self.preparation.mode == 'result':
+                self.preparation.mode = 'select'
+            self.preparing = True
+            if None in self.names:
+                self.daemon_index = self.names.index(None)
+            self.view = 0
+            self.opened_job = None
+            self.next_refresh = 0
+        elif key == ord('q'):
             return False
         if key in (ord(']'), ord('[')):
             self.daemon_index = (self.daemon_index + (1 if key == ord(']') else -1)) % len(self.names)
@@ -218,6 +236,31 @@ class OperatorView:
             line(0, 'Auton: enlarge terminal to 64x12; q quits')
             screen.refresh()
             return
+        if self.preparing:
+            panel = self.preparation
+            line(0, 'AUTON %s | %s' % (__version__, panel.mode.upper()), curses.A_BOLD)
+            line(1, panel.error, curses.A_BOLD)
+            values = panel.lines()
+            if panel.mode == 'select':
+                for y, value in enumerate(values[:5], 2):
+                    line(y, value)
+                available = height - 8
+                start = max(0, panel.index - available + 1)
+                for y, value in enumerate(values[5 + start:5 + start + available], 7):
+                    line(y, value)
+            else:
+                wrap_key = (id(panel.result), panel.mode, width, id(panel.service))
+                if self.preparation_wrap_key != wrap_key:
+                    self.preparation_wrapped = [part for value in values for part in
+                        (textwrap.wrap(safe_text(value), width - 1, replace_whitespace=False) or [''])]
+                    self.preparation_wrap_key = wrap_key
+                wrapped = self.preparation_wrapped
+                panel.scroll = min(panel.scroll, max(0, len(wrapped) - height + 3))
+                for y, value in enumerate(wrapped[panel.scroll:panel.scroll + height - 3], 2):
+                    line(y, value)
+            line(height - 1, 'j/k scroll | Esc back | No job starts without confirmation')
+            screen.refresh()
+            return
         line(0, 'AUTON %s | READ ONLY | %s' % (__version__, 'PAUSED' if self.paused else 'LIVE'), curses.A_BOLD)
         health = ('unchecked' if not self.data else 'partial' if self.data.get('partial')
                   else 'error' if self.data.get('errors') else 'ok')
@@ -274,11 +317,12 @@ class OperatorView:
                         value = item['daemon'] + ' / ' + value
                 line(6 + i - start, value, curses.A_REVERSE if i == self.index else 0)
         line(height - 2, 'Tab view | Enter open | j/k move | / search | s state | c clear')
-        line(height - 1, 'r refresh | p pause | v stdout/stderr | PgUp/PgDn scroll | q quit')
+        line(height - 1, 'e prepare | r refresh | p pause | v stdout/stderr | q quit')
         screen.refresh()
 
 
-def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None, selected=None):
+def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None, selected=None,
+        groups=None, scenarios=None, scenario_groups=None):
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError('TUI requires an interactive terminal')
     if not math.isfinite(refresh) or refresh < 0.2:
@@ -289,7 +333,12 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     clients = {name: DaemonClient(uri, auth, http_timeout)
                for name, uri in connections.items()}
     monitor = FleetMonitor(clients)
-    view = OperatorView(monitor, refresh)
+    from auton_client.preparation import PreparationView
+    from auton_client.session import ExecutionSession
+    session = ExecutionSession()
+    preparation = PreparationView(connections, groups or {}, scenarios or {}, scenario_groups or {},
+                                  session, dict(auth=auth, http_timeout=http_timeout))
+    view = OperatorView(monitor, refresh, preparation=preparation)
     def display(screen):
         screen.keypad(True)
         screen.timeout(100)
@@ -308,4 +357,5 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
         raise ValueError('unable to initialize or draw TUI; check TERM and terminal capabilities') from None
     finally:
         monitor.close()
+        session.close()
     return 0

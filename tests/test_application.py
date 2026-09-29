@@ -378,6 +378,14 @@ assert operation['status'] == 'completed'
 steps = operation['targets'][0]['scenarios'][0]['steps']
 assert len(steps) == 2 and steps[0]['job_id'] != steps[1]['job_id']
 assert steps[1]['stdout'] == ['done']
+from auton_client.session import ExecutionSession
+session = ExecutionSession()
+try:
+    session.start(ScenarioService(selected, plan, client_factory=FakeRemote))
+    session.future.result(timeout=2)
+    assert session.poll()['status'] == 'completed'
+finally:
+    session.close()
 '''
         result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
                                 env=dict(os.environ, PYTHONPATH=str(ROOT)),

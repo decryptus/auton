@@ -168,11 +168,11 @@ class OperationService:
             result.pop('_output_limit', None)
         return result
 
-    def run(self, operation_id=None):
+    def run(self, operation_id=None, stopped=None):
         operation_id = operation_identity(operation_id)
         jobs = {name: str(uuid.uuid4()) for name in self.targets}
         deadline = self.clock() + self.timeout
-        stopped = threading.Event()
+        stopped = threading.Event() if stopped is None else stopped
         with ThreadPoolExecutor(max_workers=self.parallel) as pool:
             futures = [pool.submit(self.execute_target, name, jobs[name], deadline, stopped) for name in self.targets]
             try:

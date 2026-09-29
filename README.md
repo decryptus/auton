@@ -398,13 +398,14 @@ zero only when every step on every target completes successfully. Save the JSON
 for the job mapping; progression requires the client to remain running.
 
 Scenario steps own their inputs: `--endpoint` (including `AUTON_ENDPOINT`), CLI
-argument/environment options, legacy `run`/`status` modes and `--tui` cannot be
-combined with scenario execution. Interactive scenario preparation is planned.
+argument/environment options, legacy `run`/`status` modes cannot be combined with scenario execution.
+With `--tui`, scenario selectors only restrict the interactive catalogue.
 Existing single-command and legacy failover invocations remain available.
 
 ### Operator TUI (client)
 
-The Unix client includes a read-only ncurses interface. It requires an interactive
+The Unix client includes a ncurses interface with read-only monitoring and an
+explicit execution preparation screen. It requires an interactive
 terminal with Python curses support and a daemon with the visibility API above.
 
 ```sh
@@ -425,7 +426,9 @@ silently retried against another daemon.
 `--daemon` is TUI-only and overrides `AUTON_URI`; it cannot be combined with
 explicit `--uri`. One `--uri` (or one `AUTON_URI` value) is accepted as a shortcut.
 Multiple execution `--uri` values remain **failover**, not daemon selection or
-broadcast. The TUI never submits commands, cancels jobs or creates operations.
+broadcast. Opening the TUI never submits commands. Execution requires the
+separate preparation screen and an explicit confirmation; remote cancellation
+is not implemented.
 
 | Key | Action |
 | --- | --- |
@@ -440,7 +443,51 @@ broadcast. The TUI never submits commands, cancels jobs or creates operations.
 | `v` | Switch stdout and stderr/diagnostics. |
 | Page Up / Page Down | Scroll by ten rows. |
 | `r` / `p` | Refresh now / pause automatic refresh. |
+| `e` | Open execution preparation; does not submit a job. |
 | Escape / `q` | Return to jobs / quit. |
+
+#### Prepare and run interactively
+
+```sh
+# Browse the inventory, then explicitly choose what and where to execute.
+auton --tui -c client.yml
+# Restrict the available targets and scenario catalogue before opening.
+auton --tui -c client.yml -g 'prod-*' -S 'maintenance-*'
+```
+
+Press **e** to prepare an operation. **Tab** switches Targets, Target groups,
+Scenarios, Scenario groups and Endpoints. **Space** selects/unselects an entry;
+selection order determines scenario order. Nothing is selected for execution
+just by opening the screen. Groups extending outside the startup target scope
+are omitted; scenario groups with members outside the filtered catalogue are
+also omitted. Startup filters use glob/`~regex`; `/` inside the panel is literal
+substring search and does not change the selection.
+
+Choose scenarios/groups **or one endpoint**. Endpoint choices come from the
+visible daemon catalogue; availability on every selected target is not assumed,
+and the daemon checks authorization again at submission. For an endpoint,
+press **i** and enter a JSON object such as `{"args": ["hello"], "env": {"LANG": "C"}}`;
+Enter finishes editing. Scenarios retain their declared inputs.
+
+**Enter** prepares a validated preview with target names/origins, ordered steps
+and inputs. Review it with **j/k**, then **y** submits exactly once;
+**n** or Escape returns without submission. The operation runs in the background
+using the same application services and defaults as CLI execution. **x** stops
+observation and further submissions, waits for in-flight requests and displays
+available results; running remote jobs are not cancelled. Closing the terminal
+also stops client progression but cannot undo accepted work.
+
+The result screen shows per-target/per-step status, job IDs, exit codes,
+stdout/stderr and truncation. Use **j/k** or Page Up/Page Down to scroll, then
+Escape to return to monitoring. Results are session-local; use CLI JSON output
+when you need a saved operation report. A live per-step operation dashboard and
+result export remain future work.
+
+Captures below come from real terminal sessions against disposable local daemons:
+
+[![Prepare targets and scenario groups](docs/images/tui-prepare.png)](docs/images/tui-prepare.png)
+[![Review the execution plan](docs/images/tui-confirm.png)](docs/images/tui-confirm.png)
+[![Inspect operation results](docs/images/tui-result.png)](docs/images/tui-result.png)
 
 Counts and lists retain server-side ownership and endpoint ACL restrictions.
 Completion is separate from success: inspect the exit code and stderr. Output

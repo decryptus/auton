@@ -41,6 +41,12 @@ assert len(ScenarioService(inventory["targets"], scenarios).steps) == 1
 from auton_client.visibility import DaemonClient
 from auton_client.monitor import FleetMonitor
 from auton_client.tui import OperatorView, daemon_specs
+from auton_client.preparation import PreparationView
+from auton_client.session import ExecutionSession
+session = ExecutionSession()
+panel = PreparationView(inventory['targets'], {}, scenarios, {}, session, {})
+assert not any(panel.selected)
+session.close()
 client = DaemonClient('http://localhost')
 monitor = FleetMonitor({'local': client})
 assert OperatorView(monitor).daemon == 'local'
