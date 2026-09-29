@@ -10,6 +10,11 @@ import sys
 import tempfile
 import time
 import unittest
+import pty
+import select
+import fcntl
+import struct
+import termios
 
 import requests
 import yaml
@@ -18,6 +23,42 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HTTPIntegrationTests(unittest.TestCase):
+    def run_tui(self, uri, auth_args, env):
+        master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 100, 0, 0))
+        proc = subprocess.Popen([sys.executable, str(ROOT / 'bin/auton'), '--tui',
+                                 '--uri', uri, '--refresh', '0.2', '--http-timeout', '1'] + auth_args,
+                                stdin=slave, stdout=slave, stderr=slave,
+                                env=dict(env, TERM='xterm'), cwd=ROOT)
+        os.close(slave)
+        captured = bytearray()
+        def until(text):
+            end = time.monotonic() + 5
+            while time.monotonic() < end:
+                if select.select([master], [], [], 0.1)[0]:
+                    try:
+                        captured.extend(os.read(master, 65536))
+                    except OSError:
+                        break
+                    if text in captured:
+                        return
+                if proc.poll() is not None:
+                    break
+            self.fail('TUI did not display %r: %r' % (text, bytes(captured)))
+        try:
+            until(b'http-test-job')
+            os.write(master, b'\n')
+            until(b'hello')
+            os.write(master, b'v')
+            until(b'diagnostics')
+            os.write(master, b'q')
+            self.assertEqual(proc.wait(timeout=3), 0, bytes(captured))
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            os.close(master)
+
     def test_client_output_exit_code_and_replay(self):
         self.run_scenario(False)
 
@@ -103,6 +144,8 @@ class HTTPIntegrationTests(unittest.TestCase):
                     self.assertEqual(inspect('/endpoints').json()['endpoints'], [{'name': 'test'}])
                     self.assertEqual(inspect('/health').json()['status'], 'ok')
                     self.assertEqual(inspect('/stats').json()['stats']['jobs'], 1)
+                    self.run_tui(uri, auth_args, env)
+                    self.assertEqual(len(inspect('/jobs').json()['jobs']), 1)
                     if authenticated:
                         for path in ('/jobs', '/jobs/test/http-test-job', '/endpoints', '/health', '/stats'):
                             self.assertEqual(inspect(path, None).status_code, 401)
