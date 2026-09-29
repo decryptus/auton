@@ -40,11 +40,12 @@ def argv_parse_check():
     """
     parser        = argparse.ArgumentParser()
 
+    parser.add_argument('--config', help='Client YAML inventory; targets must still be selected explicitly')
     parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
-    parser.add_argument('--daemon', action='append', default=[], metavar='NAME=URI',
-                        help='Explicit daemon for TUI; repeat to enable daemon selection')
-    parser.add_argument('--target', action='append', default=[], metavar='NAME=URI',
-                        help='Explicit execution target; repeat for multiple daemons')
+    parser.add_argument('--daemon', action='append', default=[], metavar='NAME[=URI]',
+                        help='Explicit daemon name from --config or NAME=URI for TUI')
+    parser.add_argument('--target', action='append', default=[], metavar='NAME[=URI]',
+                        help='Explicit target name from --config or NAME=URI; repeat for multiple daemons')
     parser.add_argument('--parallel', type=int, default=4, help='Maximum concurrent targets (1-32)')
     parser.add_argument('--operation-timeout', type=float, default=300,
                         help='Stop observing after this many seconds; does not cancel remote jobs')
@@ -190,6 +191,22 @@ def argv_parse_check():
                 or options.imp_envvars or options.load_envfiles):
             parser.error('--tui is read-only and cannot be combined with execution options')
 
+    options.configured_targets = {}
+    if options.config:
+        if options.uri or not (options.target or options.daemon):
+            parser.error('--config requires explicit --target or --daemon selections and cannot use --uri')
+        try:
+            from auton_client.config import load_targets
+            options.configured_targets = load_targets(options.config)
+        except ValueError as error:
+            parser.error(str(error))
+    if options.target or options.daemon:
+        try:
+            from auton_client.connections import named_connections
+            named_connections(options.target or options.daemon, options.configured_targets)
+        except ValueError as error:
+            parser.error(str(error))
+
     return options
 
 
@@ -296,7 +313,8 @@ def main(options):
         try:
             from auton_client.tui import run
             auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
-            return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh)
+            return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh,
+                              configured=options.configured_targets)
         except ImportError:
             print('Auton TUI requires Python curses support.', file=sys.stderr)
             return_code = 1
@@ -328,7 +346,7 @@ def main(options):
         if options.target:
             from auton_client.operations import OperationService, named_connections
             auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
-            operation = OperationService(named_connections(options.target), options.endpoint,
+            operation = OperationService(named_connections(options.target, options.configured_targets), options.endpoint,
                                          payload=PayloadBuilder(options).payload, auth=auth,
                                          http_timeout=options.http_timeout, parallel=options.parallel,
                                          timeout=options.operation_timeout, delay=options.delay)

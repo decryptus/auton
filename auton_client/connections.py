@@ -22,17 +22,24 @@ def validate_connection_name(name):
     return name
 
 
-def named_connections(specs):
+def named_connections(specs, configured=None):
     """Parse explicit named connections, shared by execution and visibility."""
+    configured = {} if configured is None else configured
     result = {}
     for spec in specs:
         name, separator, uri = spec.partition('=')
-        if not separator or not uri:
-            raise ValueError('connection must use NAME=URI')
         validate_connection_name(name)
+        if not separator:
+            if name not in configured:
+                raise ValueError('unknown connection name; declare it in --config or use NAME=URI')
+            uri = configured[name]
+        elif name in configured:
+            raise ValueError('inline connection shadows a configured name; select its name or use another alias')
+        if not uri:
+            raise ValueError('connection must use NAME=URI')
         if name in result:
             raise ValueError('duplicate connection name: ' + name)
-        result[name] = uri
+        result[name] = normalize_origin(uri)
     return result
 
 

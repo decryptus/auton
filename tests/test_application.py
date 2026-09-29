@@ -349,6 +349,13 @@ else:
     raise AssertionError('expiry missing')
 from auton_client import RemoteClient
 assert RemoteClient
+from auton_client.config import load_targets
+import tempfile
+from pathlib import Path
+with tempfile.TemporaryDirectory() as directory:
+    config_path = Path(directory) / 'targets.yml'
+    config_path.write_text('targets: {local: http://localhost}')
+    assert load_targets(config_path) == {'local': 'http://localhost'}
 from auton_client.operations import OperationService
 class FakeRemote:
     def __init__(self, uris, endpoint, uid, **kwargs):

@@ -107,8 +107,15 @@ class HTTPIntegrationTests(unittest.TestCase):
                              expected_job=b'shared-job', expected_output=b'one')
                 self.assertEqual(len(clients['one'].jobs()), 1)
                 self.assertEqual(len(clients['two'].jobs()), 1)
-                target_args = ['--target', 'one=' + clients['one'].uri,
+                client_config = Path(tmp) / 'client-targets.yml'
+                client_config.write_text(yaml.safe_dump({'targets': {'one': clients['one'].uri}}))
+                target_args = ['--config', str(client_config), '--target', 'one',
                                '--target', 'two=' + clients['two'].uri]
+                self.run_tui(None, ['--auth-user', 'alice', '--auth-passwd', 'secret'],
+                             dict(os.environ, PYTHONPATH=str(ROOT)),
+                             daemon_args=['--config', str(client_config), '--daemon', 'one',
+                                          '--daemon', 'two=' + clients['two'].uri],
+                             expected_job=b'shared-job', expected_output=b'one')
                 for exit_code in (0, 7):
                     execution = subprocess.run([sys.executable, str(ROOT / 'bin/auton'),
                         '--endpoint', 'test', '--auth-user', 'alice', '--auth-passwd', 'secret',

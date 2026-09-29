@@ -132,7 +132,10 @@ Implemented on the development branch: `OperationService` submits one independen
 job per explicitly named target, with bounded parallelism and per-target results.
 The CLI emits a final JSON operation summary, including output, exit codes,
 observation duration, refusal and unknown outcomes. POST requests are not replayed.
-Two authenticated daemons are exercised by integration tests.
+Two authenticated daemons are exercised by integration tests. An explicit client
+YAML inventory can declare named targets; `--target NAME` and `--daemon NAME`
+select entries, and inline `NAME=URI` remains available for ad hoc connections.
+Declaring entries never implies execution or broadcast.
 
 Current CLI:
 
@@ -183,7 +186,7 @@ Keep one job as one command on one daemon. An operation may later describe
 several ordered steps, each producing a distinct job per selected target.
 
 Provide named, declarative scenarios, initially described in a versioned YAML
-file. A scenario lists ordered steps with a unique step name, endpoint and
+file, preferably one file per scenario. A scenario lists ordered steps with a unique step name, endpoint and
 arguments. Targets remain an explicit selection, with the same name/origin
 validation as multi-target execution. Validate the entire scenario before any
 submission. A typical scenario is `preflight -> deploy -> verify`.
@@ -197,6 +200,19 @@ remote script under its normal daemon authorization rules.
 
 This is a planned capability: scenario files and a scenario CLI option are not
 yet implemented. Multi-target execution currently runs one job per target.
+
+Configuration layout:
+
+- Client `targets.yml`: named daemon origins, selected explicitly at invocation.
+- Client `scenarios/<name>.yml`: one versioned scenario and its ordered steps.
+- Daemon `endpoints.yml`: optional separate endpoint definitions, command settings
+  and endpoint ACLs, loaded by `autond`; adding this import is future work. Keep
+  existing inline daemon endpoint configuration compatible.
+
+A scenario references endpoint names, never installs endpoint definitions or
+changes server permissions. Daemon authentication and endpoint authorization
+remain authoritative. Separate client inventories/scenarios from daemon-owned
+configuration; do not introduce a mandatory shared configuration service.
 
 - Run steps sequentially on each target; stop that target's sequence on the
   first failed step by default and mark subsequent steps as skipped.
