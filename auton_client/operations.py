@@ -9,10 +9,9 @@ import time
 import uuid
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlsplit
 
 from auton_client import DEFAULT_HTTP_TIMEOUT, DEFAULT_DELAY
-from auton_client.connections import named_connections, validate_connection_name
+from auton_client.connections import named_connections, validate_connection_name, target_origins, origin_key
 from auton_client.execution import ExecutionClient, ExecutionError
 from auton_client.visibility import DaemonClient, JOB_STATES
 
@@ -63,16 +62,19 @@ class OperationService:
             raise ValueError('payload must be a mapping')
         json.dumps(payload, allow_nan=False)  # Reject unserializable inputs before any submission.
         self.targets = {}
+        self.origins = {}
         seen = set()
         for name, uri in targets.items():
             validate_connection_name(name)
-            origin = DaemonClient(uri, http_timeout=http_timeout).uri
-            parsed = urlsplit(origin)
-            key = parsed.scheme, parsed.hostname.lower().rstrip('.'), parsed.port or (443 if parsed.scheme == 'https' else 80)
-            if key in seen:
-                raise ValueError('duplicate target origin; aliases must not cause duplicate execution')
-            seen.add(key)
-            self.targets[name] = origin
+            origins = target_origins(uri)
+            for origin in origins:
+                DaemonClient(origin, http_timeout=http_timeout)
+                key = origin_key(origin)
+                if key in seen:
+                    raise ValueError('duplicate target origin across selected targets')
+                seen.add(key)
+            self.targets[name] = origins[0]
+            self.origins[name] = origins
         self.endpoint, self.payload, self.auth = endpoint, copy.deepcopy(payload or {}), auth
         self.http_timeout, self.parallel = http_timeout, parallel
         self.timeout, self.delay = timeout, delay
@@ -107,30 +109,45 @@ class OperationService:
                                             or not isinstance(data.get('return_code'), int)):
             raise ValueError('missing final exit code')
 
-    def execute_target(self, name, job_id, deadline, stopped, output_limit=MAX_RETAINED_OUTPUT_BYTES):
+    def execute_target(self, name, job_id, deadline, stopped, output_limit=MAX_RETAINED_OUTPUT_BYTES, origin=None):
         if type(output_limit) is not int or not 0 <= output_limit <= MAX_RETAINED_OUTPUT_BYTES:
             raise ValueError("invalid retained output limit")
+        origins = self.origins[name] if origin is None else [origin]
+        if any(value not in self.origins[name] for value in origins):
+            raise ValueError('pinned origin is not in this target')
         started = self.clock()
-        result = {'target': name, 'uri': self.targets[name], 'job_id': job_id,
+        result = {'target': name, 'uri': origins[0], 'job_id': job_id,
                   'uid': self.endpoint + ':' + job_id, 'status': 'not_submitted',
                   'return_code': None, 'stdout': [], 'stderr': [], 'error': None,
-                  'output_truncated': False, '_output_bytes': 0, '_output_limit': output_limit}
+                  'output_truncated': False, '_output_bytes': 0, '_output_limit': output_limit, 'attempts': []}
         client = None
         submitted = False
         try:
-            remaining = deadline - self.clock()
-            if remaining <= 0 or stopped.is_set():
-                result['error'] = 'observation stopped before submission'
-                return result
-            client = self.client_factory([self.targets[name]], self.endpoint, job_id,
-                                          payload=copy.deepcopy(self.payload), auth=self.auth,
-                                          http_timeout=min(self.http_timeout, remaining))
-            # Exactly one POST per target. No application retry, even for connection refusal.
-            data = client.do_run()
-            submitted = True
+            for candidate in origins:
+                remaining = deadline - self.clock()
+                if remaining <= 0 or stopped.is_set():
+                    result.update(status='not_submitted', error='observation stopped before submission')
+                    return result
+                result['uri'] = candidate
+                attempt = {'uri': candidate, 'status': 'unknown', 'reason': None}
+                result['attempts'].append(attempt)
+                client = self.client_factory([candidate], self.endpoint, job_id,
+                    payload=copy.deepcopy(self.payload), auth=self.auth,
+                    http_timeout=min(self.http_timeout, remaining))
+                try:
+                    data = client.do_run()
+                except ExecutionError as error:
+                    attempt.update(status='not_admitted' if error.rejected else 'unknown', reason=str(error))
+                    if error.retry_safe and candidate != origins[-1]:
+                        continue
+                    raise
+                submitted = True
+                attempt['status'] = 'responded'
+                break
             error_offset = 0
             while True:
                 self._validate(data, result['uid'], client.output_offset)
+                attempt['status'] = 'admitted'
                 self._retain(result, 'stdout', data.get('stream', []))
                 errors = data.get('errors', [])
                 if len(errors) < error_offset:

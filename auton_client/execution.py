@@ -14,9 +14,10 @@ JOB_RESPONSE_CODES = frozenset((200, 400))
 
 
 class ExecutionError(Exception):
-    def __init__(self, message, rejected=False):
+    def __init__(self, message, rejected=False, retry_safe=False):
         super().__init__(message)
         self.rejected = rejected
+        self.retry_safe = bool(retry_safe and rejected)
 
 
 class ExecutionClient(RemoteClient):
@@ -36,7 +37,7 @@ class ExecutionClient(RemoteClient):
                 if (isinstance(data, dict) and data.get('message') == 'daemon_maintenance'
                         and data.get('code') == 503 and 'uid' not in data
                         and response.headers.get('X-Auton-Admission') == 'not-admitted'):
-                    raise ExecutionError('daemon maintenance; no job admitted', rejected=True)
+                    raise ExecutionError('daemon maintenance; no job admitted', rejected=True, retry_safe=True)
             if code in JOB_RESPONSE_CODES:
                 data = response.json()
                 # Legacy run/status returns HTTP 400 for a job with stderr.
@@ -46,8 +47,11 @@ class ExecutionClient(RemoteClient):
                     raise ExecutionError('unexpected job identity; remote outcome unknown')
             raise ExecutionError('HTTP %s' % code,
                                  rejected=method == 'run' and code in REJECTED_HTTP_CODES)
-        except exceptions.RequestException:
-            raise ExecutionError('network/TLS failure; remote outcome unknown') from None
+        except exceptions.RequestException as error:
+            safe = method == 'run' and self._safe_to_retry(error)
+            raise ExecutionError('connection failed before admission' if safe else
+                                 'network/TLS failure; remote outcome unknown',
+                                 rejected=safe, retry_safe=safe) from None
         except ValueError:
             raise ExecutionError('invalid JSON response; remote outcome unknown') from None
         finally:
@@ -84,7 +88,12 @@ class ExecutionClient(RemoteClient):
             if not isinstance(maintenance, dict) or type(maintenance.get('enabled')) is not bool:
                 raise ExecutionError('invalid maintenance response; no job submitted', rejected=True)
             if maintenance['enabled']:
-                raise ExecutionError('daemon maintenance; no job submitted', rejected=True)
+                raise ExecutionError('daemon maintenance; no job submitted', rejected=True, retry_safe=True)
+        except exceptions.SSLError:
+            raise ExecutionError('availability TLS failure; no job submitted', rejected=True) from None
+        except (exceptions.ConnectionError, exceptions.Timeout):
+            # Only GET was attempted, so an unavailable origin cannot have accepted a job.
+            raise ExecutionError('availability connection failed; no job submitted', rejected=True, retry_safe=True) from None
         except (exceptions.RequestException, ValueError):
             raise ExecutionError('availability check failed; no job submitted', rejected=True) from None
         finally:

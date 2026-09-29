@@ -340,13 +340,13 @@ shared terminology does not require a shared execution framework.
 - Test admission races, queued/running behavior, direct HTTP enforcement,
   authorization and partial multi-target outcomes before delivering the feature.
 
-### Ordered failover origins per target (planned)
+### Ordered failover origins per target (implemented)
 
 Extend the client inventory so one logical target can declare ordered replacement
 daemons. Keep the existing `name: URI` form, inline `NAME=URI` and legacy repeated
 `--uri` behavior compatible; no additional CLI flag is needed for this extension.
 
-Proposed YAML (not yet supported):
+Supported YAML:
 
 ```yaml
 targets:
@@ -373,7 +373,8 @@ targets:
 - Validate the complete nonempty, bounded resolved URI list before execution,
   using the same origin checks as individual targets. Retain duplicate-origin
   protections across separately selected execution targets.
-- Try the next origin only when connection failure proves no submission could
+- An unavailable health precheck may move to the next origin before any POST.
+  Try the next origin after POST only when connection failure proves no submission could
   have been accepted, or a trusted maintenance precheck/explicit daemon refusal
   establishes that no job was admitted. A generic HTTP 503 is not such proof.
 - Do not fail over after an ambiguous POST, read timeout, lost response or known
@@ -384,8 +385,12 @@ targets:
 - Replacement daemons must be configured by the operator to perform equivalent
   work with appropriate endpoint permissions and shared dependencies. Do not
   assume another host can replace a command acting on a specific machine.
-- For scenarios, define and test origin affinity across steps before enabling
-  failover: a step depending on daemon-local state must not silently move hosts.
+- Scenario affinity is implemented: the first successful step pins the accepting
+  daemon for every remaining step/scenario in that invocation. Later failure or
+  maintenance stops that target; no cross-host continuation is inferred.
+- TUI execution shows chains and attempted origins. Monitoring deliberately stays
+  on primary origins; select physical target names to inspect replacement daemons.
+  A richer origin-aware monitoring view remains future work.
 - Cover maintenance/admission races, unreachable origins, exhausted lists,
   ambiguous responses, pinned observation and legacy compatibility in tests.
 

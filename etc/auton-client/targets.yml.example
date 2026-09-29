@@ -21,3 +21,11 @@ groups:
 #scenario_groups:
 #  release: [deploy]
 #import_scenario_groups: scenario-groups.yml
+
+# A logical target may use ordered replacement origins (never broadcast):
+# Add under targets, then select only deployment for one execution:
+#  deployment:
+#    uris:
+#      - {target: autond-01}
+#      - {target: autond-02}
+# Individual target references are allowed; group references are forbidden.

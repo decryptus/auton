@@ -38,6 +38,9 @@ Path("targets.yml").write_text("targets: {local: http://localhost}\nimport_scena
 inventory = load_inventory("targets.yml")
 scenarios = select_scenarios([], ["ch*"], inventory["scenarios"], inventory["scenario_groups"])
 assert len(ScenarioService(inventory["targets"], scenarios).steps) == 1
+from auton_client.connections import resolve_targets
+targets = resolve_targets({"one": "http://one", "deployment": {"uris": [{"target": "one"}, "http://two"]}})
+assert OperationService({"deployment": targets["deployment"]}, "example").origins["deployment"] == ["http://one", "http://two"]
 from auton_client.visibility import DaemonClient
 from auton_client.monitor import FleetMonitor
 from auton_client.tui import OperatorView, daemon_specs
