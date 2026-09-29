@@ -12,16 +12,14 @@
 [![Docker Hub](https://github.com/decryptus/auton/actions/workflows/dockerhub.yml/badge.svg)](https://github.com/decryptus/auton/actions/workflows/dockerhub.yml)
 [![Documentation Status](https://readthedocs.org/projects/auton/badge/?version=latest)](https://auton.readthedocs.io/)
 
-auton is a free and open-source, we develop it to run programs and command-lines on remote servers through HTTP protocol.
-There are two programs, auton for client side and autond for server side.
-auton is just a helper to transform command-lines into HTTP protocol, it is able to transform basic arguments, file arguments and environment variables.
-For example, you can use auton from CI/CD to run on remote servers, you just need to configure your endpoints:
-  - [ansible](https://github.com/ansible/ansible)
-  - [curl](https://github.com/curl/curl)
-  - [terraform](https://github.com/hashicorp/terraform)
+Auton is a free, open-source remote-execution product. **auton** is the CLI/TUI
+client; **autond** exposes configured commands through an authenticated HTTP API
+and an optional local web console. Use it for operator diagnostics, CI/CD tasks
+and remote tools such as Ansible, curl or Terraform.
 
-You can also use auton if you need to execute a new version of a software but you can't install it on a legacy server
-or tests programs execution.
+The client selects targets and orchestrates scenarios. Each daemon enforces its
+own endpoint permissions, executes jobs and retains their results. No central
+server is required.
 
 ## Roadmap
 
@@ -29,24 +27,43 @@ See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including th
 
 ## Quickstart
 
-Using autond in Docker
+This quickstart uses the **development checkout**, including SQLite authentication,
+durable jobs and the web console. These features are not in the published 0.3.2
+packages yet. Run the following from the repository root with Docker Compose:
 
-`docker compose up --build -d`
+```sh
+docker compose build
+docker compose run --rm --no-deps --entrypoint autond-auth auton \
+  -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
+docker compose up -d
+```
 
-See [docker-compose.yml](docker-compose.yml)
+Choose a password at the interactive prompt, then open
+[http://127.0.0.1:8666/ui/](http://127.0.0.1:8666/ui/) and sign in as `operator`.
+Select the `hello` endpoint and confirm execution: its fixed command prints
+`Hello from Auton!`. There are no default credentials.
+
+[Compose](docker-compose.yml) binds the published port to host loopback; the
+[container configuration](etc/auton/docker.yml.example) listens on the container
+interface. Authentication and job history use separate SQLite files in a named
+volume. `docker compose down` preserves them; **`docker compose down -v` deletes
+them**. Results still expire according to the configured retention policy.
+
+For remote access, configure HTTPS, set `web_origin` to the external origin and
+keep the backend private (see [the web console](#autond-web-console)).
+The supplied browser origin deliberately accepts `127.0.0.1`, not `localhost`.
 
 ## Runtime and reliability notes
 
 This branch targets Linux/Unix with Python **3.10–3.12**. Python 2 support is
-removed. Python 3.13+ is not supported yet because the HTTP dependency uses
+removed. Python 3.13+ is not supported yet because the daemon still imports
 `crypt`. Python 3.12 installs the `pyasyncore` compatibility dependency.
 
 The Docker image now installs **this checkout**, runs as the `auton` user, and
-Compose publishes port 8666 on **127.0.0.1 only**. The demo still has no
-authentication; enable Basic authentication on every route, configure endpoint
-users and use HTTPS before exposing it remotely. Basic authentication supports
-the documented `{SHA}` htpasswd format and formats available through system
-`crypt`. The handler keeps each authenticated identity local to its request.
+Compose publishes port 8666 on **127.0.0.1 only**. The quickstart uses required
+SQLite authentication and endpoint permissions. Existing Basic configurations
+remain supported; use HTTPS before exposing either authentication mode remotely.
+The handler keeps each authenticated identity local to its request.
 
 ### Execution and failover
 
@@ -82,7 +99,8 @@ Limits in `general`:
 | `max_jobs` | 128 | Caps queued, running and retained jobs together. Oldest completed results are evicted first; if all jobs are active, new submissions receive 503. |
 | `max_output_bytes` | 1048576 | Combined UTF-8 stdout/stderr budget per job. Exceeding it stops the command with exit code 1. A short diagnostic is retained in addition. |
 
-Results are in memory and are lost on restart. IDs are reserved only while their
+By default, results are in memory and lost on restart. Optional SQLite storage
+preserves retained results; the Docker quickstart enables it. IDs are reserved only while their
 job is retained; use a fresh UUID for each operation. Once evicted or expired,
 results cannot be replayed and IDs no longer protect against repeat execution.
 Status access is restricted to the submitting authenticated user and the current
@@ -904,7 +922,8 @@ implemented; selecting a target group does not copy or synchronize credentials.
 
 Revocation, disabling and password replacement take effect on subsequent requests
 without restarting. They do not cancel jobs already admitted. Accounts, sessions,
-tokens and revocations survive restart; jobs remain in memory at this stage. No
+tokens and revocations survive restart. Jobs also survive restart when optional
+SQLite job storage is enabled (as in the Docker quickstart). No
 automatic job replay is introduced. Tokens and passwords are mutually exclusive
 client modes, and SQLite mode never falls back to Basic. The client refuses bearer
 credentials over HTTP except to literal loopback IPs; TLS verification remains on.
@@ -971,8 +990,9 @@ and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
 on each protected route until migrating to `required`.
 
 The shipped example now listens on loopback and selects `required`. Consequently,
-the default Docker configuration needs mounted authentication configuration and credentials before
-it can start; it no longer starts an anonymously accessible example daemon. For a
+the Docker quickstart provisions an account before starting its separately
+configured, authenticated daemon. It no longer starts an anonymously accessible
+example daemon. For a
 container reverse proxy, explicitly choose the internal listen address and keep
 the backend off public published ports. Existing mounted configurations are not
 rewritten. CLI commands, endpoint ACLs and job ownership semantics are unchanged.

@@ -27,8 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t auton:test .
+      - run: docker build -t auton:test -t auton:local .
       - run: docker run --rm --entrypoint autond auton:test -d
+      - name: Check authenticated Compose quickstart and durable volume
+        run: python3 scripts/check_compose_quickstart.py
 
   browser:
     runs-on: ubuntu-latest
