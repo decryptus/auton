@@ -20,6 +20,10 @@ from auton.classes.jobs import (JobService, job_result, UnknownEndpoint, Unknown
                                 DEFAULT_RESULT_TTL, DEFAULT_MAX_JOBS,
                                 DEFAULT_MAX_OUTPUT_BYTES)
 
+from auton.classes.availability import Availability, MaintenanceActive
+
+MAINTENANCE_FIELDS = frozenset(('enabled', 'reason'))
+
 LOG = logging.getLogger('auton.modules.job')
 OUTPUT_OFFSET_PATTERN = re.compile(r'[0-9]{1,12}')
 JOB_FILTER_FIELDS = frozenset(('endpoint', 'status'))
@@ -75,6 +79,8 @@ class JobModule(DWhoModuleBase):
                                    general.get('journal_backup_count', DEFAULT_JOURNAL_BACKUPS))
         self.service = JobService(ENDPOINTS, EPTS_SYNC, object_factory=AutonEPTObject,
                                   lock=_WriteLock(self), journal=journal,
+                                  availability=Availability(general.get('maintenance', False), general.get('maintenance_reason', '')),
+                                  maintenance_operators=general.get('maintenance_operators', []),
                                   lock_timeout=general['lock_timeout'],
                                   result_ttl=general.get('result_ttl', DEFAULT_RESULT_TTL),
                                   max_jobs=general.get('max_jobs', DEFAULT_MAX_JOBS),
@@ -147,6 +153,8 @@ class JobModule(DWhoModuleBase):
                 result = _http_call(self.service.status, params['endpoint'], params['id'],
                                     principal, offset)
             return self._http_result(result)
+        except MaintenanceActive:
+            raise
         except HttpReqErrJson:
             raise
         except Exception as error:
@@ -154,7 +162,22 @@ class JobModule(DWhoModuleBase):
             raise HttpReqErrJson(503, repr(error))
 
     def job_run(self, request):
-        return self._handle(request, submit=True)
+        try:
+            return self._handle(request, submit=True)
+        except MaintenanceActive:
+            raise HttpReqErrJson(503, 'daemon_maintenance',
+                                headers={'X-Auton-Admission': 'not-admitted'})
+
+    def daemon_maintenance(self, request):
+        payload = request.payload_params()
+        if not isinstance(payload, dict) or not set(payload) <= MAINTENANCE_FIELDS or 'enabled' not in payload:
+            raise HttpReqErrJson(400, 'invalid maintenance payload')
+        try:
+            result = _http_call(self.service.set_maintenance,
+                request.get_server_vars().get('HTTP_AUTH_USER'), **payload)
+        except ValueError as error:
+            raise HttpReqErrJson(400, str(error))
+        return {'code': 200, 'maintenance': result}
 
     def job_status(self, request):
         return self._handle(request)

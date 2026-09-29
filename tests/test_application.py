@@ -190,7 +190,7 @@ class ServiceTests(unittest.TestCase):
         for value in ('', [], 42):
             with self.subTest(value=value), self.assertRaises(InvalidFilter):
                 self.service.list_jobs('alice', endpoint=value)
-        self.assertEqual(self.service.health(), {'status': 'ok'})
+        self.assertEqual(self.service.health()['status'], 'ok')
         self.service.lock = Mock()
         self.service.lock.acquire.return_value = False
         for call in (self.service.health, lambda: self.service.list_jobs('alice'),
@@ -333,7 +333,11 @@ assert service.list_jobs('bob') == []
 assert service.detail('fake', 'one', 'alice')['stream'] == ['done']
 assert service.list_endpoints('alice') == [{'name': 'fake'}]
 assert service.stats('alice')['jobs'] == 1
-assert service.health() == {'status': 'ok'}
+assert service.health()['accepting_jobs'] is True
+service.maintenance_operators = frozenset(('admin',))
+service.set_maintenance('admin', True)
+assert service.health()['maintenance']['enabled'] is True
+service.set_maintenance('admin', False)
 try:
     service.status('fake', 'one', 'bob')
 except AccessDenied:

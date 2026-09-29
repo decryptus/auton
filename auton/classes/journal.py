@@ -15,7 +15,7 @@ LOG = logging.getLogger('auton.journal')
 DEFAULT_JOURNAL_BYTES = 10485760
 DEFAULT_JOURNAL_BACKUPS = 5
 JOURNAL_EVENTS = frozenset(('job.admitted', 'job.started', 'job.completed',
-                            'job.failed', 'job.timeout', 'job.rejected'))
+                            'job.failed', 'job.timeout', 'job.rejected', 'daemon.maintenance'))
 MAX_FIELD_LENGTH = 256
 ERROR_LOG_INTERVAL = 60
 

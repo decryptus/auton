@@ -20,6 +20,11 @@ job:
       regexp:    '^health$'
       auth:      false
       op:        'GET'
+    maintenance:
+      handler:   'daemon_maintenance'
+      regexp:    '^maintenance$'
+      auth:      true
+      op:        'POST'
     stats:
       handler:   'daemon_stats'
       regexp:    '^stats$'

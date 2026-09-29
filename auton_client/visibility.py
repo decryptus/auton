@@ -57,6 +57,11 @@ class DaemonClient:
         data = self._read(READ_ROUTES['health'])
         if data.get('status') != 'ok':
             raise VisibilityError('daemon is not healthy')
+        maintenance = data.get('maintenance')
+        if maintenance is not None and (not isinstance(maintenance, dict)
+                or type(maintenance.get('enabled')) is not bool
+                or not isinstance(maintenance.get('reason', ''), str)):
+            raise VisibilityError('invalid maintenance response')
         return data
 
     def jobs(self):

@@ -73,10 +73,12 @@ class OperatorView:
 
     def rows(self):
         if self.view == 3:
+            maintenance = self.data.get('health', {}).get('maintenance', {})
             rows = self.data.get('daemons', [{'name': self.daemon, 'state':
-                    'unchecked' if not self.data else ('error' if self.data.get('errors') else 'ok'),
+                    'unchecked' if not self.data else ('error' if self.data.get('errors') else
+                    'maintenance' if maintenance.get('enabled') else 'ok'),
                     'jobs': len(self.data['jobs']) if 'jobs' in self.data else None,
-                    'error': '; '.join(self.data.get('errors', {}).values())}])
+                    'error': '; '.join(self.data.get('errors', {}).values()) or maintenance.get('reason', '')}])
             return [row for row in rows if self.search.casefold() in (row['name'] or '').casefold()]
         if self.view == 1:
             return [item for item in self.data.get('endpoints', [])
@@ -264,6 +266,9 @@ class OperatorView:
         line(0, 'AUTON %s | READ ONLY | %s' % (__version__, 'PAUSED' if self.paused else 'LIVE'), curses.A_BOLD)
         health = ('unchecked' if not self.data else 'partial' if self.data.get('partial')
                   else 'error' if self.data.get('errors') else 'ok')
+        maintenance = self.data.get('health', {}).get('maintenance', {})
+        if maintenance.get('enabled'):
+            health = 'maintenance: ' + maintenance.get('reason', '')
         line(1, 'Daemon %s (%s/%s) [%s]   [ / ] switch | a all' %
              (self.daemon or 'ALL', self.daemon_index + 1, len(self.names), health))
         counts = self.data.get('stats', {}).get('jobs_by_status', {})
