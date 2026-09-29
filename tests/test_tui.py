@@ -64,7 +64,11 @@ class VisibilityClientTests(unittest.TestCase):
 
     def test_bad_payloads_and_origins_are_rejected(self):
         for uri in ('file:///tmp/a', 'https://user:secret@host', 'https://host/path',
-                    'https://host?token=secret', 'https://host:invalid'):
+                    'https://host?token=secret', 'https://host:invalid',
+                    'http://host:0', 'http://host:65536', 'http://host:',
+                    ' http://host', 'http://ho st', 'http://host\n', 'http://ho\tst',
+                    'http://host%00', 'http://host\\path', 'http://-host', 'http://host..org', 'http://host..',
+                    'http://999.1.2.3', 'http://[invalid]', 'http://host?', 'http://host#'):
             with self.subTest(uri=uri), self.assertRaises(ValueError):
                 DaemonClient(uri)
         for method, data in (('jobs', {'jobs': [None]}), ('endpoints', {'endpoints': ['x']}),

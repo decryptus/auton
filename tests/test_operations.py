@@ -110,6 +110,15 @@ class OperationTests(unittest.TestCase):
         self.assertEqual(data['status'], 'completed')
         self.assertEqual(active[1], 2)
 
+    def test_origin_normalization_preserves_valid_hosts_and_ipv6(self):
+        from auton_client.connections import normalize_origin
+        for source, expected in [('https://Example.COM:443/', 'https://example.com:443'),
+                                 ('http://localhost:8666', 'http://localhost:8666'),
+                                 ('http://127.0.0.1', 'http://127.0.0.1'),
+                                 ('http://[2001:0db8::1]:8666', 'http://[2001:db8::1]:8666'),
+                                 ('https://éxemple.fr', 'https://xn--xemple-9ua.fr')]:
+            self.assertEqual(normalize_origin(source), expected)
+
     def test_connection_names_use_exact_ascii_grammar(self):
         from auton_client.tui import daemon_specs
         for name in ('autond-01', 'a', '0', '-', 'a' * 32):
@@ -128,6 +137,8 @@ class OperationTests(unittest.TestCase):
         factory = Mock()
         for targets, kwargs in [({'a': 'http://a', 'b': 'http://a:80'}, {}),
                                 ({'a': 'http://a', 'b': 'http://user:secret@b'}, {}),
+                                ({'a': 'http://a', 'b': 'http://ho st'}, {}),
+                                ({'a': 'http://host', 'b': 'http://HOST.:80'}, {}),
                                 ({'a': 'http://a'}, {'parallel': 0}),
                                 ({'a': 'http://a'}, {'timeout': float('nan')}),
                                 ({'a': 'http://a'}, {'payload': []})]:

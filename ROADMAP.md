@@ -223,6 +223,8 @@ Persistent storage is not mandatory for the initial multi-daemon client work. It
 
 ## Milestone 7 — Website
 
+Domain purchased: **auton.run**. DNS and website deployment remain to be configured.
+
 Create a dedicated **Auton website**, following the same product/documentation approach used for monit-docker.
 
 The site should become the main public entry point for the project and explain the product before exposing implementation details.

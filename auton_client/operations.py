@@ -49,7 +49,7 @@ class OperationService:
             validate_connection_name(name)
             origin = DaemonClient(uri, http_timeout=http_timeout).uri
             parsed = urlsplit(origin)
-            key = parsed.scheme, parsed.hostname.lower(), parsed.port or (443 if parsed.scheme == 'https' else 80)
+            key = parsed.scheme, parsed.hostname.lower().rstrip('.'), parsed.port or (443 if parsed.scheme == 'https' else 80)
             if key in seen:
                 raise ValueError('duplicate target origin; aliases must not cause duplicate execution')
             seen.add(key)

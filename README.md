@@ -138,7 +138,8 @@ and `--daemon` must fully match `[a-z0-9-]+`, with 1–32 characters. It cannot 
 The same prepared arguments, argument files and environment are sent to every
 selected target. Authentication options apply to every target, so use origins
 that trust the same credentials and HTTPS outside a trusted local network.
-Redirects are never followed. Each daemon still enforces its authentication,
+All target origins are validated before the first POST (hostname/IPv4/IPv6,
+port 1–65535, no whitespace or control characters). Redirects are never followed. Each daemon still enforces its authentication,
 endpoint ACLs and job ownership. Duplicate normalized origins are rejected;
 different DNS aliases for the same daemon cannot be detected automatically.
 
