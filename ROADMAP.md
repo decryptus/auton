@@ -177,10 +177,26 @@ Improve distributed-operation ergonomics:
 - show elapsed time and completion state per job;
 - add filtering and grouping in TUI.
 
-### Job sequences (after explicit multi-target execution)
+### Named scenarios and job sequences (next development milestone)
 
 Keep one job as one command on one daemon. An operation may later describe
 several ordered steps, each producing a distinct job per selected target.
+
+Provide named, declarative scenarios, initially described in a versioned YAML
+file. A scenario lists ordered steps with a unique step name, endpoint and
+arguments. Targets remain an explicit selection, with the same name/origin
+validation as multi-target execution. Validate the entire scenario before any
+submission. A typical scenario is `preflight -> deploy -> verify`.
+
+Each invocation receives an operation ID; results retain target, step and job
+identity, including skipped steps and unknown outcomes. Begin with linear
+sequences and bounded concurrency across targets. Do not introduce arbitrary
+Python/shell evaluation in the scenario format, a generic DAG engine, implicit
+rollback, or a permanent scheduler. An endpoint may still execute a configured
+remote script under its normal daemon authorization rules.
+
+This is a planned capability: scenario files and a scenario CLI option are not
+yet implemented. Multi-target execution currently runs one job per target.
 
 - Run steps sequentially on each target; stop that target's sequence on the
   first failed step by default and mark subsequent steps as skipped.
