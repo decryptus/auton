@@ -6,6 +6,7 @@ general:
   max_workers: 2
   max_requests: 0
   max_life_time: 0
+  lock_timeout: 60
   result_ttl: 3600
   max_jobs: 128
   max_output_bytes: 1048576
