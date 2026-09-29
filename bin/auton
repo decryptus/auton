@@ -40,12 +40,14 @@ def argv_parse_check():
     """
     parser        = argparse.ArgumentParser()
 
-    parser.add_argument('--config', help='Client YAML inventory; targets must still be selected explicitly')
+    parser.add_argument('-c', '--config', help='Client YAML inventory; targets must still be selected explicitly')
     parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
     parser.add_argument('--daemon', action='append', default=[], metavar='NAME[=URI]',
                         help='Explicit daemon name from --config or NAME=URI for TUI')
-    parser.add_argument('--target', action='append', default=[], metavar='NAME[=URI]',
+    parser.add_argument('-t', '--target', action='append', default=[], metavar='NAME[=URI]',
                         help='Explicit target name from --config or NAME=URI; repeat for multiple daemons')
+    parser.add_argument('-g', '--target-group', action='append', default=[], metavar='NAME',
+                        help='Select a named YAML target group; repeat to combine groups')
     parser.add_argument('--parallel', type=int, default=4, help='Maximum concurrent targets (1-32)')
     parser.add_argument('--operation-timeout', type=float, default=300,
                         help='Stop observing after this many seconds; does not cancel remote jobs')
@@ -168,16 +170,17 @@ def argv_parse_check():
             or not math.isfinite(options.delay) or options.delay < 0):
         parser.error('http-timeout must be positive and delay non-negative')
 
-    if not options.uri and not options.daemon and not options.target and os.environ.get('AUTON_URI'):
+    if not options.uri and not options.daemon and not options.target and not options.target_group and os.environ.get('AUTON_URI'):
         options.uri = [x.strip() for x in os.environ.get('AUTON_URI').split(',')]
 
-    if options.target:
-        if options.uri or options.daemon or options.tui or options.mode != 'autorun' or options.uid is not None:
-            parser.error('--target cannot be combined with --uri, --daemon, --tui, --uid/AUTON_UID or --mode run/status')
-        if options.no_return_code:
+    if options.target or options.target_group:
+        if options.uri or (options.daemon and options.target) or (not options.tui and
+                (options.mode != 'autorun' or options.uid is not None)):
+            parser.error('target selections cannot use --uri, --uid/AUTON_UID, --mode run/status or mix --target with --daemon')
+        if options.no_return_code and not options.tui:
             parser.error('--no-return-code cannot hide multi-target failures')
-    elif options.operation_id or options.parallel != 4 or options.operation_timeout != 300:
-        parser.error('operation options require --target')
+    if (options.tui or not (options.target or options.target_group)) and (options.operation_id or options.parallel != 4 or options.operation_timeout != 300):
+        parser.error('operation options require execution with --target or --target-group')
     if options.uid is None:
         options.uid = str(uuid.uuid4())
 
@@ -192,18 +195,27 @@ def argv_parse_check():
             parser.error('--tui is read-only and cannot be combined with execution options')
 
     options.configured_targets = {}
+    options.configured_groups = {}
+    if options.target_group and not options.config:
+        parser.error('--target-group requires --config')
     if options.config:
-        if options.uri or not (options.target or options.daemon):
-            parser.error('--config requires explicit --target or --daemon selections and cannot use --uri')
+        if options.uri or not (options.target or options.daemon or options.target_group):
+            parser.error('--config requires explicit target/group/daemon selections and cannot use --uri')
         try:
-            from auton_client.config import load_targets
-            options.configured_targets = load_targets(options.config)
+            from auton_client.config import load_inventory
+            inventory = load_inventory(options.config)
+            options.configured_targets = inventory['targets']
+            options.configured_groups = inventory['groups']
         except ValueError as error:
             parser.error(str(error))
-    if options.target or options.daemon:
+    options.selected_targets = None
+    if options.target or options.daemon or options.target_group:
         try:
-            from auton_client.connections import named_connections
-            named_connections(options.target or options.daemon, options.configured_targets)
+            from auton_client.connections import select_connections
+            options.selected_targets = select_connections(options.target or options.daemon,
+                options.target_group, options.configured_targets, options.configured_groups)
+            if not options.selected_targets:
+                raise ValueError("selection contains no targets")
         except ValueError as error:
             parser.error(str(error))
 
@@ -314,7 +326,7 @@ def main(options):
             from auton_client.tui import run
             auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
             return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh,
-                              configured=options.configured_targets)
+                              configured=options.configured_targets, selected=options.selected_targets)
         except ImportError:
             print('Auton TUI requires Python curses support.', file=sys.stderr)
             return_code = 1
@@ -343,10 +355,10 @@ def main(options):
     rc      = 0
 
     try:
-        if options.target:
-            from auton_client.operations import OperationService, named_connections
+        if options.target or options.target_group:
+            from auton_client.operations import OperationService
             auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
-            operation = OperationService(named_connections(options.target, options.configured_targets), options.endpoint,
+            operation = OperationService(options.selected_targets, options.endpoint,
                                          payload=PayloadBuilder(options).payload, auth=auth,
                                          http_timeout=options.http_timeout, parallel=options.parallel,
                                          timeout=options.operation_timeout, delay=options.delay)

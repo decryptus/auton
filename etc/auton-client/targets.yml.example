@@ -4,3 +4,14 @@
 targets:
   autond-01: https://autond-01.example.com
   autond-02: https://autond-02.example.com
+groups:
+  production:
+    - autond-01
+    - autond-02
+
+# Alternatively, declare the section mappings in separate local files:
+#import_targets:
+#  - targets/production.yml
+#import_groups: groups.yml
+# Only the main file may import. Imported files have no targets/groups wrapper.
+# Imported and inline names must not overlap.

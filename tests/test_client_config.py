@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from auton_client.config import load_targets, MAX_CONFIG_BYTES
-from auton_client.connections import named_connections
+from auton_client.config import load_targets, load_inventory, MAX_CONFIG_BYTES
+from auton_client.connections import named_connections, select_connections
 from auton_client.tui import daemon_specs
 from test_regressions import client_module
 
@@ -82,3 +82,94 @@ class ClientConfigTests(unittest.TestCase):
             path.write_text('targets: {one: https://one, two: "http://ho st"}')
             with patch.object(client_module.sys, 'argv', ['auton', '--config', str(path), '--target', 'one']), self.assertRaises(SystemExit):
                 client_module.argv_parse_check()
+
+
+class GroupAndImportTests(unittest.TestCase):
+    def test_stable_union_deduplicates_group_members_and_explicit_targets(self):
+        targets = {'one': 'https://one', 'two': 'https://two', 'three': 'https://three'}
+        groups = {'web': ['one', 'two'], 'all': ['two', 'three']}
+        result = select_connections(['three'], ['web', 'all', 'web'], targets, groups)
+        self.assertEqual(list(result), ['three', 'one', 'two'])
+        with self.assertRaises(ValueError):
+            select_connections([], ['missing'], targets, groups)
+
+    def test_inline_groups_validate_all_members_and_reject_nesting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.yml'
+            for group in ('{web: []}', '{web: [missing]}', '{web: one}', '{Web: [one]}',
+                          '{web: [1]}', '{web: [other], other: [one]}', '{web: [[one]]}'):
+                path.write_text('targets: {one: https://one}\ngroups: ' + group)
+                with self.subTest(group=group), self.assertRaises(ValueError):
+                    load_inventory(path)
+            path.write_text('targets: {one: https://one}\ngroups: {web: [one, one]}')
+            self.assertEqual(load_inventory(path)['groups'], {'web': ['one']})
+            self.assertEqual(load_targets(path), {'one': 'https://one'})
+
+    def test_relative_imports_merge_disjoint_sections_before_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'parts').mkdir()
+            path = root / 'config.yml'
+            path.write_text('import_targets: [parts/a.yml, parts/b.yml]\nimport_groups: parts/groups.yml\ntargets: {three: https://three}\ngroups: {extra: [three]}')
+            (root / 'parts/a.yml').write_text('one: https://one')
+            (root / 'parts/b.yml').write_text('two: https://two')
+            (root / 'parts/groups.yml').write_text('web: [one, two, three]')
+            inventory = load_inventory(path)
+            self.assertEqual(list(inventory['targets']), ['one', 'two', 'three'])
+            self.assertEqual(inventory['groups'], {'web': ['one', 'two', 'three'], 'extra': ['three']})
+
+    def test_invalid_imports_duplicates_and_recursion_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'config.yml'
+            (root / 'targets.yml').write_text('one: https://one')
+            for config in ('import_targets: missing.yml', 'import_targets: config.yml',
+                           'import_targets: [targets.yml, targets.yml]',
+                           'import_targets: targets.yml\ntargets: {one: https://different}',
+                           'import_targets: https://example.com/targets.yml',
+                           'import_targets: []', 'import_targets: 42'):
+                path.write_text(config)
+                with self.subTest(config=config), self.assertRaises(ValueError):
+                    load_inventory(path)
+            path.write_text('import_targets: targets.yml')
+            (root / 'targets.yml').write_text('import_targets: config.yml')
+            with self.assertRaises(ValueError):
+                load_inventory(path)
+            (root / 'targets.yml').write_text('targets: {one: https://one}')
+            with self.assertRaises(ValueError):
+                load_inventory(path)
+
+    def test_import_limits_apply_to_whole_inventory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'config.yml'
+            path.write_text('import_targets: targets.yml')
+            (root / 'targets.yml').write_text('one: https://one\n#' + 'x' * MAX_CONFIG_BYTES)
+            with self.assertRaises(ValueError):
+                load_inventory(path)
+            paths = []
+            for i in range(17):
+                name = 'part-%s.yml' % i
+                paths.append(name)
+                (root / name).write_text('node-%s: https://node%s' % (i, i))
+            path.write_text('import_targets: [' + ', '.join(paths) + ']')
+            with self.assertRaises(ValueError):
+                load_inventory(path)
+
+    def test_cli_short_options_group_selection_and_tui_are_equivalent(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
+            path = Path(directory) / 'config.yml'
+            path.write_text('targets: {one: https://one, two: https://two}\ngroups: {web: [one, two]}')
+            variants = [ ['-c', str(path), '-t', 'one', '-g', 'web'],
+                         ['--config', str(path), '--target', 'one', '--target-group', 'web'],
+                         ['--tui', '-c', str(path), '-g', 'web'],
+                         ['--tui', '-c', str(path), '-t', 'one', '-g', 'web'],
+                         ['--tui', '-c', str(path), '--daemon', 'one', '-g', 'web'] ]
+            for args in variants:
+                with patch.object(client_module.sys, 'argv', ['auton'] + args):
+                    options = client_module.argv_parse_check()
+                    self.assertEqual(options.selected_targets, {'one': 'https://one', 'two': 'https://two'})
+            for flags in (['-g', 'unknown', '-c', str(path)], ['-g', 'web'],
+                          ['-g', 'web', '-c', str(path), '--uri', 'https://other']):
+                with patch.object(client_module.sys, 'argv', ['auton'] + flags), self.assertRaises(SystemExit):
+                    client_module.argv_parse_check()

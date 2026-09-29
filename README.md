@@ -160,22 +160,73 @@ The same inventory supports read-only TUI selection:
 auton --config targets.yml --tui --daemon autond-01 --daemon autond-02
 ```
 
-Declaring targets never selects them automatically. `--config` requires explicit
-`--target` or `--daemon` selections and cannot be combined with `--uri`. There is
-no implicit inventory path or automatic environment-variable substitution.
-Unknown selected names, duplicate YAML keys, invalid names/URIs (including
-unselected entries), unknown configuration fields and non-string URI values are
-rejected before any request. An inline `NAME=URI` cannot shadow a configured
-name; choose another alias for an ad hoc target. Duplicate selections are errors.
-The file must contain only a `targets` mapping, with 1–128 entries and a maximum
-size of 64 KiB. Quote numeric-only names and YAML-reserved words such as `on`.
-Authentication remains in the existing CLI/environment options, not in this file.
+Named groups can select several declared targets. Group and target names use
+`[a-z0-9-]+` (1–32 characters); members are exact target names, not nested groups.
 
-`--target NAME` (from the inventory) or `--target NAME=URI` is repeatable (maximum 128 targets). Names for both `--target`
-and `--daemon` must fully match `[a-z0-9-]+`, with 1–32 characters. It cannot be mixed with
-`--uri`, `--daemon`, `--tui`, `--uid`/`AUTON_UID`, or `--mode run/status`.
-`AUTON_URI` is ignored when explicit targets are supplied. Existing repeated
-`--uri` values remain **failover**, never broadcast targets.
+```yaml
+targets:
+  autond-01: https://autond-01.example.com
+  autond-02: https://autond-02.example.com
+groups:
+  production: [autond-01, autond-02]
+```
+
+```sh
+# Execute once on each target in the union of the selections.
+auton -c targets.yml -t autond-01 -g production --endpoint curl -a https://example.com
+
+# Open a read-only TUI restricted to the same group; no job is submitted.
+auton --tui -c targets.yml -g production
+```
+
+`-c`, `-t` and `-g` are aliases for `--config`, `--target` and `--target-group`.
+Repeat `-g` to combine groups. Explicit targets are resolved first, then groups
+in option order and members in file order; overlapping members execute once.
+Repeated direct `--target` names remain errors. Separate names pointing at the
+same normalized origin are still rejected for execution. Groups never change
+failover behavior. Glob/regex selection remains planned; current names are exact.
+
+Declaring targets never selects them automatically. `--config` requires explicit
+`--target`, `--target-group` or `--daemon` selections and cannot be combined with
+`--uri`. There is no implicit inventory path or variable substitution. Unknown
+names, duplicate YAML keys, invalid names/URIs (including unselected entries),
+unknown fields and non-string URI values are rejected before any request. An
+inline `NAME=URI` cannot shadow a configured name; choose another alias.
+
+The inventory supports 1–128 targets, at most 128 groups and 1–128 members per
+group. Quote numeric-only names and YAML-reserved words such as `on`.
+Authentication stays in the existing CLI/environment options, not in the file.
+
+`--target NAME` or `--target NAME=URI` can also select read-only TUI connections.
+`--daemon` remains TUI-only and cannot be mixed with `--target`; either can be
+combined with `--target-group`. For execution, target selections cannot use
+`--uid`/`AUTON_UID`, `--mode run/status` or `--no-return-code`. `AUTON_URI` is
+ignored for explicit named selections. Repeated `--uri` values remain failover.
+
+#### Single-level section imports
+
+Use DWho's `import_<section>` convention in the **main client file**:
+
+```yaml
+import_targets:
+  - targets/production.yml
+  - targets/staging.yml
+import_groups: groups.yml
+```
+
+An imported targets file contains the name-to-URI mapping directly, without a
+`targets:` wrapper. An imported groups file contains the group-to-member-list
+mapping directly, without a `groups:` wrapper. Inline `targets` and `groups`
+sections can add other names alongside imports.
+
+Paths are local, relative to the main file's directory (absolute local paths are
+also accepted). **Only one import level is allowed**: imported files cannot import
+other files. Duplicate file paths (including symlink aliases), duplicate names
+across files/inline sections, missing files and malformed sections are errors;
+there is no silent override. The aggregate UTF-8 input is limited to 64 KiB and
+16 imported files. URL imports, custom `!include` tags, YAML merge keys and
+nested groups are not supported. All sections are loaded and validated before
+selection or network access. Scenario imports remain planned with scenario support.
 
 The same prepared arguments, argument files and environment are sent to every
 selected target. Authentication options apply to every target, so use origins

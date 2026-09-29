@@ -162,7 +162,7 @@ class OperationTests(unittest.TestCase):
                 self.assertEqual(len(''.join(data['stdout'])), MAX_RETAINED_OUTPUT_BYTES)
 
     def test_cli_rejects_mixed_modes_without_network(self):
-        for args in (['--uri', 'http://b'], ['--tui'], ['--mode', 'run'], ['--uid', 'example-job'],
+        for args in (['--uri', 'http://b'], ['--mode', 'run'], ['--uid', 'example-job'],
                      ['--no-return-code']):
             env = {k: v for k, v in os.environ.items() if not k.startswith('AUTON_')}
             call = subprocess.run([sys.executable, str(ROOT / 'bin/auton'), '--target', 'a=http://a'] + args,
