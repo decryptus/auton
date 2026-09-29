@@ -891,11 +891,16 @@ above automatically.
 ```sh
 auton --uri https://autond.example -k ~/.config/auton/operator.token --endpoint check
 auton --tui --uri https://autond.example -k ~/.config/auton/operator.token
-auton -c inventory.yml -g production -s diagnostics -k ~/.config/auton/operator.token
+auton -c inventory.yml -t prod-01 -s diagnostics -k ~/.config/auton/operator.token
 # AUTON_TOKEN_FILE can supply the same filename.
 sudo -u auton autond-auth -c /etc/auton/auton.yml token revoke -i CREDENTIAL_ID
 sudo -u auton autond-auth -c /etc/auton/auton.yml user disable -u alice
 ```
+
+The supplied token is used for every selected origin, including failover origins.
+Independent daemon databases issue independent tokens: use separate invocations
+with their matching token files for now. Per-target credential profiles are not
+implemented; selecting a target group does not copy or synchronize credentials.
 
 Revocation, disabling and password replacement take effect on subsequent requests
 without restarting. They do not cancel jobs already admitted. Accounts, sessions,
