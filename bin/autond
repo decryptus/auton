@@ -21,6 +21,10 @@ from sonicprobe.libs import daemonize
 from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
 from auton.classes.http import AutonHttpReqHandler
 from auton.classes.auth_store import PersistentAuthentication
+from auton.classes.job_store import SQLiteJobStore
+from auton.classes.jobs import DEFAULT_MAX_OUTPUT_BYTES
+from auton.classes.plugins import ENDPOINTS
+from dwho.classes.modules import MODULES
 from auton.modules import * # XXX
 from auton.plugins import * # XXX
 
@@ -141,6 +145,7 @@ def main(options):
     daemonize.lock_pidfile_or_die(options.pidfile)
 
     authentication = None
+    history = None
     try:
         LOG.info("pidfile ok")
         root_logger.setLevel(options.loglevel)
@@ -152,6 +157,11 @@ def main(options):
         if settings:
             authentication = PersistentAuthentication(settings)
             options.auth_provider = authentication.provider
+        storage = options.configuration['general'].get('job_storage')
+        if storage:
+            history = SQLiteJobStore(storage['path'], timeout=storage['timeout'],
+                max_output_bytes=options.configuration['general'].get('max_output_bytes', DEFAULT_MAX_OUTPUT_BYTES))
+            MODULES['job'].history_store = history
         httpdis_json.init(options, False)
         DWHO_THREADS.append(httpdis_json.stop)
         start_endpoints()
@@ -165,8 +175,17 @@ def main(options):
             httpdis_json.stop()
         finally:
             try:
-                if authentication is not None:
-                    authentication.close()
+                for endpoint in ENDPOINTS.values():
+                    try:
+                        endpoint.at_stop()
+                    except Exception:
+                        LOG.error('endpoint shutdown failed')
+                try:
+                    if history is not None:
+                        history.close()
+                finally:
+                    if authentication is not None:
+                        authentication.close()
             finally:
                 daemonize.unlock_pidfile(options.pidfile)
 

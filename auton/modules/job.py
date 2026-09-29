@@ -70,6 +70,10 @@ class JobModule(DWhoModuleBase):
     max_jobs = _service_property('max_jobs')
     max_output_bytes = _service_property('max_output_bytes')
 
+    def __init__(self):
+        super().__init__()
+        self.history_store = None
+
     def safe_init(self, options):
         general = self.config['general']
         self.LOCK = RWLock()
@@ -79,6 +83,7 @@ class JobModule(DWhoModuleBase):
                                    general.get('journal_max_bytes', DEFAULT_JOURNAL_BYTES),
                                    general.get('journal_backup_count', DEFAULT_JOURNAL_BACKUPS))
         self.service = JobService(ENDPOINTS, EPTS_SYNC, object_factory=AutonEPTObject,
+                                  store=self.history_store,
                                   lock=_WriteLock(self), journal=journal,
                                   availability=Availability(general.get('maintenance', False), general.get('maintenance_reason', '')),
                                   maintenance_operators=general.get('maintenance_operators', []),

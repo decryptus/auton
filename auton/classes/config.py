@@ -23,6 +23,7 @@ from sonicprobe.helpers import load_yaml
 
 from auton.classes.exceptions import AutonConfigurationError
 from auton.classes.authentication import apply_auth_policy, PasswordAuthenticator
+from auton.classes.job_store import history_config
 from auton.classes.plugins import ENDPOINTS, PLUGINS
 from auton.classes.endpoint_imports import load_endpoint_imports, load_component, COMPONENT_SECTIONS
 
@@ -81,6 +82,9 @@ def load_conf(xfile, options = None, envvar = None):
     conf = import_conf_files('modules', conf)
 
     apply_auth_policy(conf)
+    storage = history_config(conf['general'], conf.get('_config_directory'))
+    if storage is not None:
+        conf['general']['job_storage'] = storage
     PasswordAuthenticator.from_file(conf['general'].get('auth_basic_file'),
                                     required=(conf['general'].get('auth_mode') == 'required'
                                               and not conf['general'].get('authentication')))

@@ -10,6 +10,12 @@ general:
   result_ttl:    3600
   max_jobs:      128
   max_output_bytes: 1048576
+  # Optional durable local jobs; separate file from authentication.
+  # Private directory must already exist and be owned by the daemon user.
+  #job_storage:
+  #  backend: sqlite
+  #  path: /var/lib/autond/jobs/jobs.db
+  #  timeout: 5
   # Local maintenance: queued jobs wait; running jobs finish. Not persisted.
   maintenance: false
   maintenance_reason: ""

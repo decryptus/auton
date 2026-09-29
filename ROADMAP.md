@@ -406,7 +406,8 @@ errors do not change command outcomes. This does not provide job restoration
 or transactional durability. Real terminal captures are included in the README.
 
 - improve cleanup of expired jobs;
-- review persistence requirements for local daemon jobs;
+- Implemented: optional local SQLite job snapshots, terminal output restoration,
+  explicit interrupted/uncertain recovery without replay, independent of authentication;
 - improve reproducible builds;
 - review Python 3.13+ compatibility when dependencies allow it;
 - strengthen HTTPS/auth deployment guidance;
@@ -415,7 +416,8 @@ or transactional durability. Real terminal captures are included in the README.
 - preserve process-group cleanup and output limits;
 - keep ACL checks both at admission and execution.
 
-Persistent storage is not mandatory for the initial multi-daemon client work. It should only be introduced if product behavior requires it.
+Persistent job storage is optional; the default remains in memory. Redis is a later
+adapter, with independent auth/history configuration and mixed backends when supported.
 
 ## 1.0 gate — Authentication and local daemon web console
 
@@ -438,9 +440,9 @@ as the HTTP API. No central service is required.
   `-k` token files for CLI/TUI. Required mode protects all routes; endpoint ACLs,
   ownership and maintenance operator checks remain in force. Basic stays available
   as an explicit compatibility mode.
-- Authentication state survives restart. Job history remains in memory until its
-  separate storage adapter is delivered. SQLite first, Redis later; configure the
-  two stores independently and allow mixed backends once both are supported.
+- Authentication state and optional local job history survive restart in separate
+  SQLite files. Interrupted jobs are never replayed. Redis is deferred; configure
+  the two stores independently and allow mixed backends once both are supported.
 - SSO/OIDC and mTLS remain separately scoped extensions.
 
 ## Milestone 7 — Website

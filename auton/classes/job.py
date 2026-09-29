@@ -37,6 +37,11 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
         self.max_output_bytes = 1048576
         self.owner       = principal
         self.journal     = None
+        self.persistence = None
+        self.persistence_error = False
+        self.execution_uncertain = False
+        self.launch_cancelled = False
+        self.admitted_at = None
         self.outcome     = None
         self.outcome_reason = None
         self.started_monotonic = None
@@ -111,6 +116,8 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
         with self.output_lock:
             previous = self.status
             self.status = status
+            if status != previous and self.persistence is not None:
+                self.persistence(self)
             if status != previous and status in (STATUS_PROCESSING, STATUS_COMPLETE):
                 event = 'job.started' if status == STATUS_PROCESSING else (
                     self.outcome or ('job.completed' if self.return_code == 0 else 'job.failed'))
