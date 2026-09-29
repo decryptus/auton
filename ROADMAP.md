@@ -232,6 +232,38 @@ A remote script can already group commands into one job, but Auton then sees
 the script's overall result rather than separate step results. This milestone
 does not introduce a central scheduler or a generic workflow engine.
 
+### Target groups and scenario selection (planned)
+
+- Add `--target-group NAME` to select an explicit named group from the client
+  inventory. Combine explicit targets and groups as a stable union, with each
+  target executed once; reject unknown members and keep failover separate.
+- Add `--scenario NAME` for one scenario and `--scenario-group NAME` for an
+  ordered group of scenarios, retaining existing endpoint execution commands.
+- Expose the same selections in the TUI: targets/groups, endpoint or scenario,
+  arguments, an exact target/action summary before launch, then per-target results.
+- Reuse application services across CLI and TUI; server-side authorization
+  remains authoritative. These selection options are not yet implemented.
+
+### Scenario Group (planned, after individual scenarios)
+
+Add named, ordered groups of existing scenarios, distinct from target groups.
+A target group selects where to execute; a scenario group selects what to run.
+
+- Proposed CLI: `--scenario-group maintenance`, combined with explicit targets
+  or a target group; preserve single-scenario and existing execution commands.
+- Validate every scenario reference before submitting any job. Start with flat
+  groups; reject duplicate members and nested group references.
+- Run scenarios in declared order on each target, with bounded concurrency
+  across targets. Stop the remaining scenarios on that target on failure or
+  unknown outcome; independent targets may continue.
+- Retain operation, target, scenario, step and job identities, with separate
+  outputs, exit codes and explicit skipped/unknown states.
+- Never replay an ambiguous POST, imply rollback or cancel running jobs.
+- Keep execution in application services shared by CLI and TUI.
+
+This is a roadmap item, not an available command. Development remains focused
+on Auton; shared terminology does not require a shared execution framework.
+
 ## Milestone 6 — Reliability and lifecycle
 
 Continue product hardening:
