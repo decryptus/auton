@@ -241,6 +241,19 @@ does not introduce a central scheduler or a generic workflow engine.
   ordered group of scenarios, retaining existing endpoint execution commands.
 - Expose the same selections in the TUI: targets/groups, endpoint or scenario,
   arguments, an exact target/action summary before launch, then per-target results.
+- Support startup filtering before opening the TUI: `--target`,
+  `--target-group`, `--scenario` and `--scenario-group`. Preserve existing
+  `--daemon` usage. With `--tui`, these flags select what can be browsed and
+  prepared; they never submit jobs automatically.
+- Resolve and validate selections before curses initialization or network access.
+  Combine target/group selections as a deduplicated union; scenario/group
+  selections independently restrict the action catalogue. Contact only selected
+  daemons. Reject unknown names; never broaden an empty/invalid selection to all.
+- Display active filters and the resolved targets in the TUI. Changing the scope
+  must be explicit, and execution still requires reviewing the selected action
+  and exact destinations. These are operator filters, not authorization rules.
+- Scenario filters initially apply to the scenario catalogue, not to historical
+  jobs that lack scenario/operation metadata.
 - Reuse application services across CLI and TUI; server-side authorization
   remains authoritative. These selection options are not yet implemented.
 
