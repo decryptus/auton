@@ -55,8 +55,9 @@ jobs:
       - name: Test image before publication
         run: |
           docker run --rm --entrypoint autond auton:test -d
-          docker run --rm --entrypoint python -v "$PWD/.github/scripts:/collection:ro" auton:test /collection/check-test-collection.py --runner unittest tests
-          docker run --rm --entrypoint python auton:test -m unittest discover -s tests -v
+          docker build --target test -t auton:tests .
+          docker run --rm --entrypoint python -v "$PWD/.github/scripts:/collection:ro" auton:tests /collection/check-test-collection.py --runner unittest tests
+          docker run --rm --entrypoint python auton:tests -m unittest discover -s tests -v
           docker run --rm --entrypoint python -e EXPECTED_VERSION="$(cat VERSION)" auton:test -c 'import os; from importlib.metadata import version; assert version("autond") == os.environ["EXPECTED_VERSION"]; assert os.getuid() != 0'
       - uses: actions/setup-python@v5
         with:

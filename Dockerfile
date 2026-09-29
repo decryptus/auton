@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm AS runtime
 
 LABEL maintainer="docker@doowan.net"
 
@@ -21,3 +21,12 @@ RUN chmod +x /run.sh
 USER auton
 EXPOSE 8666/tcp
 CMD ["/run.sh"]
+
+# Client-only dependencies are needed by the combined integration suite, not
+# by the production daemon image. Run this stage as the same unprivileged user.
+FROM runtime AS test
+USER root
+RUN pip install --no-cache-dir -r requirements-auton.txt
+USER auton
+
+FROM runtime AS final
