@@ -1,56 +1,30 @@
-"""Request-local Basic authentication for the legacy httpdis transport."""
-import base64
-import binascii
-import crypt
-import hashlib
-import hmac
-
+"""Request-local Basic authentication for the httpdis transport."""
 from httpdis.ext.httpdis_json import HttpReqHandler, HttpReqErrJson
+from auton.classes.authentication import PasswordAuthenticator
+from auton.classes.exceptions import AutonConfigurationError
 
 
 class AutonHttpReqHandler(HttpReqHandler):
-    passwords = {}
+    # Immutable process-start credential snapshot, never request identity.
+    authenticator = PasswordAuthenticator()
     realm = 'Restricted'
 
     @classmethod
-    def configure_auth(cls, filename=None, realm=None):
-        cls.passwords = {}
-        cls.realm = realm or 'Restricted'
-        if filename:
-            with open(filename, encoding='utf-8') as stream:
-                for line in stream:
-                    line = line.strip()
-                    if line and not line.startswith('#') and ':' in line:
-                        user, secret = line.split(':', 1)
-                        if user and secret:
-                            cls.passwords[user] = secret
+    def configure_auth(cls, filename=None, realm=None, required=False):
+        realm = realm or 'Restricted'
+        if not isinstance(realm, str) or any(ord(c) < 32 or c in '\\"' for c in realm):
+            raise AutonConfigurationError('invalid authentication realm')
+        cls.authenticator = PasswordAuthenticator.from_file(filename, required=required)
+        cls.realm = realm
 
     def authenticate(self, auth_users=None):
-        # Do not mutate httpdis's shared authentication object: concurrent
-        # requests must never exchange identities or retain a previous login.
+        if self.get_context().auth_provider is not None:
+            return super().authenticate(auth_users)
+        self._SERVER.pop('HTTP_AUTH_IDENTITY', None)
         self._SERVER.pop('HTTP_AUTH_USER', None)
         self._SERVER.pop('HTTP_AUTH_PASSWD', None)
-        denied = HttpReqErrJson(401, 'authentication required', headers={
-            'WWW-Authenticate': 'Basic realm="%s"' % self.realm})
-        try:
-            scheme, encoded = self.headers.get('Authorization', '').split(' ', 1)
-            if scheme.lower() != 'basic':
-                raise ValueError('unsupported authentication scheme')
-            raw = base64.b64decode(encoded, validate=True).decode('utf-8')
-            user, password = raw.split(':', 1)
-            if '\x00' in password:
-                raise ValueError('invalid password')
-        except (ValueError, UnicodeError, binascii.Error):
-            raise denied
-        secret = self.passwords.get(user)
-        if not secret:
-            raise denied
-        if secret.startswith('{SHA}'):
-            candidate = '{SHA}' + base64.b64encode(hashlib.sha1(password.encode('utf-8')).digest()).decode('ascii')
-        else:
-            candidate = crypt.crypt(password, secret)
-        if not candidate or not hmac.compare_digest(candidate, secret):
-            raise denied
-        if auth_users and user not in auth_users:
-            raise denied
-        self._SERVER['HTTP_AUTH_USER'] = user
+        principal = self.authenticator.authenticate(self.headers.get('Authorization', ''), auth_users)
+        if principal is None:
+            raise HttpReqErrJson(401, 'authentication required', headers={
+                'WWW-Authenticate': 'Basic realm="%s"' % self.realm})
+        self._SERVER['HTTP_AUTH_USER'] = principal

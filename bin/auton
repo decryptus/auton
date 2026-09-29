@@ -22,6 +22,7 @@ from sonicprobe import helpers
 
 import requests  # Compatibility for clients patching the historical transport.
 from auton_client import RemoteClient
+from auton_client.credentials import credentials_from_options
 
 import six
 
@@ -99,6 +100,8 @@ def argv_parse_check():
                         type      = six.ensure_text,
                         default   = os.environ.get('AUTON_ENDPOINT'),
                         help      = "Auton endpoint")
+    parser.add_argument('-k', '--token-file', default=os.environ.get('AUTON_TOKEN_FILE'),
+                        help='Private bearer-token file; mutually exclusive with Basic credentials')
     parser.add_argument("--auth-user",
                         dest      = 'auth_user',
                         type      = six.ensure_text,
@@ -206,6 +209,9 @@ def argv_parse_check():
                 or options.argfiles or options.margs or options.margsfiles or options.envvars
                 or options.envfiles or options.imp_envvars or options.load_envfiles):
             parser.error('scenario definitions own endpoints and inputs; incompatible execution options')
+
+    if options.token_file and (options.auth_user or options.auth_passwd):
+        parser.error('token-file and Basic credentials are mutually exclusive')
 
     options.selected_scenarios = None
     options.configured_targets = {}
@@ -321,7 +327,7 @@ class AutonClient(RemoteClient, PayloadBuilder):
         if not options.endpoint:
             raise ValueError('missing variable AUTON_ENDPOINT')
         PayloadBuilder.__init__(self, options)
-        auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+        auth = credentials_from_options(options)
         RemoteClient.__init__(self, options.uri, options.endpoint, options.uid,
                               payload=self.payload, auth=auth, http_timeout=options.http_timeout)
 
@@ -348,7 +354,7 @@ def main(options):
     if options.tui:
         try:
             from auton_client.tui import run
-            auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+            auth = credentials_from_options(options)
             return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh,
                               configured=options.configured_targets, selected=options.selected_targets,
                               groups=options.configured_groups,
@@ -384,7 +390,7 @@ def main(options):
     try:
         if options.target or options.target_group:
             from auton_client.operations import OperationService
-            auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+            auth = credentials_from_options(options)
             settings = dict(auth=auth, http_timeout=options.http_timeout, parallel=options.parallel,
                             timeout=options.operation_timeout, delay=options.delay)
             if options.selected_scenarios:

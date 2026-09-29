@@ -417,6 +417,32 @@ or transactional durability. Real terminal captures are included in the README.
 
 Persistent storage is not mandatory for the initial multi-daemon client work. It should only be introduced if product behavior requires it.
 
+## 1.0 gate — Authentication and local daemon web console
+
+Before the public website, strengthen authentication and deliver an optional web
+console served by autond. It uses the same application services and authorization
+as the HTTP API. No central service is required.
+
+- Safe local defaults and an explicit migration from historical route-based auth.
+- Protect all configured routes in required mode; retain endpoint ACLs and ownership.
+- Verify modern password hashing across supported packages and images.
+- HTTPS guidance, client credential profiles and safe secret input.
+- Bound failed authentication attempts and audit refusals without credentials.
+- Browser authentication, CSRF protection, safe output rendering and security headers.
+- Console: daemon state, maintenance, allowed endpoints, jobs, output, search and
+  confirmed single-endpoint execution. Targets and scenario orchestration remain
+  client-side for this first console.
+- Test permissions and browser flows before screenshots, recording and publication.
+- Implemented: HTTPdis-backed persistent SQLite authentication, Argon2 accounts,
+  expiring/revocable scoped tokens, local `autond-auth` administration and client
+  `-k` token files for CLI/TUI. Required mode protects all routes; endpoint ACLs,
+  ownership and maintenance operator checks remain in force. Basic stays available
+  as an explicit compatibility mode.
+- Authentication state survives restart. Job history remains in memory until its
+  separate storage adapter is delivered. SQLite first, Redis later; configure the
+  two stores independently and allow mixed backends once both are supported.
+- SSO/OIDC and mTLS remain separately scoped extensions.
+
 ## Milestone 7 — Website
 
 Domain purchased: **auton.run**. DNS and website deployment remain to be configured.
@@ -451,7 +477,7 @@ The site should:
 - use galleries/lightboxes where useful;
 - present real terminal recordings and local screenshots using disposable demo
   daemons; do not expose a public remote-execution daemon;
-- provide a contact form with spam protection (recipient and delivery configuration
+- provide a contact form with spam protection (recipient auton@doowan.net; delivery configuration
   to be supplied), alongside GitHub issue links;
 - expose the current project version clearly;
 - be deployable automatically from GitHub;

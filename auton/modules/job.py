@@ -21,6 +21,7 @@ from auton.classes.jobs import (JobService, job_result, UnknownEndpoint, Unknown
                                 DEFAULT_MAX_OUTPUT_BYTES)
 
 from auton.classes.availability import Availability, MaintenanceActive
+from auton.classes.auth_store import authorized_principal
 
 MAINTENANCE_FIELDS = frozenset(('enabled', 'reason'))
 
@@ -86,6 +87,12 @@ class JobModule(DWhoModuleBase):
                                   max_jobs=general.get('max_jobs', DEFAULT_MAX_JOBS),
                                   max_output_bytes=general.get('max_output_bytes', DEFAULT_MAX_OUTPUT_BYTES))
 
+    @staticmethod
+    def _principal(request, scope):
+        values = request.get_server_vars()
+        return _http_call(authorized_principal, values.get('HTTP_AUTH_USER'),
+                          values.get('HTTP_AUTH_IDENTITY'), scope)
+
     def _expire_results(self):
         return self.service.expire_results()
 
@@ -123,7 +130,7 @@ class JobModule(DWhoModuleBase):
         # Kept for callers of the historical helper. Admission still checks ACLs,
         # capacity and duplicates through the same service as the HTTP endpoint.
         _http_call(self.service.submit, endpoint, xid, request.payload_params() or {},
-                   request.get_server_vars().get('HTTP_AUTH_USER'), offset=0, method=method)
+                   self._principal(request, 'run'), offset=0, method=method)
         return self._get_obj(endpoint, xid)
 
     @staticmethod
@@ -144,7 +151,7 @@ class JobModule(DWhoModuleBase):
         payload = (request.payload_params() or {}) if submit else None
         _http_call(validate_input, params, payload)
         offset = self._output_offset(request)
-        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        principal = self._principal(request, 'run' if submit else 'read')
         try:
             if submit:
                 result = _http_call(self.service.submit, params['endpoint'], params['id'],
@@ -174,7 +181,7 @@ class JobModule(DWhoModuleBase):
             raise HttpReqErrJson(400, 'invalid maintenance payload')
         try:
             result = _http_call(self.service.set_maintenance,
-                request.get_server_vars().get('HTTP_AUTH_USER'), **payload)
+                self._principal(request, 'maintenance'), **payload)
         except ValueError as error:
             raise HttpReqErrJson(400, str(error))
         return {'code': 200, 'maintenance': result}
@@ -186,30 +193,31 @@ class JobModule(DWhoModuleBase):
         params = request.query_params() or {}
         if not isinstance(params, dict) or set(params) - JOB_FILTER_FIELDS:
             raise HttpReqErrJson(400, 'invalid job filters')
-        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        principal = self._principal(request, 'read')
         return {'code': 200, 'jobs': _http_call(self.service.list_jobs, principal, **params)}
 
     def job_detail(self, request):
         params = request.query_params()
         _http_call(validate_input, params)
         result = _http_call(self.service.detail, params['endpoint'], params['id'],
-                            request.get_server_vars().get('HTTP_AUTH_USER'),
+                            self._principal(request, 'read'),
                             self._output_offset(request))
         # A failed job is still a successful inspection request.
         result['code'] = 200
         return result
 
     def endpoint_list(self, request):
-        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        principal = self._principal(request, 'read')
         return {'code': 200, 'endpoints': _http_call(self.service.list_endpoints, principal)}
 
     def daemon_health(self, request):
+        self._principal(request, 'read')
         result = _http_call(self.service.health)
         result['code'] = 200
         return result
 
     def daemon_stats(self, request):
-        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        principal = self._principal(request, 'read')
         return {'code': 200, 'stats': _http_call(self.service.stats, principal)}
 
 

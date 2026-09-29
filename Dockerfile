@@ -7,12 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system auton \
     && useradd --system --gid auton --home-dir /etc/auton auton \
-    && mkdir -p /run/auton /var/log/autond /etc/auton \
-    && chown -R auton:auton /run/auton /var/log/autond /etc/auton
+    && mkdir -p /run/auton /var/log/autond /etc/auton /var/lib/autond/auth \
+    && chown -R auton:auton /run/auton /var/log/autond /etc/auton /var/lib/autond
 
 WORKDIR /opt/auton
 COPY . .
-RUN AUTON_PACKAGE=autond pip install --no-cache-dir .
+RUN AUTON_PACKAGE=autond pip install --no-cache-dir '.[auth]'
 COPY docker-run.sh /run.sh
 COPY etc/auton/modules /etc/auton/modules
 COPY etc/auton/auton.yml.example /etc/auton/auton.yml

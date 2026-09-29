@@ -20,6 +20,7 @@ from sonicprobe.libs import daemonize
 
 from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
 from auton.classes.http import AutonHttpReqHandler
+from auton.classes.auth_store import PersistentAuthentication
 from auton.modules import * # XXX
 from auton.plugins import * # XXX
 
@@ -124,10 +125,13 @@ def main(options):
     setattr(options, 'server_version', "%s/%s" % (SYSLOG_NAME, __version__))
     setattr(options, 'sys_version', '')
 
-    httpdis_json.init(options, False)
-    AutonHttpReqHandler.configure_auth(getattr(options, 'auth_basic_file', None),
-                                      getattr(options, 'auth_basic', None))
-    DWHO_THREADS.append(httpdis_json.stop)
+    # Basic files may be readable only before dropping privileges. SQLite is
+    # opened later, under the daemon account and after daemonization.
+    settings = options.configuration['general'].get('authentication')
+    if not settings:
+        AutonHttpReqHandler.configure_auth(getattr(options, 'auth_basic_file', None),
+                                          getattr(options, 'auth_basic', None),
+                                          required=options.configuration['general'].get('auth_mode') == 'required')
 
     if not options.foreground:
         LOG.info("Transforming into a daemon from hell")
@@ -136,6 +140,7 @@ def main(options):
     LOG.info("locking PID")
     daemonize.lock_pidfile_or_die(options.pidfile)
 
+    authentication = None
     try:
         LOG.info("pidfile ok")
         root_logger.setLevel(options.loglevel)
@@ -144,6 +149,11 @@ def main(options):
         os.setuid(uid)
         os.umask(0o22)
 
+        if settings:
+            authentication = PersistentAuthentication(settings)
+            options.auth_provider = authentication.provider
+        httpdis_json.init(options, False)
+        DWHO_THREADS.append(httpdis_json.stop)
         start_endpoints()
         httpdis_json.run(options, http_req_handler=AutonHttpReqHandler)
     except (KeyboardInterrupt, SystemExit):
@@ -151,7 +161,14 @@ def main(options):
     except Exception:
         LOG.exception("bad things happen")
     finally:
-        daemonize.unlock_pidfile(options.pidfile)
+        try:
+            httpdis_json.stop()
+        finally:
+            try:
+                if authentication is not None:
+                    authentication.close()
+            finally:
+                daemonize.unlock_pidfile(options.pidfile)
 
 if __name__ == '__main__':
     def _start():

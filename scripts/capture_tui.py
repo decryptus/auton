@@ -86,7 +86,7 @@ def main():
                     port = sock.getsockname()[1]
                 config = yaml.safe_load((ROOT / 'etc/auton/auton.yml.example').read_text())
                 config['general'].update(listen_addr='127.0.0.1', listen_port=port,
-                                         max_life_time=0, max_requests=0)
+                                         max_life_time=0, max_requests=0, auth_mode='anonymous')
                 config.pop('import_modules', None)
                 config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
                 config['endpoints'] = {'diagnostics': {'plugin': 'subproc', 'config': {
