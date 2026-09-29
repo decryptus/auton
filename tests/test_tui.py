@@ -72,6 +72,7 @@ class VisibilityClientTests(unittest.TestCase):
             with self.subTest(uri=uri), self.assertRaises(ValueError):
                 DaemonClient(uri)
         for method, data in (('jobs', {'jobs': [None]}), ('endpoints', {'endpoints': ['x']}),
+                             ('endpoints', {'endpoints': [{'name': 'test', 'description': []}]}),
                              ('stats', {'stats': {'jobs_by_status': []}}), ('health', {'status': 'bad'})):
             session = Mock()
             session.get.return_value = response(dict(data, code=200))
@@ -158,6 +159,14 @@ class OperatorViewTests(unittest.TestCase):
         self.monitor.poll.return_value = None
         self.view = OperatorView(self.monitor, clock=lambda: 1)
         self.view.cache['one'] = snapshot(fake_client())
+
+    def test_endpoint_search_includes_published_description(self):
+        self.view.view = 1
+        self.view.cache['one']['endpoints'] = [{'name': 'test', 'description': 'Database checks'}]
+        self.view.search = 'DATABASE'
+        self.assertEqual(self.view.rows()[0]['name'], 'test')
+        self.view.search = 'missing'
+        self.assertEqual(self.view.rows(), [])
 
     def test_navigation_search_state_and_endpoint_filter(self):
         self.view.handle(ord('/'))

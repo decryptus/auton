@@ -90,8 +90,8 @@
     $('endpoints').replaceChildren(); $('run-endpoint').replaceChildren();
     const oldEndpoint = selectedRunEndpoint;
     for (const endpoint of endpoints) {
-      const item = document.createElement('li'); item.textContent = endpoint.name; $('endpoints').append(item);
-      const option = document.createElement('option'); option.value = endpoint.name; option.textContent = endpoint.name; $('run-endpoint').append(option);
+      const item = document.createElement('li'); item.textContent = endpoint.name + (endpoint.description ? ' — ' + endpoint.description : ''); $('endpoints').append(item);
+      const option = document.createElement('option'); option.value = endpoint.name; option.textContent = item.textContent; $('run-endpoint').append(option);
     }
     if (endpoints.some(e => e.name === oldEndpoint)) $('run-endpoint').value = oldEndpoint;
     $('endpoint-count').textContent = String(endpoints.length);

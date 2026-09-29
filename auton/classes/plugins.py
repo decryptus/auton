@@ -126,8 +126,10 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
         self.credentials = None
         self.users       = None
         self.target      = None
+        self.discovery   = {}
 
     def safe_init(self):
+        self.discovery = dict(self.config.get('discovery', {}))
         if self.config.get('users'):
             self.users = self.config['users']
 

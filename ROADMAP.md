@@ -65,6 +65,12 @@ GET /health
 GET /stats
 ```
 
+Endpoint discovery is implemented through the existing authenticated `/endpoints`
+catalogue and current endpoint ACLs. Optional explicitly published descriptions
+appear in TUI and web selection; private plugin configuration is never serialized.
+Endpoints without metadata keep their previous response shape. Parameter schemas
+and generated forms remain planned, with execution-time validation required.
+
 Exact routes remain implementation details and must respect existing HTTP conventions.
 
 ## Milestone 2 — Auton TUI

@@ -77,7 +77,8 @@ class DaemonClient:
     def endpoints(self):
         data = self._read(READ_ROUTES['endpoints']).get('endpoints')
         if not isinstance(data, list) or any(not isinstance(item, dict)
-                or not isinstance(item.get('name'), str) for item in data):
+                or not isinstance(item.get('name'), str)
+                or ('description' in item and not isinstance(item['description'], str)) for item in data):
             raise VisibilityError('invalid endpoints response')
         return data
 

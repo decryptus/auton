@@ -106,6 +106,45 @@ results cannot be replayed and IDs no longer protect against repeat execution.
 Status access is restricted to the submitting authenticated user and the current
 endpoint permissions. Unauthenticated demo jobs have no individual user identity.
 
+### Endpoint discovery
+
+Clients discover the daemon's permitted endpoints through authenticated
+`GET /endpoints` (scope `read` in SQLite mode). The TUI and web console already
+use this catalogue; target addresses remain client configuration. Discovery never
+submits a job, broadcasts to failover URIs or grants execution rights.
+
+An endpoint can explicitly publish an optional description:
+
+```yaml
+endpoints:
+  hello:
+    plugin: subproc
+    discovery:
+      description: Print a greeting to verify remote execution.
+    users:
+      operator: true
+    config:
+      prog: /usr/bin/printf
+      args: ['Hello from Auton!\n']
+      disallow-args: true
+      timeout: 5
+```
+
+Only `name` and the explicitly declared `description` are returned, after current
+endpoint ACL checks. Without a description the existing `{"name": "hello"}`
+response is unchanged. Descriptions are plain, single-line printable text, at most
+512 characters; unknown discovery fields and invalid values fail configuration
+loading before any endpoint initializes. Treat this text as visible to every
+principal allowed to discover that endpoint: never put secrets in it. Commands,
+paths, variables, credentials, users and queue activity are not inferred or exposed.
+
+The TUI displays and searches descriptions; the web console displays them as text,
+including in its endpoint selector. Execution still requires `run` and endpoint
+permission at admission and execution time. Legacy/anonymous configurations retain
+their existing authentication policy; discovery does not silently strengthen it.
+Parameter schemas and generated input forms remain future work: no arguments,
+constraints or defaults are inferred from the executable's private configuration.
+
 ### Local daemon visibility
 
 The daemon also exposes these read-only routes:

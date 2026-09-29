@@ -23,6 +23,8 @@ import_modules:
   - modules/job.yml
 endpoints:
   hello:
+    discovery:
+      description: Print a greeting to verify remote execution.
     plugin: subproc
     users:
       operator: true

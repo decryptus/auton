@@ -112,6 +112,10 @@ class WebHTTPTests(unittest.TestCase):
         other, _ = self.daemon.login('other')
         for browser in (operator, reader, other):
             self.addCleanup(browser.close)
+        catalogue = operator.get(self.uri + '/endpoints', timeout=2).json()['endpoints']
+        self.assertEqual(next(item for item in catalogue if item['name'] == 'diagnostic'),
+                         {'name': 'diagnostic', 'description': '<script>discovery()</script> Diagnostic checks'})
+        self.assertNotIn('private', [item['name'] for item in catalogue])
         jobpath = '/run/diagnostic/browser-job'
         payload = {'args': ['-c', 'print("<script>window.pwned = true</script>")']}
         self.assertEqual(reader.post(self.uri + jobpath, json=payload, timeout=2).status_code, 403)

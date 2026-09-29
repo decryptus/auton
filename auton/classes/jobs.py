@@ -312,7 +312,7 @@ class JobService(object):
                                                     item['uid']))
 
     def list_endpoints(self, principal):
-        """Return endpoint names visible to the authenticated principal."""
+        """Return names and explicitly published descriptions after endpoint ACL checks."""
         result = []
         for name in sorted(self.endpoints):
             try:
@@ -320,7 +320,11 @@ class JobService(object):
             except AccessDenied:
                 continue
             # Shared queue depths would disclose activity belonging to other users.
-            result.append({'name': name})
+            item = {'name': name}
+            description = getattr(self.endpoints[name], 'discovery', {}).get('description')
+            if description:
+                item['description'] = description
+            result.append(item)
         return result
 
     def detail(self, endpoint, xid, principal, offset=0):
