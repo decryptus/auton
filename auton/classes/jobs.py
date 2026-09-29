@@ -7,7 +7,7 @@ import threading
 import time
 from contextlib import contextmanager
 
-from auton.classes.job import JobObject, STATUS_COMPLETE
+from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE
 from auton.classes.job_schema import validate_input
 
 DEFAULT_RESULT_TTL = 3600
@@ -15,6 +15,7 @@ DEFAULT_MAX_JOBS = 128
 DEFAULT_MAX_OUTPUT_BYTES = 1048576
 DEFAULT_LOCK_TIMEOUT = 5
 MAX_OUTPUT_OFFSET = 999999999999
+JOB_STATUSES = (STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE)
 
 
 class JobError(Exception):
@@ -45,6 +46,10 @@ class InvalidOffset(JobError):
     pass
 
 
+class InvalidFilter(JobError):
+    pass
+
+
 def validate_offset(offset):
     if offset is not None and (isinstance(offset, bool) or not isinstance(offset, int)
                                or offset < 0 or offset > MAX_OUTPUT_OFFSET):
@@ -64,6 +69,22 @@ def job_result(obj, offset=None):
         if obj.has_error():
             result['errors'] = list(obj.get_errors())
         return result
+
+
+def job_summary(obj):
+    """Return non-streaming metadata suitable for fleet/job listings."""
+    with obj.output_lock:
+        return {
+            'uid': obj.get_uid(),
+            'endpoint': obj.get_endpoint(),
+            'status': obj.get_status(),
+            'return_code': obj.get_return_code(),
+            'started_at': obj.get_started_at(),
+            'ended_at': obj.get_ended_at(),
+            'owner': obj.owner,
+            'output_chunks': len(obj.result),
+            'error_chunks': len(obj.errors),
+        }
 
 
 class JobService(object):
@@ -174,3 +195,71 @@ class JobService(object):
             obj = self.get_object(endpoint, xid)
             self.authorize(endpoint, principal, obj)
             return job_result(obj, offset)
+
+    def list_jobs(self, principal, endpoint=None, status=None):
+        """Return visible jobs without consuming output cursors."""
+        if endpoint is not None and (not isinstance(endpoint, str) or not endpoint):
+            raise InvalidFilter('invalid endpoint filter')
+        if status is not None and status not in JOB_STATUSES:
+            raise InvalidFilter('invalid status filter')
+        with self._locked():
+            self.expire_results()
+            result = []
+            for obj in self.objs.values():
+                try:
+                    self.authorize(obj.get_endpoint(), principal, obj)
+                except (AccessDenied, UnknownEndpoint):
+                    continue
+                item = job_summary(obj)
+                if endpoint is not None and item['endpoint'] != endpoint:
+                    continue
+                if status is not None and item['status'] != status:
+                    continue
+                result.append(item)
+            return sorted(result, key=lambda item: (item['started_at'] is None,
+                                                    item['started_at'] or 0,
+                                                    item['uid']))
+
+    def list_endpoints(self, principal):
+        """Return endpoint names visible to the authenticated principal."""
+        result = []
+        for name in sorted(self.endpoints):
+            try:
+                self.authorize(name, principal)
+            except AccessDenied:
+                continue
+            # Shared queue depths would disclose activity belonging to other users.
+            result.append({'name': name})
+        return result
+
+    def detail(self, endpoint, xid, principal, offset=0):
+        """Read metadata and output without advancing the legacy status cursor."""
+        validate_input({'endpoint': endpoint, 'id': xid})
+        validate_offset(offset)
+        if offset is None:
+            offset = 0
+        with self._locked():
+            self.expire_results()
+            obj = self.get_object(endpoint, xid)
+            self.authorize(endpoint, principal, obj)
+            with obj.output_lock:
+                result = job_summary(obj)
+                result.update(job_result(obj, offset))
+                return result
+
+    def health(self):
+        """Report local service availability without exposing job data."""
+        with self._locked():
+            return {'status': 'ok'}
+
+    def stats(self, principal):
+        """Return a compact summary derived from visible jobs/endpoints."""
+        jobs = self.list_jobs(principal)
+        counts = {}
+        for item in jobs:
+            counts[item['status']] = counts.get(item['status'], 0) + 1
+        return {
+            'jobs': len(jobs),
+            'jobs_by_status': counts,
+            'endpoints': len(self.list_endpoints(principal)),
+        }

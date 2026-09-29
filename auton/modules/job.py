@@ -15,14 +15,15 @@ from auton.classes.plugins import (AutonEPTObject, EPTS_SYNC, ENDPOINTS,
 from auton.classes.job_schema import (RUN_QSCHEMA, RUN_PSCHEMA, validate_input,
                                       InvalidArguments, InvalidArgumentsType)
 from auton.classes.jobs import (JobService, job_result, UnknownEndpoint, UnknownJob,
-                                AccessDenied, DuplicateJob, JobUnavailable, InvalidOffset,
+                                AccessDenied, DuplicateJob, JobUnavailable, InvalidOffset, InvalidFilter,
                                 DEFAULT_RESULT_TTL, DEFAULT_MAX_JOBS,
                                 DEFAULT_MAX_OUTPUT_BYTES)
 
 LOG = logging.getLogger('auton.modules.job')
 OUTPUT_OFFSET_PATTERN = re.compile(r'[0-9]{1,12}')
+JOB_FILTER_FIELDS = frozenset(('endpoint', 'status'))
 HTTP_ERROR_CODES = {UnknownEndpoint: 404, UnknownJob: 404, AccessDenied: 403,
-                    DuplicateJob: 415, JobUnavailable: 503, InvalidOffset: 400,
+                    DuplicateJob: 415, JobUnavailable: 503, InvalidOffset: 400, InvalidFilter: 400,
                     InvalidArgumentsType: 400, InvalidArguments: 415}
 HTTP_ERRORS = tuple(HTTP_ERROR_CODES)
 
@@ -151,6 +152,36 @@ class JobModule(DWhoModuleBase):
 
     def job_status(self, request):
         return self._handle(request)
+
+    def job_list(self, request):
+        params = request.query_params() or {}
+        if not isinstance(params, dict) or set(params) - JOB_FILTER_FIELDS:
+            raise HttpReqErrJson(400, 'invalid job filters')
+        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        return {'code': 200, 'jobs': _http_call(self.service.list_jobs, principal, **params)}
+
+    def job_detail(self, request):
+        params = request.query_params()
+        _http_call(validate_input, params)
+        result = _http_call(self.service.detail, params['endpoint'], params['id'],
+                            request.get_server_vars().get('HTTP_AUTH_USER'),
+                            self._output_offset(request))
+        # A failed job is still a successful inspection request.
+        result['code'] = 200
+        return result
+
+    def endpoint_list(self, request):
+        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        return {'code': 200, 'endpoints': _http_call(self.service.list_endpoints, principal)}
+
+    def daemon_health(self, request):
+        result = _http_call(self.service.health)
+        result['code'] = 200
+        return result
+
+    def daemon_stats(self, request):
+        principal = request.get_server_vars().get('HTTP_AUTH_USER')
+        return {'code': 200, 'stats': _http_call(self.service.stats, principal)}
 
 
 if __name__ != '__main__':

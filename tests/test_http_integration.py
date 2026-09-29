@@ -84,7 +84,32 @@ class HTTPIntegrationTests(unittest.TestCase):
                     self.assertEqual(a.json()['stream'], b.json()['stream'])
                     self.assertEqual(''.join(a.json()['stream']), 'hello\n')
                     self.assertEqual(a.json()['return_code'], 7)
+                    def inspect(path, identity=auth):
+                        return requests.get(uri + path, auth=identity, timeout=2)
+                    jobs = inspect('/jobs')
+                    self.assertEqual(jobs.status_code, 200, jobs.text)
+                    self.assertEqual([j['uid'] for j in jobs.json()['jobs']], ['test:http-test-job'])
+                    self.assertNotIn('stream', jobs.json()['jobs'][0])
+                    self.assertEqual(inspect('/jobs?status=complete&endpoint=test').json()['jobs'],
+                                     jobs.json()['jobs'])
+                    self.assertEqual(inspect('/jobs?status=new').json()['jobs'], [])
+                    for query in ('status=invalid', 'owner=bob', 'status[]=new'):
+                        self.assertEqual(inspect('/jobs?' + query).status_code, 400)
+                    detail = inspect('/jobs/test/http-test-job')
+                    self.assertEqual(detail.status_code, 200, detail.text)
+                    self.assertEqual(''.join(detail.json()['stream']), 'hello\n')
+                    self.assertEqual(detail.json()['return_code'], 7)
+                    self.assertEqual(inspect('/jobs/test/missing-job').status_code, 404)
+                    self.assertEqual(inspect('/endpoints').json()['endpoints'], [{'name': 'test'}])
+                    self.assertEqual(inspect('/health').json()['status'], 'ok')
+                    self.assertEqual(inspect('/stats').json()['stats']['jobs'], 1)
                     if authenticated:
+                        for path in ('/jobs', '/jobs/test/http-test-job', '/endpoints', '/health', '/stats'):
+                            self.assertEqual(inspect(path, None).status_code, 401)
+                            self.assertEqual(inspect(path, ('alice', 'wrong')).status_code, 401)
+                        self.assertEqual(inspect('/jobs', ('bob', 'secret')).json()['jobs'], [])
+                        self.assertEqual(inspect('/stats', ('bob', 'secret')).json()['stats']['jobs'], 0)
+                        self.assertEqual(inspect('/jobs/test/http-test-job', ('bob', 'secret')).status_code, 403)
                         self.assertEqual(requests.get(url, timeout=2).status_code, 401)
                         self.assertEqual(requests.get(url, auth=('alice', 'wrong'), timeout=2).status_code, 401)
                         self.assertEqual(requests.get(url, auth=('bob', 'secret'), timeout=2).status_code, 403)
