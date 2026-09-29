@@ -232,6 +232,25 @@ A remote script can already group commands into one job, but Auton then sees
 the script's overall result rather than separate step results. This milestone
 does not introduce a central scheduler or a generic workflow engine.
 
+### Short CLI options (planned)
+
+Provide short aliases for frequently used interactive CLI options while keeping
+the explicit long forms for readable scripts and backwards compatibility.
+
+| Long option | Planned short alias |
+| --- | --- |
+| `--config` | `-c` |
+| `--target` | `-t` |
+| `--target-group` | `-g` |
+| `--scenario` | `-s` |
+| `--scenario-group` | `-S` |
+
+Example of intended usage: `auton --tui -c targets.yml -g 'prod-*' -S 'maintenance-*'`.
+These aliases are not yet implemented. Check the complete parser before assigning
+short flags; do not repurpose existing options such as `-a`, `-A`, `-e` or `-l`.
+Short and long forms must share validation, repeated-selection and pattern
+semantics. Cover equivalence in CLI tests and show both forms in `--help` and docs.
+
 ### Target groups and scenario selection (planned)
 
 - Add `--target-group NAME` to select an explicit named group from the client
