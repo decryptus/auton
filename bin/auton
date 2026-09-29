@@ -40,6 +40,12 @@ def argv_parse_check():
     """
     parser        = argparse.ArgumentParser()
 
+    parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
+    parser.add_argument('--daemon', action='append', default=[], metavar='NAME=URI',
+                        help='Explicit daemon for TUI; repeat to enable daemon selection')
+    parser.add_argument('--refresh', type=float, default=2.0,
+                        help='TUI refresh interval in seconds (minimum 0.2, default: 2)')
+
     parser.add_argument("-a",
                         action    = 'append',
                         dest      = 'args',
@@ -155,8 +161,18 @@ def argv_parse_check():
             or not math.isfinite(options.delay) or options.delay < 0):
         parser.error('http-timeout must be positive and delay non-negative')
 
-    if not options.uri and os.environ.get('AUTON_URI'):
+    if not options.uri and not options.daemon and os.environ.get('AUTON_URI'):
         options.uri = [x.strip() for x in os.environ.get('AUTON_URI').split(',')]
+
+    if options.daemon and not options.tui:
+        parser.error('--daemon requires --tui; it is not a broadcast execution option')
+    if options.tui:
+        if not math.isfinite(options.refresh) or options.refresh < 0.2:
+            parser.error('refresh must be at least 0.2 seconds')
+        if (options.mode != 'autorun' or options.args or options.argfiles or options.margs
+                or options.margsfiles or options.envvars or options.envfiles
+                or options.imp_envvars or options.load_envfiles):
+            parser.error('--tui is read-only and cannot be combined with execution options')
 
     return options
 
@@ -258,6 +274,21 @@ def main(options):
     """
     Main function
     """
+    if options.tui:
+        try:
+            from auton_client.tui import run
+            auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
+            return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh)
+        except ImportError:
+            print('Auton TUI requires Python curses support.', file=sys.stderr)
+            return_code = 1
+        except KeyboardInterrupt:
+            return_code = 2
+        except ValueError as error:
+            print(str(error), file=sys.stderr)
+            return_code = 1
+        sys.exit(return_code)
+
     xformat = "%(levelname)s:%(asctime)-15s: %(message)s"
     datefmt = '%Y-%m-%d %H:%M:%S'
     logging.basicConfig(level   = options.loglevel,
@@ -293,4 +324,3 @@ def main(options):
 
 if __name__ == '__main__':
     main(argv_parse_check())
-

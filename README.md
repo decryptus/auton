@@ -118,6 +118,56 @@ in `etc/auton/modules/job.yml`, configure Basic authentication and endpoint user
 and serve behind HTTPS. Apply the same protection when adding these routes to an
 existing installation; keep the existing `run` route's `safe_init: true` setting.
 
+### Operator TUI (client)
+
+The Unix client includes a read-only ncurses interface. It requires an interactive
+terminal with Python curses support and a daemon with the visibility API above.
+
+```sh
+auton --tui --uri https://autond.example.net --http-timeout 5
+
+# Named daemons are selected explicitly; only the selected daemon is refreshed.
+auton --tui --daemon prod=https://autond-01.example.net \
+            --daemon staging=https://autond-02.example.net --refresh 2
+```
+
+Authentication uses the existing `--auth-user` / `--auth-passwd` options or
+`AUTON_AUTH_USER` / `AUTON_AUTH_PASSWD`. These credentials apply to all explicitly
+listed daemons; select only trusted servers sharing that identity. URIs must be
+HTTP(S) origins without embedded credentials, paths, queries or fragments.
+Use HTTPS for remote connections. Redirects are rejected and failures are not
+silently retried against another daemon.
+
+`--daemon` is TUI-only and overrides `AUTON_URI`; it cannot be combined with
+explicit `--uri`. One `--uri` (or one `AUTON_URI` value) is accepted as a shortcut.
+Multiple execution `--uri` values remain **failover**, not daemon selection or
+broadcast. The TUI never submits commands, cancels jobs or creates operations.
+
+| Key | Action |
+| --- | --- |
+| `[` / `]` | Select previous / next named daemon. |
+| `Tab` | Switch Jobs, Endpoints and Output views. |
+| Up / Down or `k` / `j` | Select a row; scroll in Output. |
+| Enter | Open a job's output; select an endpoint as a job filter. |
+| `/` | Edit literal search; Enter or Escape finishes editing. |
+| `s` | Cycle all / queued / running / completed job states. |
+| `c` | Clear search, state and endpoint filters. |
+| `v` | Switch stdout and stderr/diagnostics. |
+| Page Up / Page Down | Scroll by ten rows. |
+| `r` / `p` | Refresh now / pause automatic refresh. |
+| Escape / `q` | Return to jobs / quit. |
+
+Counts and lists retain server-side ownership and endpoint ACL restrictions.
+Completion is separate from success: inspect the exit code and stderr. Output
+reads replay retained data without consuming the legacy status cursor.
+API errors (including older daemons returning 404) are shown explicitly.
+The display handles terminal resizing (minimum 64 columns by 12 rows), filters
+control characters from remote output, and keeps navigation responsive while a
+single background refresh is pending. A daemon switch may wait for the current
+bounded refresh; `q` exits immediately. `--refresh` defaults to 2 seconds after a
+refresh finishes, with a minimum of 0.2 seconds; `--http-timeout` bounds each GET.
+Only the active daemon is polled; this is not yet an aggregated multi-daemon view.
+
 ### Development
 
 ```sh

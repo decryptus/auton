@@ -69,9 +69,12 @@ Exact routes remain implementation details and must respect existing HTTP conven
 
 ## Milestone 2 — Auton TUI
 
-Add a ncurses/TUI interface to the **auton client**, built on top of `RemoteClient`.
+Initial read-only implementation: `auton --tui`. The **auton client** provides
+a pinned `DaemonClient` visibility adapter alongside the execution `RemoteClient`,
+a terminal-independent background monitor, and a curses presentation layer.
+Only the selected daemon is refreshed; aggregated views remain Milestone 3.
 
-The TUI should provide:
+The initial TUI provides:
 
 - daemon selection;
 - endpoint browsing;
@@ -82,7 +85,7 @@ The TUI should provide:
 - job details;
 - live refresh;
 - filtering/search;
-- clear daemon health state.
+- clear health/API errors for the selected daemon.
 
 The TUI must remain a client interface. It must not move UI responsibilities into `autond`.
 
