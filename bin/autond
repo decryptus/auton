@@ -21,6 +21,7 @@ from sonicprobe.libs import daemonize
 from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
 from auton.classes.http import AutonHttpReqHandler
 from auton.classes.auth_store import PersistentAuthentication
+from auton.classes.auth_audit import AuthenticationAudit
 from auton.classes.job_store import SQLiteJobStore
 from auton.classes.jobs import DEFAULT_MAX_OUTPUT_BYTES
 from auton.classes.plugins import ENDPOINTS
@@ -154,8 +155,11 @@ def main(options):
         os.setuid(uid)
         os.umask(0o22)
 
+        audit_settings = options.configuration['general'].get('auth_audit')
+        audit = AuthenticationAudit(**audit_settings) if audit_settings else None
+        handler = type('DaemonHttpReqHandler', (AutonHttpReqHandler,), {'auth_audit': audit})
         if settings:
-            authentication = PersistentAuthentication(settings)
+            authentication = PersistentAuthentication(settings, audit=audit.service_event if audit else None)
             options.auth_provider = authentication.provider
             if options.configuration['general'].get('web_enabled'):
                 from httpdis.auth_browser import BrowserAuthProvider
@@ -170,7 +174,7 @@ def main(options):
         httpdis_json.init(options, False)
         DWHO_THREADS.append(httpdis_json.stop)
         start_endpoints()
-        httpdis_json.run(options, http_req_handler=AutonHttpReqHandler)
+        httpdis_json.run(options, http_req_handler=handler)
     except (KeyboardInterrupt, SystemExit):
         pass
     except Exception:

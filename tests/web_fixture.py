@@ -31,7 +31,8 @@ class WebDaemon:
         conf['general'].update(listen_addr='127.0.0.1', listen_port=port, max_life_time=0, max_requests=0,
             auth_mode='required', web_enabled=True, web_origin=self.uri, maintenance_operators=['operator'],
             authentication={'backend': 'sqlite', 'path': str(self.path / 'auth.db')},
-            job_storage={'backend': 'sqlite', 'path': str(self.path / 'jobs.db')})
+            job_storage={'backend': 'sqlite', 'path': str(self.path / 'jobs.db')},
+            auth_audit={'path': str(self.path / 'auth.jsonl')})
         conf.pop('import_modules', None)
         conf['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
         conf['endpoints'] = {name: {'plugin': 'subproc', 'users': {'operator': True, 'reader': True, 'other': True},

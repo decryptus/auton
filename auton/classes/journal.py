@@ -68,14 +68,18 @@ class JSONLJournal:
             row['truncated_fields'] = truncated
         encoded = (json.dumps(row, ensure_ascii=True, separators=(',', ':')) + '\n').encode('utf-8')
         with self.lock:
-            try:
-                self._append(encoded)
-            except OSError:
-                self.failures += 1
-                now = time.monotonic()
-                if now - self.last_error_log >= ERROR_LOG_INTERVAL:
-                    LOG.error('job journal write failed; events may be missing (failures=%s)', self.failures)
-                    self.last_error_log = now
+            self._write(encoded)
+
+    def _write(self, encoded):
+        """Write under the caller's lock; observability failures stay non-fatal."""
+        try:
+            self._append(encoded)
+        except OSError:
+            self.failures += 1
+            now = time.monotonic()
+            if now - self.last_error_log >= ERROR_LOG_INTERVAL:
+                LOG.error('journal write failed; events may be missing (failures=%s)', self.failures)
+                self.last_error_log = now
 
     def _open(self):
         descriptor = os.open(self.path, os.O_WRONLY | os.O_APPEND | os.O_CREAT |
