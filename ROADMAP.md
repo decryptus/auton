@@ -1096,8 +1096,20 @@ targets:
 - `--target deploy` selects one logical destination with ordered failover origins.
   Multiple targets still mean explicit execution on each target; replacement
   origins are never implicitly broadcast destinations or a target group.
-- Validate the complete nonempty, bounded URI list before execution, using the
-  same origin checks and duplicate-origin protections as individual targets.
+- Allow explicit references to individual declared targets in the ordered
+  `uris` list, alongside literal URI strings, to reuse connection definitions.
+  Example: `uris: [{target: node-01}, {target: node-02}]`, with both nodes declared
+  using the existing `name: URI` form.
+- Exclude target-group references from failover lists in the first version.
+  Target groups select multiple execution destinations; they do not declare
+  interchangeable daemons. Changing group membership must not silently alter
+  a failover chain.
+- Resolve references before network access; reject missing references and
+  self/indirect cycles, bound expansion, and preserve declared order. Deduplicate
+  normalized origins within a resolved chain, retaining their first occurrence.
+- Validate the complete nonempty, bounded resolved URI list before execution,
+  using the same origin checks as individual targets. Retain duplicate-origin
+  protections across separately selected execution targets.
 - Try the next origin only when connection failure proves no submission could
   have been accepted, or a trusted maintenance precheck/explicit daemon refusal
   establishes that no job was admitted. A generic HTTP 503 is not such proof.
