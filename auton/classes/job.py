@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 
 from auton.classes.exceptions import AutonTargetFailed
+from auton.classes.journal import record_event
 
 STATUS_NEW = 'new'
 STATUS_PROCESSING = 'processing'
@@ -35,13 +36,19 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
         self.output_size = 0
         self.max_output_bytes = 1048576
         self.owner       = principal
+        self.journal     = None
+        self.outcome     = None
+        self.outcome_reason = None
+        self.started_monotonic = None
+        self.ended_monotonic = None
         self.started_at  = None
         self.ended_at    = None
+        self.execution_id = str(uuid.uuid4())
         self.vars        = {'_env_':    os.environ.copy(),
                             '_time_':   datetime.now(),
                             '_gmtime_': datetime.utcnow(),
                             '_uid_':    uid,
-                            '_uuid_':   "%s" % uuid.uuid4()}
+                            '_uuid_':   self.execution_id}
 
     def get_uid(self):
         return self.uid
@@ -101,7 +108,19 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
         self.vars = {}
 
     def set_status(self, status):
-        self.status = status
+        with self.output_lock:
+            previous = self.status
+            self.status = status
+            if status != previous and status in (STATUS_PROCESSING, STATUS_COMPLETE):
+                event = 'job.started' if status == STATUS_PROCESSING else (
+                    self.outcome or ('job.completed' if self.return_code == 0 else 'job.failed'))
+                duration = None
+                if status == STATUS_COMPLETE and self.started_monotonic is not None and self.ended_monotonic is not None:
+                    duration = max(0, (self.ended_monotonic - self.started_monotonic) * 1000)
+                record_event(self.journal, event, uid=self.uid, endpoint=self.endpoint,
+                             principal=self.owner, return_code=self.return_code,
+                             duration_ms=duration, reason=self.outcome_reason,
+                             execution_id=self.execution_id)
 
         return self
 
@@ -110,12 +129,14 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
 
     def set_started_at(self):
         self.started_at = time.time()
+        self.started_monotonic = time.monotonic()
 
     def get_started_at(self):
         return self.started_at
 
     def set_ended_at(self):
         self.ended_at = time.time()
+        self.ended_monotonic = time.monotonic()
 
     def get_ended_at(self):
         return self.ended_at
@@ -126,4 +147,3 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
     def __call__(self):
         if self.callback:
             self.callback(self)
-

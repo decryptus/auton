@@ -8,6 +8,11 @@ general:
   result_ttl:    3600
   max_jobs:      128
   max_output_bytes: 1048576
+  # Optional job lifecycle journal; parent directory must exist and be writable
+  # by the daemon user. One daemon process per journal path.
+  #journal_path: /var/log/auton/jobs.jsonl
+  #journal_max_bytes: 10485760
+  #journal_backup_count: 5
   charset:       utf-8
   content_type:  'application/json; charset=utf-8'
   #auth_basic:      'Restricted'

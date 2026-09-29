@@ -177,7 +177,8 @@ class HTTPIntegrationTests(unittest.TestCase):
                 port = sock.getsockname()[1]
             config = yaml.safe_load((ROOT / 'etc/auton/auton.yml.example').read_text())
             config['general'].update(listen_addr='127.0.0.1', listen_port=port,
-                                     max_life_time=0, max_requests=0)
+                                     max_life_time=0, max_requests=0,
+                                     journal_path=str(Path(tmp) / 'jobs.jsonl'))
             config.pop('import_modules', None)
             config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
             auth = None
@@ -251,6 +252,13 @@ class HTTPIntegrationTests(unittest.TestCase):
                     self.assertEqual(inspect('/stats').json()['stats']['jobs'], 1)
                     self.run_tui(uri, auth_args, env)
                     self.assertEqual(len(inspect('/jobs').json()['jobs']), 1)
+                    journal_text = (Path(tmp) / 'jobs.jsonl').read_text()
+                    journal = [json.loads(line) for line in journal_text.splitlines()]
+                    self.assertEqual([row['event'] for row in journal],
+                                     ['job.admitted', 'job.started', 'job.failed'])
+                    self.assertEqual(journal[-1]['return_code'], 7)
+                    self.assertEqual(journal[-1]['principal'], 'alice' if authenticated else None)
+                    self.assertNotIn('hello', journal_text)
                     if authenticated:
                         for path in ('/jobs', '/jobs/test/http-test-job', '/endpoints', '/health', '/stats'):
                             self.assertEqual(inspect(path, None).status_code, 401)

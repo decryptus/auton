@@ -9,6 +9,7 @@ import re
 from dwho.classes.modules import DWhoModuleBase, MODULES
 from httpdis.ext.httpdis_json import HttpReqErrJson
 from sonicprobe.libs.moresynchro import RWLock
+from auton.classes.journal import JSONLJournal, DEFAULT_JOURNAL_BYTES, DEFAULT_JOURNAL_BACKUPS
 
 from auton.classes.plugins import (AutonEPTObject, EPTS_SYNC, ENDPOINTS,
                                    STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE)
@@ -67,8 +68,13 @@ class JobModule(DWhoModuleBase):
     def safe_init(self, options):
         general = self.config['general']
         self.LOCK = RWLock()
+        journal = None
+        if general.get('journal_path'):
+            journal = JSONLJournal(general['journal_path'],
+                                   general.get('journal_max_bytes', DEFAULT_JOURNAL_BYTES),
+                                   general.get('journal_backup_count', DEFAULT_JOURNAL_BACKUPS))
         self.service = JobService(ENDPOINTS, EPTS_SYNC, object_factory=AutonEPTObject,
-                                  lock=_WriteLock(self),
+                                  lock=_WriteLock(self), journal=journal,
                                   lock_timeout=general['lock_timeout'],
                                   result_ttl=general.get('result_ttl', DEFAULT_RESULT_TTL),
                                   max_jobs=general.get('max_jobs', DEFAULT_MAX_JOBS),

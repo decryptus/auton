@@ -180,6 +180,20 @@ epub_title = project
 # A list of files that should not be packed into the epub file.
 epub_exclude_files = ['search.html']
 
+def copy_screenshot_links(app, exception):
+    """Keep full-size Markdown image links local in generated HTML as well."""
+    if exception is None and app.builder.format == 'html':
+        import shutil
+        from pathlib import Path
+        source = Path(app.srcdir) / 'images'
+        if source.is_dir():
+            shutil.copytree(source, Path(app.outdir) / 'images', dirs_exist_ok=True)
+
+
+def setup(app):
+    app.connect('build-finished', copy_screenshot_links)
+
+
 # Napoleon settings
 #napoleon_google_docstring = True
 #napoleon_numpy_docstring = False

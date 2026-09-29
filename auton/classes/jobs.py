@@ -9,6 +9,7 @@ from contextlib import contextmanager
 
 from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE
 from auton.classes.job_schema import validate_input
+from auton.classes.journal import record_event
 
 DEFAULT_RESULT_TTL = 3600
 DEFAULT_MAX_JOBS = 128
@@ -91,12 +92,13 @@ class JobService(object):
     def __init__(self, endpoints, queues, objects=None, object_factory=JobObject,
                  clock=time.time, lock=None, lock_timeout=DEFAULT_LOCK_TIMEOUT,
                  result_ttl=DEFAULT_RESULT_TTL, max_jobs=DEFAULT_MAX_JOBS,
-                 max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES):
+                 max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES, journal=None):
         self.endpoints = endpoints
         self.queues = queues
         self.objs = {} if objects is None else objects
         self.object_factory = object_factory
         self.clock = clock
+        self.journal = journal
         self.lock = threading.RLock() if lock is None else lock
         self.lock_timeout = lock_timeout
         self.result_ttl = float(result_ttl)
@@ -166,11 +168,16 @@ class JobService(object):
         obj = self.object_factory(queue.name, uid, endpoint, method,
                                   payload=payload, principal=principal)
         obj.max_output_bytes = self.max_output_bytes
+        obj.journal = self.journal
         self.objs[uid] = obj
+        record_event(self.journal, 'job.admitted', uid=uid, endpoint=endpoint,
+                     principal=principal, execution_id=obj.execution_id)
         try:
             queue.qput(obj)
         except Exception:
             del self.objs[uid]
+            record_event(self.journal, 'job.rejected', uid=uid, endpoint=endpoint,
+                         principal=principal, reason='queue_unavailable', execution_id=obj.execution_id)
             raise
         return obj
 
@@ -178,13 +185,18 @@ class JobService(object):
         validate_input({'endpoint': endpoint, 'id': xid}, payload)
         validate_offset(offset)
         with self._locked():
-            self.authorize(endpoint, principal)
-            self.expire_results()
-            if self.uid(endpoint, xid) in self.objs:
-                raise DuplicateJob('uid already exists')
-            # Resolve the queue before evicting a retained result.
-            self.get_queue(endpoint)
-            self.make_capacity()
+            try:
+                self.authorize(endpoint, principal)
+                self.expire_results()
+                if self.uid(endpoint, xid) in self.objs:
+                    raise DuplicateJob('uid already exists')
+                # Resolve the queue before evicting a retained result.
+                self.get_queue(endpoint)
+                self.make_capacity()
+            except (AccessDenied, UnknownEndpoint, DuplicateJob, JobUnavailable) as error:
+                record_event(self.journal, 'job.rejected', uid=self.uid(endpoint, xid),
+                             endpoint=endpoint, principal=principal, reason=type(error).__name__)
+                raise
             return job_result(self._enqueue(endpoint, xid, method, payload, principal), offset)
 
     def status(self, endpoint, xid, principal, offset=None):

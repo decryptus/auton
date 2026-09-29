@@ -15,7 +15,7 @@ from dwho.config import load_credentials
 
 from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE
 from auton.classes.target import AutonTarget
-from auton.classes.exceptions import AutonTargetUnauthorized, AutonTargetFailed
+from auton.classes.exceptions import AutonTargetUnauthorized, AutonTargetFailed, AutonTargetTimeout
 
 LOG                   = logging.getLogger('auton.plugins')
 
@@ -193,6 +193,11 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 getattr(self, func)(obj)
                 obj.set_return_code(0)
             except Exception as e:
+                if isinstance(e, AutonTargetTimeout):
+                    obj.outcome = 'job.timeout'
+                elif isinstance(e, AutonTargetUnauthorized):
+                    obj.outcome = 'job.rejected'
+                    obj.outcome_reason = 'execution_acl'
                 # Preserve an explicit failure even when the output budget is exhausted.
                 with obj.output_lock:
                     obj.errors.append("ERROR: %s\n" % str(e)[:4096])
@@ -220,4 +225,3 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
     def __call__(self):
         self.start()
         return self
-
