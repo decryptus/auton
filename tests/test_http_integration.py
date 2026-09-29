@@ -49,6 +49,17 @@ class HTTPIntegrationTests(unittest.TestCase):
                         route['auth'] = True
                     config['endpoints'] = {'test': {'plugin': 'subproc', 'config': {
                         'prog': sys.executable, 'timeout': 2}}}
+                    if name == 'two':
+                        catalogue = Path(tmp) / 'endpoints'
+                        catalogue.mkdir()
+                        (catalogue / 'catalogue.yml').write_text(yaml.safe_dump({'test': {
+                            'plugin': 'subproc', 'import_config': 'config.yml',
+                            'import_vars': 'vars.yml', 'import_users': 'users.yml'}}))
+                        (catalogue / 'config.yml').write_text("prog: ${vars['python']}\ntimeout: 2\n")
+                        (catalogue / 'vars.yml').write_text(yaml.safe_dump({'python': sys.executable}))
+                        (catalogue / 'users.yml').write_text('alice: true\nbob: false\n')
+                        config.pop('endpoints')
+                        config['import_endpoints'] = 'endpoints/catalogue.yml'
                     conf = Path(tmp) / (name + '.yml')
                     conf.write_text(yaml.safe_dump(config))
                     proc = subprocess.Popen([sys.executable, str(ROOT / 'bin/autond'), '-f',
@@ -79,6 +90,11 @@ class HTTPIntegrationTests(unittest.TestCase):
                         time.sleep(0.02)
                     self.assertEqual(detail['status'], 'complete')
                     self.assertEqual(DaemonClient(uri, auth=('bob', 'secret')).jobs(), [])
+                    if name == 'two':
+                        self.assertEqual(DaemonClient(uri, auth=('bob', 'secret')).endpoints(), [])
+                        denied = requests.post(uri + '/run/test/denied-import', auth=('bob', 'secret'),
+                                               json={'args': ['-c', 'print(1)']}, timeout=2)
+                        self.assertEqual(denied.status_code, 403, denied.text)
                     clients[name] = client
                 # An authenticated but unauthorized connection fails independently.
                 clients['denied'] = DaemonClient(clients['one'].uri, auth=('alice', 'wrong'), http_timeout=1)

@@ -1,0 +1,7 @@
+python-check:
+  plugin: subproc
+  import_vars: python-vars.yml
+  import_config: python-config.yml
+  import_users: operators.yml
+  config:
+    timeout: 10

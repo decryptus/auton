@@ -1,0 +1,5 @@
+prog: ${vars['python']}
+args:
+  - '-c'
+  - 'print("Auton endpoint ready")'
+timeout: 5
