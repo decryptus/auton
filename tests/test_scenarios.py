@@ -148,7 +148,7 @@ class ScenarioTests(unittest.TestCase):
                 with patch.object(client_module.sys, 'argv', ['auton', '-c', str(path), '-t', 'one'] + selection):
                     options = client_module.argv_parse_check()
                     self.assertEqual(list(options.selected_scenarios), ['check'])
-            for flags in ([], ['-t', 'one', '--endpoint', 'test'], ['-t', 'one', '--tui'],
+            for flags in ([], ['-t', 'one', '--endpoint', 'test'],
                           ['-t', 'one', '-a', 'argument']):
                 with patch.object(client_module.sys, 'argv', ['auton', '-c', str(path), '-s', 'check'] + flags), self.assertRaises(SystemExit):
                     client_module.argv_parse_check()

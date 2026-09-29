@@ -182,6 +182,12 @@ class HTTPIntegrationTests(unittest.TestCase):
                             self.assertEqual([step['status'] for step in steps],
                                 ['rejected' if password == 'wrong' else 'failed', 'skipped', 'skipped'])
                         self.assertEqual(len(clients[target['target']].jobs()), before[target['target']] + added)
+                self.run_tui_execution(['--uri', clients['one'].uri], scenario=False)
+                plan['check']['steps'][0]['args'] = ['-c', 'print("first")']
+                scenario_path.write_text(yaml.safe_dump(plan))
+                self.run_tui_execution(['-c', str(client_config), '-t', 'one', '-s', 'ch*'], scenario=True)
+                self.assertEqual(len(clients['one'].jobs()), 10)
+                self.assertEqual(len(clients['two'].jobs()), 7)
             finally:
                 if monitor is not None:
                     monitor.close()
@@ -192,6 +198,56 @@ class HTTPIntegrationTests(unittest.TestCase):
                     except subprocess.TimeoutExpired:
                         proc.kill()
                         proc.wait()
+
+    def run_tui_execution(self, connection_args, scenario):
+        master, slave = pty.openpty()
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 120, 0, 0))
+        proc = subprocess.Popen([sys.executable, str(ROOT / 'bin/auton'), '--tui',
+            '--auth-user', 'alice', '--auth-passwd', 'secret', '--refresh', '0.2', '--http-timeout', '1']
+            + connection_args, stdin=slave, stdout=slave, stderr=slave,
+            env=dict(os.environ, PYTHONPATH=str(ROOT), TERM='xterm'), cwd=ROOT)
+        os.close(slave)
+        captured = bytearray()
+        def until(text):
+            deadline = time.monotonic() + 8
+            while text not in captured and time.monotonic() < deadline:
+                if select.select([master], [], [], 0.1)[0]:
+                    try:
+                        captured.extend(os.read(master, 65536))
+                    except OSError:
+                        break
+                if proc.poll() is not None:
+                    break
+            self.assertIn(text, captured)
+        try:
+            until(b'Last refresh completed')
+            os.write(master, b'e')
+            until(b'PREPARE')
+            # Select the first target, then a scenario or the single endpoint.
+            os.write(master, b' ' + (b'\t\t' if scenario else b'\t\t\t\t'))
+            until(b'[ ] check' if scenario else b'[ ] test')
+            os.write(master, b' ')
+            if not scenario:
+                os.write(master, b'i{"args":["-c","print(42)"]}\n')
+            os.write(master, b'\n')
+            until(b'CONFIRM EXECUTION')
+            captured.clear()
+            os.write(master, b'y')
+            until(b'OPERATION RESULT')
+            until(b'completed')
+            os.write(master, b'\x1b')
+            until(b'e prepare')
+            os.write(master, b'q')
+            self.assertEqual(proc.wait(timeout=3), 0, bytes(captured))
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            os.close(master)
 
     def run_tui(self, uri, auth_args, env, daemon_args=None,
                 expected_job=b'http-test-job', expected_output=b'hello'):

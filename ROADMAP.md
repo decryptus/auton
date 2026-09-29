@@ -87,6 +87,14 @@ The initial TUI provides:
 - filtering/search;
 - clear health/API errors for the selected daemon.
 
+Interactive execution is implemented in a separate preparation screen (`e`):
+select scoped targets/groups and scenarios/groups or one endpoint, inspect the
+full preview, and confirm with `y`. Opening the TUI or applying startup filters
+never submits work. Background execution uses OperationService/ScenarioService;
+results show separate outputs and skipped/unknown outcomes. Stopping observation
+does not cancel remote jobs. Live step progress and result export remain planned.
+Real terminal screenshots are included in the README.
+
 The TUI must remain a client interface. It must not move UI responsibilities into `autond`.
 
 Example:
@@ -200,7 +208,7 @@ remote script under its normal daemon authorization rules.
 
 Implemented: version-1 scenario YAML, `-s/--scenario`, `-S/--scenario-group`,
 validated flat imports and a neutral ScenarioService. One command per target
-remains available without a scenario. Interactive preparation is the next step.
+remains available without a scenario. Interactive preparation is also implemented.
 
 Configuration layout:
 
@@ -247,7 +255,7 @@ the explicit long forms for readable scripts and backwards compatibility.
 | `--scenario-group` | `-S` implemented |
 
 Example of intended usage: `auton --tui -c targets.yml -g 'prod-*' -S 'maintenance-*'`.
-Scenario aliases work in CLI; the TUI example remains planned. Check the parser before assigning
+Scenario aliases execute in CLI and restrict the catalogue in TUI. Check the parser before assigning
 short flags; do not repurpose existing options such as `-a`, `-A`, `-e` or `-l`.
 Short and long forms must share validation, repeated-selection and pattern
 semantics. Cover equivalence in CLI tests and show both forms in `--help` and docs.
@@ -271,8 +279,8 @@ semantics. Cover equivalence in CLI tests and show both forms in `--help` and do
 - Display the selected destinations and active filters in the TUI; scope changes
   must be explicit. Scenario filters initially restrict the catalogue, not jobs
   without scenario/operation metadata. Server authorization remains authoritative.
-- CLI and TUI use shared application services. Scenario selection within the TUI
-  and TUI execution remain planned; YAML group members remain exact names.
+- CLI and TUI use shared application services. TUI selection and confirmation
+  are implemented; YAML group members remain exact names.
 
 ### Single-level section imports
 
@@ -304,7 +312,7 @@ A target group selects where to execute; a scenario group selects what to run.
 - Never replay an ambiguous POST, imply rollback or cancel running jobs.
 - Keep execution in application services shared by CLI and TUI.
 
-Interactive selection remains planned. Development remains focused on Auton;
+Interactive selection and explicit confirmation are implemented. Development remains focused on Auton;
 shared terminology does not require a shared execution framework.
 
 ### Local daemon maintenance and pre-execution checks (planned)

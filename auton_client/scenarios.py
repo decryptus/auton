@@ -136,10 +136,10 @@ class ScenarioService:
         target['duration_ms'] = round(max(0, self.settings.clock() - started) * 1000, 3)
         return target
 
-    def run(self, operation_id=None):
+    def run(self, operation_id=None, stopped=None):
         operation_id = operation_identity(operation_id)
         deadline = self.settings.clock() + self.settings.timeout
-        stopped = threading.Event()
+        stopped = threading.Event() if stopped is None else stopped
         with ThreadPoolExecutor(max_workers=self.settings.parallel) as pool:
             futures = [pool.submit(self._target, name, deadline, stopped) for name in self.settings.targets]
             try:

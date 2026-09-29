@@ -174,7 +174,7 @@ def argv_parse_check():
             or not math.isfinite(options.delay) or options.delay < 0):
         parser.error('http-timeout must be positive and delay non-negative')
 
-    if not options.uri and not options.daemon and not options.target and not options.target_group and os.environ.get('AUTON_URI'):
+    if not options.uri and not options.daemon and not options.target and not options.target_group and not (options.tui and options.config) and os.environ.get('AUTON_URI'):
         options.uri = [x.strip() for x in os.environ.get('AUTON_URI').split(',')]
 
     if options.target or options.target_group:
@@ -196,30 +196,34 @@ def argv_parse_check():
         if (options.mode != 'autorun' or options.args or options.argfiles or options.margs
                 or options.margsfiles or options.envvars or options.envfiles
                 or options.imp_envvars or options.load_envfiles):
-            parser.error('--tui is read-only and cannot be combined with execution options')
+            parser.error('--tui prepares execution interactively; CLI payload options are incompatible')
 
     scenario_mode = bool(options.scenario or options.scenario_group)
     if scenario_mode:
-        if not options.config or not (options.target or options.target_group):
+        if not options.config or not (options.tui or options.target or options.target_group):
             parser.error('scenario execution requires --config and explicit target selections')
-        if (options.tui or options.endpoint or options.mode != 'autorun' or options.args
+        if (options.endpoint or options.mode != 'autorun' or options.args
                 or options.argfiles or options.margs or options.margsfiles or options.envvars
                 or options.envfiles or options.imp_envvars or options.load_envfiles):
-            parser.error('scenario definitions own endpoints and inputs; incompatible execution/TUI options')
+            parser.error('scenario definitions own endpoints and inputs; incompatible execution options')
 
     options.selected_scenarios = None
     options.configured_targets = {}
     options.configured_groups = {}
+    options.configured_scenarios = {}
+    options.configured_scenario_groups = {}
     if options.target_group and not options.config:
         parser.error('--target-group requires --config')
     if options.config:
-        if options.uri or not (options.target or options.daemon or options.target_group):
+        if options.uri or not (options.tui or options.target or options.daemon or options.target_group):
             parser.error('--config requires explicit target/group/daemon selections and cannot use --uri')
         try:
             from auton_client.config import load_inventory
             inventory = load_inventory(options.config)
             options.configured_targets = inventory['targets']
             options.configured_groups = inventory['groups']
+            options.configured_scenarios = inventory['scenarios']
+            options.configured_scenario_groups = inventory['scenario_groups']
             if scenario_mode:
                 from auton_client.scenarios import select_scenarios
                 options.selected_scenarios = select_scenarios(options.scenario, options.scenario_group,
@@ -227,6 +231,8 @@ def argv_parse_check():
         except ValueError as error:
             parser.error(str(error))
     options.selected_targets = None
+    if options.tui and options.config:
+        options.selected_targets = options.configured_targets
     if options.target or options.daemon or options.target_group:
         try:
             from auton_client.connections import select_connections
@@ -344,7 +350,10 @@ def main(options):
             from auton_client.tui import run
             auth = (options.auth_user, options.auth_passwd or '') if options.auth_user else None
             return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh,
-                              configured=options.configured_targets, selected=options.selected_targets)
+                              configured=options.configured_targets, selected=options.selected_targets,
+                              groups=options.configured_groups,
+                              scenarios=options.selected_scenarios if options.selected_scenarios is not None else options.configured_scenarios,
+                              scenario_groups=options.configured_scenario_groups)
         except ImportError:
             print('Auton TUI requires Python curses support.', file=sys.stderr)
             return_code = 1

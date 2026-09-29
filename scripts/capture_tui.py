@@ -79,6 +79,7 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         try:
             uris = []
+            targets = {}
             for name in ('edge-01', 'edge-02'):
                 with socket.socket() as sock:
                     sock.bind(('127.0.0.1', 0))
@@ -114,11 +115,18 @@ def main():
                     if all(job['status'] == 'complete' for job in requests.get(uri + '/jobs', timeout=2).json()['jobs']):
                         break
                     time.sleep(0.02)
-                uris.extend(['--daemon', name + '=' + uri])
+                uris.extend(['--daemon', name])
+                targets[name] = uri
+            client_config = Path(directory) / 'client.yml'
+            client_config.write_text(yaml.safe_dump({'targets': targets, 'groups': {'edges': list(targets)},
+                'scenarios': {'diagnostics': {'version': 1, 'steps': [
+                    {'name': 'check', 'endpoint': 'diagnostics', 'args': ['-c', 'print("System healthy")']},
+                    {'name': 'verify', 'endpoint': 'diagnostics', 'args': ['-c', 'print("Verification passed")']}]}},
+                'scenario_groups': {'maintenance': ['diagnostics']}}))
             master, slave = pty.openpty()
             fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', ROWS, COLS, 0, 0))
             tui = subprocess.Popen([sys.executable, str(ROOT / 'bin/auton'), '--tui',
-                                    '--refresh', '60'] + uris, env=env, cwd=ROOT,
+                                    '--refresh', '60', '-c', str(client_config)] + uris, env=env, cwd=ROOT,
                                    stdin=slave, stdout=slave, stderr=slave)
             os.close(slave)
             screen = CaptureScreen(COLS, ROWS)
@@ -147,6 +155,21 @@ def main():
             os.write(master, b'kkkk\n')
             wait_for('Diagnostic finished successfully.')
             render(screen, 'tui-output.png')
+            os.write(master, b'e')
+            wait_for('PREPARE')
+            os.write(master, b'\t ')
+            os.write(master, b'\t\t ')
+            wait_for('[x] maintenance')
+            render(screen, 'tui-prepare.png')
+            os.write(master, b'\n')
+            wait_for('CONFIRM EXECUTION')
+            render(screen, 'tui-confirm.png')
+            os.write(master, b'y')
+            wait_for('OPERATION RESULT')
+            wait_for('Verification passed')
+            render(screen, 'tui-result.png')
+            os.write(master, b'\x1b')
+            wait_for('READ ONLY')
             os.write(master, b'q')
             if tui.wait(timeout=3) != 0:
                 raise RuntimeError('TUI exited unsuccessfully')
