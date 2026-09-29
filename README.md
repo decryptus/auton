@@ -916,8 +916,9 @@ encrypted database. The parent must be owned by the daemon and not writable by
 other users, and the database must be a private regular file. Incompatible schemas,
 unsafe permissions and backend errors fail closed. Never replace the file beneath
 a running daemon. Stop all writers before copying a backup. Redis remains planned.
-Browser login, cookies, CSRF transport protection and the web console are a later
-step; this integration enables Bearer authentication for the API/CLI/TUI.
+An optional browser console is available with SQLite authentication; see below.
+Bearer-only configurations and explicit legacy Basic authentication remain usable
+without enabling the console. TOTP and SSO are not supplied in this release.
 
 #### Existing Basic authentication
 
@@ -1373,3 +1374,100 @@ expire. Back up the database with the daemon stopped.
 
 The optional JSONL journal remains a separate metadata log. It neither restores
 jobs nor guarantees transactional agreement with the SQLite history.
+
+
+### Autond web console
+
+The console is **off by default**. Enable it after creating SQLite accounts with
+`autond-auth` (see the authentication section). An operator normally needs `read`
+and `run`; maintenance additionally requires the `maintenance` scope and membership
+in `general.maintenance_operators`.
+
+```yaml
+general:
+  auth_mode: required
+  authentication:
+    backend: sqlite
+    path: /var/lib/autond/auth/auth.db
+    timeout: 5
+  web_enabled: true
+  web_origin: https://autond.example.net
+  maintenance_operators: [operator]
+```
+
+Serve the daemon through HTTPS and open **`https://autond.example.net/ui/`**.
+`web_origin` is the public origin with no path/trailing slash. Use a dedicated
+hostname for this daemon; do not host unrelated applications on it, including
+other ports. For local development only, `http://127.0.0.1:8666` or a literal IPv6
+loopback origin is supported. HTTP hostnames such as `localhost` are refused.
+The console requires SQLite authentication; it does not expose a cached-Basic
+browser mode. Existing CLI/TUI Bearer clients continue to use the same API.
+
+A TLS-terminating reverse proxy must preserve the configured Host and serve both
+`/ui/` and the API at the root of that origin. Keep the unencrypted backend private.
+For example, inside an HTTPS nginx server with its certificate configured:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8666;
+    proxy_set_header Host autond.example.net;
+}
+```
+
+The configured origin is authoritative; Forwarded/X-Forwarded headers never select
+it. Login rate limiting sees the direct TCP peer, including a proxy. The global
+and peer limits remain effective, but proxied users share the peer limit.
+Only fixed HTML/CSS/JS/logo assets and `/ui/auth/login` are public. All job data,
+maintenance and execution routes remain authenticated. The configured route
+namespace `/ui` is reserved and overlapping routes are refused at startup.
+
+Browser authentication reuses HTTPdis's account/session service and SQLite store:
+
+- An opaque session lives in an `HttpOnly`, `SameSite=Strict` cookie, additionally
+  `Secure` and `__Host-` prefixed with HTTPS. It expires after 8 hours at most or
+  30 minutes without authenticated activity. Automatic refresh counts as activity.
+- Login requires a same-origin JSON request; it rotates an existing session.
+  Every mutation, including logout, requires exact Origin and a CSRF header.
+- The CSRF value alone is kept in browser local storage to support reloads/tabs.
+  Passwords and session/Bearer credentials are never placed there. If storage is
+  unavailable, the current page works but a reload requires another login.
+- Disabling/rotating an account revokes its sessions as well as tokens. Sign out
+  revokes the current session server-side. No CORS/preflight is enabled.
+- Responses, including application errors, are non-cacheable, framed content is
+  forbidden, and a restrictive CSP permits only bundled local assets. HTTPS mode
+  sends HSTS. Job output is rendered as text, never interpreted as HTML.
+
+The responsive console shows daemon availability and maintenance, permitted
+endpoints, the caller's jobs, search/state filters, durations and separate output
+streams. A selected job refreshes with the list every 5 seconds while the tab is
+visible; refresh can be disabled. State/counts are scoped to the signed-in user.
+The installed daemon version is shown after login. Jobs with interrupted or
+unknown outcomes remain visibly distinct from success.
+
+**Run endpoint** submits one job to this daemon after explicit confirmation.
+Arguments are literal values, one per line; no shell quoting is interpreted.
+An empty form means no arguments; empty lines in a nonempty form are empty
+arguments. This initial UI does not provide file/environment uploads, account
+administration, targets/groups, scenarios or multi-daemon orchestration; the CLI
+and TUI retain those roles. Scope controls in the UI are convenience controls;
+the services still enforce scopes, endpoint ACLs, ownership and operator policy.
+
+An ambiguous submission response is displayed with its job ID and **never retried**.
+Refresh the list and verify the job/effects before executing again. Output display
+is capped at 200,000 characters per stream; use CLI/API to retrieve the full retained
+result within the configured daemon limit. Read-only accounts cannot execute or
+change maintenance, and accounts lacking `read` are told the console requires it.
+
+Browser acceptance runs in CI against a disposable real daemon and harmless local
+Python endpoints, including output injection, mobile overflow, session restore,
+read-only access and a dropped POST response. To reproduce with Node 24 and
+Playwright 1.62.1 available, run `node scripts/check_web_console.cjs` from the
+checkout with `PYTHON` pointing at your configured daemon Python environment.
+Set `AUTON_BROWSER_EXECUTABLE` to Chromium/Chrome if using a system installation.
+The script creates the documentation captures; this is not a public execution demo.
+
+![Autond sign-in](docs/screenshots/web-login.png)
+
+![Autond jobs and output](docs/screenshots/web-console.png)
+
+![Autond mobile maintenance view](docs/screenshots/web-mobile.png)

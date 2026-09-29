@@ -30,3 +30,28 @@ jobs:
       - run: docker build -t auton:test .
       - run: docker run --rm --entrypoint autond auton:test -d
 
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y libmagic1 libcurl4-openssl-dev libssl-dev
+      - run: AUTON_PACKAGE=autond python -m pip install '.[auth]'
+      - run: npm install --prefix /tmp/auton-browser-tools playwright@1.62.1
+      - name: Check real browser flows and capture the console
+        env:
+          NODE_PATH: /tmp/auton-browser-tools/node_modules
+          AUTON_BROWSER_EXECUTABLE: /usr/bin/google-chrome
+        run: node scripts/check_web_console.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-console-captures
+          path: docs/screenshots/web-*.png
+          if-no-files-found: warn

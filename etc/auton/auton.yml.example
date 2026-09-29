@@ -35,6 +35,11 @@ general:
   #  backend: sqlite
   #  path: /var/lib/autond/auth/auth.db
   #  timeout: 5
+  # Optional browser console, requires SQLite authentication above.
+  # Production: external HTTPS origin on a dedicated hostname, no trailing slash.
+  #web_enabled: true
+  #web_origin: https://autond.example.net
+  # Local development only: http://127.0.0.1:8666
   #auth_basic:      'Restricted'
   #auth_basic_file: '/etc/auton/auton.passwd'
 import_modules:
