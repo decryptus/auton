@@ -523,7 +523,7 @@ auton --tui --daemon prod=https://autond-01.example.net \
             --daemon staging=https://autond-02.example.net --refresh 2
 ```
 
-Authentication uses the existing `--auth-user` / `--auth-passwd` options or
+Authentication uses `-k` / `--token-file` for a bearer token, or the existing `--auth-user` / `--auth-passwd` options or
 `AUTON_AUTH_USER` / `AUTON_AUTH_PASSWD`. These credentials apply to all explicitly
 listed daemons; select only trusted servers sharing that identity. URIs must be
 HTTP(S) origins without embedded credentials, paths, queries or fragments.
@@ -836,7 +836,87 @@ All endpoint components are prepared before endpoint instances are initialized.
 
 ### Authentication
 
-New installations should use the centrally enforced policy:
+New installations can use persistent SQLite authentication. Install the development
+build with its authentication extra (`AUTON_PACKAGE=autond pip install '.[auth]'`),
+or use the Docker image, which includes it. Published Auton 0.3.2 does not include
+this integration yet. HTTPdis >= 0.6.30 and Sonicprobe >= 0.3.55 provide the shared
+Argon2, token and SQLite implementations.
+
+```yaml
+general:
+  listen_addr: 127.0.0.1
+  auth_mode: required
+  authentication:
+    backend: sqlite
+    path: /var/lib/autond/auth/auth.db
+    timeout: 5
+  maintenance_operators: [alice]
+```
+
+The daemon owns the configuration and storage location. A relative database path
+is resolved beside the main YAML file; environment-only configuration requires an
+absolute path. Authentication and future job-history storage are independent.
+The database is opened after daemonization and privilege drop. It is local to this
+daemon deployment, not a shared multi-node authentication server.
+
+Create the directory and administer accounts **as the daemon OS user**. Passwords
+are prompted twice and never accepted as command-line arguments. There are no
+default accounts or public account-administration endpoints.
+
+```sh
+sudo install -d -m 0700 -o auton -g auton /var/lib/autond/auth
+sudo -u auton autond-auth -c /etc/auton/auton.yml user set -u alice -s read -s run -s maintenance
+sudo -u auton autond-auth -c /etc/auton/auton.yml user list
+sudo -u auton autond-auth -c /etc/auton/auton.yml token create -u alice -s read -s run -t 3600 -o /var/lib/autond/auth/operator.token
+```
+
+Token creation writes the secret only to a new mode-0600 file and prints its
+credential ID and expiry. It refuses to overwrite a file. Transfer that file
+securely to the operator, owned by the client OS user with mode 0600. Tokens have
+an explicit lifetime (default one hour, maximum 30 days) and a subset of the
+account's rights. Account creation and token issuance default to `read` only.
+
+| Scope | Allowed API actions |
+| --- | --- |
+| `read` | Health, stats, allowed endpoints, owned jobs, details and status |
+| `run` | Submit jobs to endpoints allowed by the account's ACLs |
+| `maintenance` | Change maintenance, also requiring `maintenance_operators` membership |
+
+Scopes do not grant endpoint access or bypass job ownership. Execution followed by
+polling needs both `run` and `read`. Custom modules must enforce their own action
+scopes; required mode authenticates every declared route and preserves route user
+allowlists. Only the built-in job/visibility/maintenance routes apply the table
+above automatically.
+
+```sh
+auton --uri https://autond.example -k ~/.config/auton/operator.token --endpoint check
+auton --tui --uri https://autond.example -k ~/.config/auton/operator.token
+auton -c inventory.yml -g production -s diagnostics -k ~/.config/auton/operator.token
+# AUTON_TOKEN_FILE can supply the same filename.
+sudo -u auton autond-auth -c /etc/auton/auton.yml token revoke -i CREDENTIAL_ID
+sudo -u auton autond-auth -c /etc/auton/auton.yml user disable -u alice
+```
+
+Revocation, disabling and password replacement take effect on subsequent requests
+without restarting. They do not cancel jobs already admitted. Accounts, sessions,
+tokens and revocations survive restart; jobs remain in memory at this stage. No
+automatic job replay is introduced. Tokens and passwords are mutually exclusive
+client modes, and SQLite mode never falls back to Basic. The client refuses bearer
+credentials over HTTP except to literal loopback IPs; TLS verification remains on.
+Use HTTPS at the proxy and keep the backend private. Do not put tokens in URIs,
+YAML inventories, shell arguments or logs.
+
+Keep the local database and backups private; this is hashed credentials, not an
+encrypted database. The parent must be owned by the daemon and not writable by
+other users, and the database must be a private regular file. Incompatible schemas,
+unsafe permissions and backend errors fail closed. Never replace the file beneath
+a running daemon. Stop all writers before copying a backup. Redis remains planned.
+Browser login, cookies, CSRF transport protection and the web console are a later
+step; this integration enables Bearer authentication for the API/CLI/TUI.
+
+#### Existing Basic authentication
+
+Basic authentication remains supported with the centrally enforced policy:
 
 ```yaml
 general:
@@ -885,7 +965,7 @@ and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
 on each protected route until migrating to `required`.
 
 The shipped example now listens on loopback and selects `required`. Consequently,
-the default Docker configuration needs a mounted configuration/password file before
+the default Docker configuration needs mounted authentication configuration and credentials before
 it can start; it no longer starts an anonymously accessible example daemon. For a
 container reverse proxy, explicitly choose the internal listen address and keep
 the backend off public published ports. Existing mounted configurations are not

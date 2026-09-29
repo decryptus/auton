@@ -18,7 +18,11 @@ LOG = logging.getLogger(__name__)
 
 
 def apply_auth_policy(conf):
+    from auton.classes.auth_store import authentication_config
     general = conf['general']
+    settings = authentication_config(general, conf.get('_config_directory'))
+    if settings is not None:
+        general['authentication'] = settings
     mode = general.get('auth_mode', 'legacy')
     if not isinstance(mode, str) or mode not in AUTH_MODES:
         raise AutonConfigurationError('auth_mode must be required, anonymous or legacy')
@@ -34,7 +38,7 @@ def apply_auth_policy(conf):
             raise AutonConfigurationError('anonymous mode requires a loopback listen_addr and no auth_basic_file')
         LOG.warning('Explicit anonymous local mode: local callers share access and job ownership')
         return
-    if not general.get('auth_basic_file'):
+    if not general.get('auth_basic_file') and settings is None:
         raise AutonConfigurationError('required authentication needs auth_basic_file; use anonymous only for local development')
     # Preserve explicit route user allowlists while protecting every declared route.
     for module in conf.get('modules', {}).values():

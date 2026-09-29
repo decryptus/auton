@@ -82,7 +82,8 @@ def load_conf(xfile, options = None, envvar = None):
 
     apply_auth_policy(conf)
     PasswordAuthenticator.from_file(conf['general'].get('auth_basic_file'),
-                                    required=conf['general'].get('auth_mode') == 'required')
+                                    required=(conf['general'].get('auth_mode') == 'required'
+                                              and not conf['general'].get('authentication')))
     init_modules(conf)
 
     for x in ('module', 'plugin'):

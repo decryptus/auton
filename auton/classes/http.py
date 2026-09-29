@@ -18,6 +18,9 @@ class AutonHttpReqHandler(HttpReqHandler):
         cls.realm = realm
 
     def authenticate(self, auth_users=None):
+        if self.get_context().auth_provider is not None:
+            return super().authenticate(auth_users)
+        self._SERVER.pop('HTTP_AUTH_IDENTITY', None)
         self._SERVER.pop('HTTP_AUTH_USER', None)
         self._SERVER.pop('HTTP_AUTH_PASSWD', None)
         principal = self.authenticator.authenticate(self.headers.get('Authorization', ''), auth_users)

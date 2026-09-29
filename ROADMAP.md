@@ -433,7 +433,15 @@ as the HTTP API. No central service is required.
   confirmed single-endpoint execution. Targets and scenario orchestration remain
   client-side for this first console.
 - Test permissions and browser flows before screenshots, recording and publication.
-- SSO/OIDC, tokens and mTLS remain separately scoped extensions.
+- Implemented: HTTPdis-backed persistent SQLite authentication, Argon2 accounts,
+  expiring/revocable scoped tokens, local `autond-auth` administration and client
+  `-k` token files for CLI/TUI. Required mode protects all routes; endpoint ACLs,
+  ownership and maintenance operator checks remain in force. Basic stays available
+  as an explicit compatibility mode.
+- Authentication state survives restart. Job history remains in memory until its
+  separate storage adapter is delivered. SQLite first, Redis later; configure the
+  two stores independently and allow mixed backends once both are supported.
+- SSO/OIDC and mTLS remain separately scoped extensions.
 
 ## Milestone 7 — Website
 

@@ -21,6 +21,8 @@ class BlockDaemon(importlib.abc.MetaPathFinder):
             raise AssertionError(fullname)
 sys.meta_path.insert(0, BlockDaemon())
 from auton_client import RemoteClient
+from auton_client.credentials import BearerCredentials
+assert 'a' * 43 not in repr(BearerCredentials('a' * 43))
 assert RemoteClient(['http://localhost'], 'example', 'one').output_offset == 0
 from auton_client.config import load_targets, load_inventory
 from auton_client.connections import select_connections
