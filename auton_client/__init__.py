@@ -32,7 +32,8 @@ class RemoteClient(object):
         self.endpoint = endpoint
         self.uid = uid
         self.payload = copy.deepcopy(payload or {})
-        self._auth = auth
+        from auton_client.credentials import bind_credentials
+        self._auth = bind_credentials(auth, self.uris)
         self.http_timeout = http_timeout
         self.session = requests if session is None else session
         self.sleep = sleep

@@ -26,7 +26,8 @@ class DaemonClient:
         if not math.isfinite(http_timeout) or http_timeout <= 0:
             raise ValueError('http-timeout must be positive')
         self.uri = origin
-        self.auth = auth
+        from auton_client.credentials import bind_credentials
+        self.auth = bind_credentials(auth, [origin])
         self.http_timeout = http_timeout
         self.session = requests if session is None else session
 

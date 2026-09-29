@@ -75,7 +75,9 @@ class OperationService:
                 seen.add(key)
             self.targets[name] = origins[0]
             self.origins[name] = origins
-        self.endpoint, self.payload, self.auth = endpoint, copy.deepcopy(payload or {}), auth
+        from auton_client.credentials import bind_credentials
+        self.endpoint, self.payload = endpoint, copy.deepcopy(payload or {})
+        self.auth = bind_credentials(auth, [uri for origins in self.origins.values() for uri in origins])
         self.http_timeout, self.parallel = http_timeout, parallel
         self.timeout, self.delay = timeout, delay
         self.client_factory, self.clock, self.sleep = client_factory, clock, sleep

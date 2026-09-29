@@ -343,6 +343,8 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     if not connections:
         raise ValueError("selection contains no targets")
     from auton_client.connections import target_origins
+    from auton_client.credentials import bind_credentials
+    auth = bind_credentials(auth, [uri for target in connections.values() for uri in target_origins(target)])
     clients = {name: DaemonClient(target_origins(uri)[0], auth, http_timeout)
                for name, uri in connections.items()}
     monitor = FleetMonitor(clients)
