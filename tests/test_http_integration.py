@@ -107,6 +107,34 @@ class HTTPIntegrationTests(unittest.TestCase):
                              expected_job=b'shared-job', expected_output=b'one')
                 self.assertEqual(len(clients['one'].jobs()), 1)
                 self.assertEqual(len(clients['two'].jobs()), 1)
+                target_args = ['--target', 'one=' + clients['one'].uri,
+                               '--target', 'two=' + clients['two'].uri]
+                for exit_code in (0, 7):
+                    execution = subprocess.run([sys.executable, str(ROOT / 'bin/auton'),
+                        '--endpoint', 'test', '--auth-user', 'alice', '--auth-passwd', 'secret',
+                        '--delay', '0.01', '--operation-id', 'integration',
+                        '-a', '-c', '-a', 'import sys; print("hello"); print("diagnostic", file=sys.stderr); sys.exit(%s)' % exit_code]
+                        + target_args, env=dict(os.environ, PYTHONPATH=str(ROOT), AUTON_URI='http://unused'),
+                        capture_output=True, text=True, timeout=10)
+                    self.assertEqual(execution.returncode, int(exit_code != 0), execution.stderr)
+                    operation = json.loads(execution.stdout)
+                    self.assertEqual(operation['operation_id'], 'integration')
+                    self.assertEqual(len({t['job_id'] for t in operation['targets']}), 2)
+                    for target in operation['targets']:
+                        self.assertEqual(target['return_code'], exit_code, target)
+                        self.assertEqual(''.join(target['stdout']), 'hello\n')
+                        self.assertTrue(''.join(target['stderr']).startswith('diagnostic\n'), target)
+                        uri = clients[target['target']].uri
+                        detail_path = '/jobs/test/' + target['job_id']
+                        self.assertEqual(requests.get(uri + detail_path, auth=('bob', 'secret'), timeout=2).status_code, 403)
+                denied = subprocess.run([sys.executable, str(ROOT / 'bin/auton'), '--endpoint', 'test',
+                                         '--auth-user', 'alice', '--auth-passwd', 'wrong'] + target_args,
+                                        env=dict(os.environ, PYTHONPATH=str(ROOT)),
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(denied.returncode, 1, denied.stderr)
+                self.assertEqual([t['status'] for t in json.loads(denied.stdout)['targets']], ['rejected', 'rejected'])
+                self.assertEqual(len(clients['one'].jobs()), 3)
+                self.assertEqual(len(clients['two'].jobs()), 3)
             finally:
                 if monitor is not None:
                     monitor.close()

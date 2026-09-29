@@ -118,6 +118,89 @@ in `etc/auton/modules/job.yml`, configure Basic authentication and endpoint user
 and serve behind HTTPS. Apply the same protection when adding these routes to an
 existing installation; keep the existing `run` route's `safe_init: true` setting.
 
+### Explicit multi-target execution (development branch)
+
+Run one command on each explicitly named daemon:
+
+```sh
+auton --target web-01=https://autond-01.example.com \
+      --target web-02=https://autond-02.example.com \
+      --endpoint curl --operation-id deploy-42 --parallel 2 \
+      -a https://example.com
+```
+
+`--target NAME=URI` is repeatable (maximum 128 targets). Names for both `--target`
+and `--daemon` must fully match `[a-z0-9-]+`, with 1–32 characters. It cannot be mixed with
+`--uri`, `--daemon`, `--tui`, `--uid`/`AUTON_UID`, or `--mode run/status`.
+`AUTON_URI` is ignored when explicit targets are supplied. Existing repeated
+`--uri` values remain **failover**, never broadcast targets.
+
+The same prepared arguments, argument files and environment are sent to every
+selected target. Authentication options apply to every target, so use origins
+that trust the same credentials and HTTPS outside a trusted local network.
+Redirects are never followed. Each daemon still enforces its authentication,
+endpoint ACLs and job ownership. Duplicate normalized origins are rejected;
+different DNS aliases for the same daemon cannot be detected automatically.
+
+The client prints one final JSON object, suitable for saving in CI:
+
+```json
+{
+  "operation_id": "deploy-42",
+  "endpoint": "curl",
+  "status": "completed",
+  "targets": [{
+    "target": "web-01",
+    "uri": "https://autond-01.example.com",
+    "job_id": "8c1438b0-df10-455c-83ba-73b5b1bcd2b0",
+    "uid": "curl:8c1438b0-df10-455c-83ba-73b5b1bcd2b0",
+    "status": "completed",
+    "remote_status": "complete",
+    "return_code": 0,
+    "stdout": ["OK\n"],
+    "stderr": [],
+    "error": null,
+    "output_truncated": false,
+    "duration_ms": 125.0
+  }]
+}
+```
+
+The example shows one target entry; each selected target gets its own entry and
+fresh UUID job ID. `operation_id` defaults to a UUID and is a client-side label,
+not an idempotency key. Repeating the invocation, even with the same operation
+label, starts new jobs. Save the JSON result to keep the operation-to-job mapping;
+there is no operation persistence or central scheduler on the daemons.
+
+| Target status | Meaning |
+| --- | --- |
+| `completed` | Confirmed completion with exit code zero |
+| `failed` | Confirmed completion with a nonzero exit code |
+| `rejected` | Submission explicitly refused, for example authentication or ACL failure |
+| `unknown` | Cannot confirm the result; the remote command may have run or still be running |
+| `not_submitted` | Observation stopped before this queued target was submitted |
+
+Operation status is `completed` only when all targets succeed, `incomplete` when
+any target is unknown or not submitted, otherwise `failed`. CLI exit status is
+zero only for a completed operation; `--no-return-code` is not supported here.
+Independent targets continue when another fails; there is no rollback.
+
+`--parallel` defaults to 4 (range 1–32). `--operation-timeout` defaults to 300
+seconds and limits the observation window, including time spent waiting for a
+worker. `--http-timeout` bounds individual connect/read waits; an in-flight
+request can finish after the observation deadline. Ctrl-C stops further
+observation and queued submissions, waits for in-flight HTTP requests, then
+prints the available results. Neither action cancels remote jobs.
+
+A possibly accepted POST is never automatically replayed, including on network
+failure. For `unknown`, inspect the recorded daemon and job ID with the TUI or
+`GET /jobs/<endpoint>/<job_id>` before deciding what to do next. Output is kept
+separately per target, with a combined 1 MiB retained stdout/stderr limit per
+target and an explicit truncation flag. The stderr array includes the daemon's
+error diagnostics as well as captured stderr. Duration measures client observation,
+not exclusively remote process runtime. This initial mode prints its result at
+the end; live operation views and ordered job sequences remain follow-up work.
+
 ### Operator TUI (client)
 
 The Unix client includes a read-only ncurses interface. It requires an interactive

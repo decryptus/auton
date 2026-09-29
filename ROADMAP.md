@@ -128,12 +128,16 @@ The implementation is client-side and stateless, with no central persistence.
 
 ## Milestone 4 — Explicit multi-target execution
 
-Add a deliberate way to execute the same logical operation on multiple selected daemons.
+Implemented on the development branch: `OperationService` submits one independent
+job per explicitly named target, with bounded parallelism and per-target results.
+The CLI emits a final JSON operation summary, including output, exit codes,
+observation duration, refusal and unknown outcomes. POST requests are not replayed.
+Two authenticated daemons are exercised by integration tests.
 
-Possible CLI direction:
+Current CLI:
 
 ```text
-auton run --target autond-01 --target autond-02 ...
+auton --endpoint curl --target autond-01=https://node1 --target autond-02=https://node2 -a https://example.com
 ```
 
 Never reinterpret existing failover URIs as broadcast targets.
