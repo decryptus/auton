@@ -1,5 +1,30 @@
 job:
   routes:
+    jobs:
+      handler:   'job_list'
+      regexp:    '^jobs$'
+      auth:      false
+      op:        'GET'
+    job_detail:
+      handler:   'job_detail'
+      regexp:    '^jobs/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
+      auth:      false
+      op:        'GET'
+    endpoints:
+      handler:   'endpoint_list'
+      regexp:    '^endpoints$'
+      auth:      false
+      op:        'GET'
+    health:
+      handler:   'daemon_health'
+      regexp:    '^health$'
+      auth:      false
+      op:        'GET'
+    stats:
+      handler:   'daemon_stats'
+      regexp:    '^stats$'
+      auth:      false
+      op:        'GET'
     run:
       handler:   'job_run'
       regexp:    '^run/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'

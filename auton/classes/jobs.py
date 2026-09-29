@@ -7,7 +7,7 @@ import threading
 import time
 from contextlib import contextmanager
 
-from auton.classes.job import JobObject, STATUS_COMPLETE
+from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE
 from auton.classes.job_schema import validate_input
 
 DEFAULT_RESULT_TTL = 3600
@@ -15,6 +15,7 @@ DEFAULT_MAX_JOBS = 128
 DEFAULT_MAX_OUTPUT_BYTES = 1048576
 DEFAULT_LOCK_TIMEOUT = 5
 MAX_OUTPUT_OFFSET = 999999999999
+JOB_STATUSES = (STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE)
 
 
 class JobError(Exception):
@@ -42,6 +43,10 @@ class JobUnavailable(JobError):
 
 
 class InvalidOffset(JobError):
+    pass
+
+
+class InvalidFilter(JobError):
     pass
 
 
@@ -191,17 +196,26 @@ class JobService(object):
             self.authorize(endpoint, principal, obj)
             return job_result(obj, offset)
 
-    def list_jobs(self, principal):
+    def list_jobs(self, principal, endpoint=None, status=None):
         """Return visible jobs without consuming output cursors."""
+        if endpoint is not None and (not isinstance(endpoint, str) or not endpoint):
+            raise InvalidFilter('invalid endpoint filter')
+        if status is not None and status not in JOB_STATUSES:
+            raise InvalidFilter('invalid status filter')
         with self._locked():
             self.expire_results()
             result = []
             for obj in self.objs.values():
                 try:
                     self.authorize(obj.get_endpoint(), principal, obj)
-                except AccessDenied:
+                except (AccessDenied, UnknownEndpoint):
                     continue
-                result.append(job_summary(obj))
+                item = job_summary(obj)
+                if endpoint is not None and item['endpoint'] != endpoint:
+                    continue
+                if status is not None and item['status'] != status:
+                    continue
+                result.append(item)
             return sorted(result, key=lambda item: (item['started_at'] is None,
                                                     item['started_at'] or 0,
                                                     item['uid']))
@@ -214,12 +228,29 @@ class JobService(object):
                 self.authorize(name, principal)
             except AccessDenied:
                 continue
-            queue = self.queues.get(name)
-            queue_depth = None
-            if queue is not None and hasattr(queue, 'queue') and hasattr(queue.queue, 'qsize'):
-                queue_depth = queue.queue.qsize()
-            result.append({'name': name, 'queue_depth': queue_depth})
+            # Shared queue depths would disclose activity belonging to other users.
+            result.append({'name': name})
         return result
+
+    def detail(self, endpoint, xid, principal, offset=0):
+        """Read metadata and output without advancing the legacy status cursor."""
+        validate_input({'endpoint': endpoint, 'id': xid})
+        validate_offset(offset)
+        if offset is None:
+            offset = 0
+        with self._locked():
+            self.expire_results()
+            obj = self.get_object(endpoint, xid)
+            self.authorize(endpoint, principal, obj)
+            with obj.output_lock:
+                result = job_summary(obj)
+                result.update(job_result(obj, offset))
+                return result
+
+    def health(self):
+        """Report local service availability without exposing job data."""
+        with self._locked():
+            return {'status': 'ok'}
 
     def stats(self, principal):
         """Return a compact summary derived from visible jobs/endpoints."""

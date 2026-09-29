@@ -47,7 +47,7 @@ Extend `autond` so clients can inspect its state without changing the current ex
 Planned capabilities:
 
 - list jobs;
-- filter jobs by state, endpoint and owner;
+- filter jobs by state and endpoint, with visibility restricted to the caller's own jobs;
 - inspect detailed job status;
 - list configured endpoints;
 - expose daemon health;
@@ -59,7 +59,7 @@ Suggested API capabilities:
 
 ```text
 GET /jobs
-GET /jobs/<id>
+GET /jobs/<endpoint>/<id>
 GET /endpoints
 GET /health
 GET /stats
@@ -165,6 +165,29 @@ Improve distributed-operation ergonomics:
 - never silently replay a possibly accepted POST;
 - show elapsed time and completion state per job;
 - add filtering and grouping in TUI.
+
+### Job sequences (after explicit multi-target execution)
+
+Keep one job as one command on one daemon. An operation may later describe
+several ordered steps, each producing a distinct job per selected target.
+
+- Run steps sequentially on each target; stop that target's sequence on the
+  first failed step by default and mark subsequent steps as skipped.
+- Allow bounded concurrency across explicitly selected targets. A failed target
+  does not stop independent targets by default.
+- Preserve each step's job ID, exit code, stdout/stderr, timing and state, and
+  provide an operation summary that exposes partial failure.
+- Consider explicit per-step `continue_on_error` later; never silently ignore errors.
+- A transport timeout means an unknown outcome, not proof of execution failure.
+  Reconcile the known job before advancing; never automatically replay an ambiguous POST.
+- Stopping a sequence does not roll back completed steps or cancel running jobs.
+  Compensation and cancellation require separate explicit designs.
+- Start with a client application service, independent of CLI/TUI. Its continuation
+  depends on a live client; durable unattended sequences need a later lifecycle decision.
+
+A remote script can already group commands into one job, but Auton then sees
+the script's overall result rather than separate step results. This milestone
+does not introduce a central scheduler or a generic workflow engine.
 
 ## Milestone 6 — Reliability and lifecycle
 

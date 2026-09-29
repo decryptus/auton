@@ -15,7 +15,7 @@ from unittest.mock import Mock
 from auton.classes.job import JobObject, STATUS_COMPLETE
 from auton.classes.job_schema import InvalidArguments, InvalidArgumentsType
 from auton.classes.jobs import (JobService, AccessDenied, DuplicateJob, JobUnavailable,
-                                InvalidOffset, UnknownJob)
+                                InvalidOffset, InvalidFilter, UnknownJob)
 from auton.classes.plugins import AutonEPTObject, AutonEPTSync, EPTS_SYNC, ENDPOINTS
 from auton.plugins.subproc import AutonSubProcPlugin
 from auton.classes.target import AutonTarget
@@ -148,6 +148,56 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(other.objs, {})
         self.assertIsNot(self.service.lock, other.lock)
 
+    def test_visibility_filters_acl_owner_and_removed_endpoints(self):
+        self.submit()
+        self.endpoint.users = None
+        self.submit('two', user='bob')
+        self.assertEqual([x['uid'] for x in self.service.list_jobs('alice')], ['test:one'])
+        self.assertEqual(self.service.list_jobs('alice', status=STATUS_COMPLETE), [])
+        self.assertEqual(self.service.list_jobs('alice', endpoint='other'), [])
+        self.assertEqual(self.service.stats('bob')['jobs'], 1)
+        self.assertEqual(self.service.list_endpoints('alice'), [{'name': 'test'}])
+        self.endpoint.users = {'bob': True}
+        self.assertEqual(self.service.list_jobs('alice'), [])
+        self.assertEqual(self.service.list_endpoints('alice'), [])
+        self.assertEqual(self.service.stats('alice')['jobs'], 0)
+        self.service.endpoints.clear()
+        self.assertEqual(self.service.list_jobs('bob'), [])
+
+    def test_visibility_preserves_output_and_expires_completed_jobs(self):
+        self.submit()
+        obj = self.finish()
+        obj.add_error('failure')
+        for _ in range(2):
+            self.assertEqual(self.service.list_jobs('alice')[0]['output_chunks'], 1)
+            self.assertEqual(self.service.stats('alice')['jobs'], 1)
+            detail = self.service.detail('test', 'one', 'alice')
+            self.assertEqual(detail['stream'], ['done'])
+            self.assertEqual(detail['errors'], ['failure'])
+        self.assertEqual(self.service.status('test', 'one', 'alice')['stream'], ['done'])
+        self.assertEqual(self.service.detail('test', 'one', 'alice', 1)['stream'], [])
+        with self.assertRaises(AccessDenied):
+            self.service.detail('test', 'one', 'bob')
+        self.now += 11
+        self.assertEqual(self.service.list_jobs('alice'), [])
+        with self.assertRaises(UnknownJob):
+            self.service.detail('test', 'one', 'alice')
+
+    def test_visibility_rejects_bad_filters_and_reports_lock_failure(self):
+        for value in ('running', '', [], 42):
+            with self.subTest(value=value), self.assertRaises(InvalidFilter):
+                self.service.list_jobs('alice', status=value)
+        for value in ('', [], 42):
+            with self.subTest(value=value), self.assertRaises(InvalidFilter):
+                self.service.list_jobs('alice', endpoint=value)
+        self.assertEqual(self.service.health(), {'status': 'ok'})
+        self.service.lock = Mock()
+        self.service.lock.acquire.return_value = False
+        for call in (self.service.health, lambda: self.service.list_jobs('alice'),
+                     lambda: self.service.stats('alice')):
+            with self.assertRaises(JobUnavailable):
+                call()
+
 
 class CompatibilityTests(unittest.TestCase):
     def test_legacy_constructor_snapshots_request_and_preserves_callback(self):
@@ -278,6 +328,12 @@ service = JobService({'fake': SimpleNamespace(users={'alice': True})}, {'fake': 
 r = service.submit('fake', 'one', {'args': ['done']}, 'alice', 0)
 assert r['stream'] == ['done'] and 'code' not in r
 assert service.status('fake', 'one', 'alice', 0)['stream'] == ['done']
+assert service.list_jobs('alice')[0]['uid'] == 'fake:one'
+assert service.list_jobs('bob') == []
+assert service.detail('fake', 'one', 'alice')['stream'] == ['done']
+assert service.list_endpoints('alice') == [{'name': 'fake'}]
+assert service.stats('alice')['jobs'] == 1
+assert service.health() == {'status': 'ok'}
 try:
     service.status('fake', 'one', 'bob')
 except AccessDenied:

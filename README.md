@@ -43,7 +43,7 @@ removed. Python 3.13+ is not supported yet because the HTTP dependency uses
 
 The Docker image now installs **this checkout**, runs as the `auton` user, and
 Compose publishes port 8666 on **127.0.0.1 only**. The demo still has no
-authentication; enable Basic authentication on both routes, configure endpoint
+authentication; enable Basic authentication on every route, configure endpoint
 users and use HTTPS before exposing it remotely. Basic authentication supports
 the documented `{SHA}` htpasswd format and formats available through system
 `crypt`. The handler keeps each authenticated identity local to its request.
@@ -87,6 +87,36 @@ job is retained; use a fresh UUID for each operation. Once evicted or expired,
 results cannot be replayed and IDs no longer protect against repeat execution.
 Status access is restricted to the submitting authenticated user and the current
 endpoint permissions. Unauthenticated demo jobs have no individual user identity.
+
+### Local daemon visibility
+
+The daemon also exposes these read-only routes:
+
+| Request | Result |
+| --- | --- |
+| `GET /jobs` | `jobs`: metadata for the caller's retained jobs, without output. |
+| `GET /jobs?endpoint=test&status=complete` | Exact endpoint/state filters. States are `new`, `processing`, `complete`; completion does not imply exit code zero. Invalid filters return 400. |
+| `GET /jobs/<endpoint>/<id>` | Metadata and retained output; `X-Auton-Output-Offset` selects stdout chunks, defaulting to zero. |
+| `GET /endpoints` | `endpoints`: names allowed by the current endpoint ACLs. |
+| `GET /health` | `status: ok` when the local job service can be accessed; not a check of remote dependencies or worker progress. |
+| `GET /stats` | `stats`: visible job count, counts by state, and accessible endpoint count. |
+
+Lists, details and statistics enforce current endpoint permissions and job
+ownership. Counts do not include other users' jobs; shared queue depths are not
+exposed. Detail returns HTTP 200 even when the inspected command failed: inspect
+`status`, `return_code` and `errors`. Missing/expired jobs return 404, access denial
+returns 403, and a service lock timeout returns 503. Listing, statistics and detail
+requests also clean expired results. There is no persistent history.
+
+These reads never advance the legacy `/status` output cursor. Detail uses the
+existing output format (`stream` for stdout, `errors` for stderr/diagnostics).
+The existing `/run` and `/status` contracts are unchanged.
+
+The example configuration is an unauthenticated local demo: anonymous clients
+share one identity. Before remote use, set `auth: true` on **all seven routes**
+in `etc/auton/modules/job.yml`, configure Basic authentication and endpoint users,
+and serve behind HTTPS. Apply the same protection when adding these routes to an
+existing installation; keep the existing `run` route's `safe_init: true` setting.
 
 ### Development
 
