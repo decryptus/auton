@@ -126,7 +126,7 @@ terminal with Python curses support and a daemon with the visibility API above.
 ```sh
 auton --tui --uri https://autond.example.net --http-timeout 5
 
-# Named daemons are selected explicitly; only the selected daemon is refreshed.
+# Named daemons are selected explicitly; press a to aggregate their read-only state.
 auton --tui --daemon prod=https://autond-01.example.net \
             --daemon staging=https://autond-02.example.net --refresh 2
 ```
@@ -145,10 +145,11 @@ broadcast. The TUI never submits commands, cancels jobs or creates operations.
 
 | Key | Action |
 | --- | --- |
-| `[` / `]` | Select previous / next named daemon. |
-| `Tab` | Switch Jobs, Endpoints and Output views. |
+| `[` / `]` | Select previous / next named daemon or ALL. |
+| `a` | Toggle between a single daemon and the aggregated ALL view. |
+| `Tab` | Switch Jobs, Endpoints, Output and Daemons views. |
 | Up / Down or `k` / `j` | Select a row; scroll in Output. |
-| Enter | Open a job's output; select an endpoint as a job filter. |
+| Enter | Open a job's output; filter by an endpoint and its daemon; open a daemon from the Daemons table. |
 | `/` | Edit literal search; Enter or Escape finishes editing. |
 | `s` | Cycle all / queued / running / completed job states. |
 | `c` | Clear search, state and endpoint filters. |
@@ -163,10 +164,22 @@ reads replay retained data without consuming the legacy status cursor.
 API errors (including older daemons returning 404) are shown explicitly.
 The display handles terminal resizing (minimum 64 columns by 12 rows), filters
 control characters from remote output, and keeps navigation responsive while a
-single background refresh is pending. A daemon switch may wait for the current
+background refresh is pending. A daemon switch may wait for the current
 bounded refresh; `q` exits immediately. `--refresh` defaults to 2 seconds after a
 refresh finishes, with a minimum of 0.2 seconds; `--http-timeout` bounds each GET.
-Only the active daemon is polled; this is not yet an aggregated multi-daemon view.
+A single-daemon selection polls only that daemon. Press `a` (or open the Daemons
+tab) to aggregate all explicitly named daemons. Up to four daemon reads run in
+parallel; completed snapshots appear while slower daemons remain pending. Each
+job and endpoint carries its daemon name, so identical job IDs remain distinct.
+Opening output always contacts the originating daemon.
+
+The Daemons table shows pending/healthy/error state, visible job counts and
+per-daemon errors. The header labels incomplete results as partial and shows
+job coverage, for example `2/3`. Counts include only jobs actually returned in
+the current refresh; failed or pending daemons are not silently counted as empty
+or represented by stale jobs. An endpoint filter in ALL applies to that endpoint
+on its originating daemon. Aggregation is read-only and entirely client-side,
+without persistent central history or any change to execution failover.
 
 ### Development
 

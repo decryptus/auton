@@ -23,10 +23,10 @@ sys.meta_path.insert(0, BlockDaemon())
 from auton_client import RemoteClient
 assert RemoteClient(['http://localhost'], 'example', 'one').output_offset == 0
 from auton_client.visibility import DaemonClient
-from auton_client.monitor import Monitor
+from auton_client.monitor import FleetMonitor
 from auton_client.tui import OperatorView, daemon_specs
 client = DaemonClient('http://localhost')
-monitor = Monitor({'local': client})
+monitor = FleetMonitor({'local': client})
 assert OperatorView(monitor).daemon == 'local'
 assert daemon_specs([], ['http://localhost']) == {'default': 'http://localhost'}
 monitor.close()

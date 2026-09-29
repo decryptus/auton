@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from auton_client.visibility import DaemonClient, VisibilityError
-from auton_client.monitor import Monitor, snapshot
+from auton_client.monitor import Monitor, FleetMonitor, snapshot, aggregate_snapshots
 from auton_client.tui import OperatorView, daemon_specs, safe_text
 from test_regressions import client_module, response
 
@@ -128,7 +128,7 @@ class Block(importlib.abc.MetaPathFinder):
         if fullname.split('.')[0] in ('auton', 'dwho', 'httpdis', 'curses', 'argparse'):
             raise AssertionError(fullname)
 sys.meta_path.insert(0, Block())
-from auton_client.monitor import Monitor, snapshot
+from auton_client.monitor import Monitor, FleetMonitor, snapshot, aggregate_snapshots
 from auton_client.visibility import DaemonClient
 class FakeClient:
     def health(self): return {'status': 'ok'}
@@ -137,6 +137,10 @@ class FakeClient:
     def stats(self): return {}
 c = FakeClient()
 assert snapshot(c)['jobs'] == []
+assert aggregate_snapshots(['one'], {'one': snapshot(c)})['stats']['jobs'] == 0
+m = FleetMonitor({'one': c})
+assert m.refresh(None)
+m.close()
 assert DaemonClient('http://localhost').uri == 'http://localhost'
 '''
         result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,

@@ -9,10 +9,10 @@ import textwrap
 import time
 
 from auton_client import __version__
-from auton_client.monitor import Monitor
+from auton_client.monitor import FleetMonitor
 from auton_client.visibility import DaemonClient, JOB_STATES
 
-VIEWS = ('Jobs', 'Endpoints', 'Output')
+VIEWS = ('Jobs', 'Endpoints', 'Output', 'Daemons')
 MIN_ROWS = 12
 MIN_COLS = 64
 MAX_SEARCH = 128
@@ -48,15 +48,19 @@ class OperatorView:
     def __init__(self, monitor, refresh=DEFAULT_REFRESH, clock=time.monotonic):
         self.monitor = monitor
         self.names = list(monitor.clients)
+        if len(self.names) > 1:
+            self.names.append(None)  # Explicit all-daemon read selection.
         self.daemon_index = 0
         self.view = 0
         self.index = 0
         self.output_line = 0
         self.stderr = False
+        self.opened_job = None
         self.search = ''
         self.editing = False
         self.state = None
         self.endpoint = None
+        self.endpoint_daemon = None
         self.paused = False
         self.refresh = refresh
         self.clock = clock
@@ -72,23 +76,33 @@ class OperatorView:
         return self.cache.get(self.daemon, {})
 
     def rows(self):
+        if self.view == 3:
+            rows = self.data.get('daemons', [{'name': self.daemon, 'state':
+                    'unchecked' if not self.data else ('error' if self.data.get('errors') else 'ok'),
+                    'jobs': len(self.data['jobs']) if 'jobs' in self.data else None,
+                    'error': '; '.join(self.data.get('errors', {}).values())}])
+            return [row for row in rows if self.search.casefold() in (row['name'] or '').casefold()]
         if self.view == 1:
             return [item for item in self.data.get('endpoints', [])
                     if self.search.casefold() in item['name'].casefold()]
         return [job for job in self.data.get('jobs', [])
                 if (self.state is None or job['status'] == self.state)
                 and (self.endpoint is None or job['endpoint'] == self.endpoint)
+                and (self.endpoint_daemon is None or job.get('daemon', self.daemon) == self.endpoint_daemon)
                 and self.search.casefold() in job['uid'].casefold()]
 
     def selected_job(self):
         if self.view != 2:
             return None
+        if self.opened_job is not None:
+            return self.opened_job
         rows = self.rows()
         if not rows:
             return None
         self.index = min(self.index, len(rows) - 1)
         job = rows[self.index]
-        return job['endpoint'], job['uid']
+        identity = job['endpoint'], job['uid']
+        return (job['daemon'],) + identity if self.daemon is None else identity
 
     def tick(self):
         result = self.monitor.poll()
@@ -99,10 +113,11 @@ class OperatorView:
                 selected = old_rows[min(self.index, len(old_rows) - 1)] if old_rows else None
                 self.cache[daemon] = data
                 rows = self.rows()
-                key = 'name' if self.view == 1 else 'uid'
+                key = 'name' if self.view in (1, 3) else 'uid'
                 if selected is not None:
                     self.index = next((i for i, row in enumerate(rows)
-                                       if row[key] == selected[key]), 0)
+                                       if (row.get('daemon'), row[key]) ==
+                                       (selected.get('daemon'), selected[key])), 0)
                 self.index = min(self.index, max(0, len(rows) - 1))
                 self.next_refresh = self.clock() + self.refresh
             else:
@@ -128,20 +143,39 @@ class OperatorView:
             self.daemon_index = (self.daemon_index + (1 if key == ord(']') else -1)) % len(self.names)
             self.index = self.output_line = 0
             self.endpoint = None
+            self.endpoint_daemon = None
+            self.opened_job = None
+            self.next_refresh = 0
+        elif key == ord('a') and len(self.names) > 1:
+            self.daemon_index = 0 if self.daemon is None else self.names.index(None)
+            self.index = self.output_line = 0
+            self.endpoint = self.endpoint_daemon = None
+            self.opened_job = None
             self.next_refresh = 0
         elif key == 9:
+            self.opened_job = None
             self.view = (self.view + 1) % len(VIEWS)
+            if self.view == 3 and None in self.names:
+                self.daemon_index = self.names.index(None)
             self.index = self.output_line = 0
             self.next_refresh = 0
         elif key in (10, 13):
             rows = self.rows()
             if rows and self.view == 1:
                 self.endpoint = rows[self.index]['name']
+                self.endpoint_daemon = rows[self.index].get('daemon', self.daemon)
                 self.search = ''
                 self.index = 0
                 self.view = 0
             elif rows and self.view == 0:
                 self.view = 2
+                self.opened_job = None
+                self.opened_job = self.selected_job()
+            elif rows and self.view == 3:
+                self.daemon_index = self.names.index(rows[self.index]['name'])
+                self.view = self.index = 0
+                self.search = ''
+                self.endpoint = self.endpoint_daemon = None
             self.output_line = 0
             self.next_refresh = 0
         elif key in (curses.KEY_DOWN, ord('j'), curses.KEY_UP, ord('k'),
@@ -164,7 +198,7 @@ class OperatorView:
             self.index = self.output_line = 0
             self.next_refresh = 0
         elif key == ord('c'):
-            self.search, self.state, self.endpoint = '', None, None
+            self.search, self.state, self.endpoint, self.endpoint_daemon = '', None, None, None
             self.index = self.output_line = 0
             self.next_refresh = 0
         elif key == ord('r'):
@@ -175,6 +209,7 @@ class OperatorView:
                 self.next_refresh = 0
         elif key == 27:
             self.view = 0
+            self.opened_job = None
             self.next_refresh = 0
         return True
 
@@ -192,9 +227,10 @@ class OperatorView:
             screen.refresh()
             return
         line(0, 'AUTON %s | READ ONLY | %s' % (__version__, 'PAUSED' if self.paused else 'LIVE'), curses.A_BOLD)
-        health = 'unchecked' if not self.data else ('error' if self.data.get('errors') else 'ok')
-        line(1, 'Daemon %s (%s/%s) [%s]   [ / ] switch' %
-             (self.daemon, self.daemon_index + 1, len(self.names), health))
+        health = ('unchecked' if not self.data else 'partial' if self.data.get('partial')
+                  else 'error' if self.data.get('errors') else 'ok')
+        line(1, 'Daemon %s (%s/%s) [%s]   [ / ] switch | a all' %
+             (self.daemon or 'ALL', self.daemon_index + 1, len(self.names), health))
         counts = self.data.get('stats', {}).get('jobs_by_status', {})
         line(2, 'Queued: %s  Running: %s  Completed: %s | %s' %
              (counts.get('new', 0), counts.get('processing', 0), counts.get('complete', 0),
@@ -202,16 +238,22 @@ class OperatorView:
         line(3, 'Filter: %s%s | state=%s endpoint=%s' %
              (self.search, '_' if self.editing else '', self.state or 'all', self.endpoint or 'all'))
         errors = self.data.get('errors', {})
-        line(4, ' | '.join('%s: %s' % item for item in errors.items()) if errors else
-             ('Refreshing...' if self.monitor.worker is not None else 'Last refresh completed'))
+        coverage = ''
+        if self.daemon is None:
+            stats = self.data.get('stats', {})
+            coverage = 'Jobs coverage %s/%s | ' % (stats.get('responding', 0), len(self.monitor.clients))
+        line(4, coverage + (' | '.join('%s: %s' % item for item in errors.items()) if errors else
+             ('Refreshing...' if self.monitor.worker is not None else 'Last refresh completed')))
         available = height - 8
         if self.view == 2:
             job = self.selected_job()
             detail = self.data.get('detail', {})
-            if job is None or detail.get('uid') != job[1]:
+            if (job is None or detail.get('uid') != job[-1]
+                    or (self.daemon is None and detail.get('daemon') != job[0])):
                 line(5, 'No current job detail (select a job and press Enter).')
             else:
-                line(5, '%s | %s | exit=%s | %s' % (detail['uid'], detail['status'],
+                line(5, '%s | %s | exit=%s | %s' % (
+                     ('%s / ' % detail['daemon'] if self.daemon is None else '') + detail['uid'], detail['status'],
                      detail.get('return_code'), 'stderr / diagnostics' if self.stderr else 'stdout'), curses.A_BOLD)
                 line(6, 'Started: %s  Ended: %s' % (detail.get('started_at'), detail.get('ended_at')))
                 raw = ''.join(detail.get('errors' if self.stderr else 'stream', []))
@@ -222,13 +264,22 @@ class OperatorView:
                     line(y, value)
         else:
             rows = self.rows()
-            line(5, 'ENDPOINT' if self.view == 1 else 'STATE       EXIT  JOB', curses.A_BOLD)
+            heading = 'DAEMON           STATE   JOBS  ERROR' if self.view == 3 else (
+                ('DAEMON / ' if self.daemon is None else '') +
+                ('ENDPOINT' if self.view == 1 else 'STATE       EXIT  JOB'))
+            line(5, heading, curses.A_BOLD)
             start = max(0, self.index - available + 1)
             if not rows:
                 line(6, '(no matching entries)')
             for i, item in enumerate(rows[start:start + available], start):
-                value = item['name'] if self.view == 1 else '%-11s %-5s %s' % (
-                    STATUS_LABELS[item['status']], item.get('return_code'), item['uid'])
+                if self.view == 3:
+                    value = '%-16s %-7s %-5s %s' % (item['name'], item['state'],
+                             item['jobs'] if item['jobs'] is not None else '?', item['error'])
+                else:
+                    value = item['name'] if self.view == 1 else '%-11s %-5s %s' % (
+                        STATUS_LABELS[item['status']], item.get('return_code'), item['uid'])
+                    if self.daemon is None:
+                        value = item['daemon'] + ' / ' + value
                 line(6 + i - start, value, curses.A_REVERSE if i == self.index else 0)
         line(height - 2, 'Tab view | Enter open | j/k move | / search | s state | c clear')
         line(height - 1, 'r refresh | p pause | v stdout/stderr | PgUp/PgDn scroll | q quit')
@@ -242,7 +293,7 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH):
         raise ValueError('refresh must be at least 0.2 seconds')
     clients = {name: DaemonClient(uri, auth, http_timeout)
                for name, uri in daemon_specs(specs, uris).items()}
-    monitor = Monitor(clients)
+    monitor = FleetMonitor(clients)
     view = OperatorView(monitor, refresh)
     def display(screen):
         screen.keypad(True)

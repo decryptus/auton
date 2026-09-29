@@ -19,20 +19,119 @@ import termios
 import requests
 import yaml
 
+from auton_client.monitor import FleetMonitor
+from auton_client.visibility import DaemonClient
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class HTTPIntegrationTests(unittest.TestCase):
-    def run_tui(self, uri, auth_args, env):
+    def test_two_daemon_aggregation_preserves_identity_and_auth(self):
+        processes = []
+        monitor = None
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                passwd = Path(tmp) / 'htpasswd'
+                hashed = '{SHA}' + base64.b64encode(hashlib.sha1(b'secret').digest()).decode()
+                passwd.write_text('alice:' + hashed + '\nbob:' + hashed + '\n')
+                clients = {}
+                for name in ('one', 'two'):
+                    with socket.socket() as sock:
+                        sock.bind(('127.0.0.1', 0))
+                        port = sock.getsockname()[1]
+                    config = yaml.safe_load((ROOT / 'etc/auton/auton.yml.example').read_text())
+                    config['general'].update(listen_addr='127.0.0.1', listen_port=port,
+                                             max_life_time=0, max_requests=0,
+                                             auth_basic='Test', auth_basic_file=str(passwd))
+                    config.pop('import_modules', None)
+                    config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
+                    for route in config['modules']['job']['routes'].values():
+                        route['auth'] = True
+                    config['endpoints'] = {'test': {'plugin': 'subproc', 'config': {
+                        'prog': sys.executable, 'timeout': 2}}}
+                    conf = Path(tmp) / (name + '.yml')
+                    conf.write_text(yaml.safe_dump(config))
+                    proc = subprocess.Popen([sys.executable, str(ROOT / 'bin/autond'), '-f',
+                                             '-c', str(conf), '-p', str(Path(tmp) / (name + '.pid')),
+                                             '--logfile', str(Path(tmp) / (name + '.log'))],
+                                            env=dict(os.environ, PYTHONPATH=str(ROOT)), cwd=ROOT,
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    processes.append(proc)
+                    uri = 'http://127.0.0.1:%s' % port
+                    ready = False
+                    for _ in range(100):
+                        try:
+                            ready = requests.get(uri + '/health', auth=('alice', 'secret'), timeout=0.1).status_code == 200
+                            if ready:
+                                break
+                        except requests.RequestException:
+                            pass
+                        time.sleep(0.02)
+                    self.assertTrue(ready, 'daemon did not start: ' + name)
+                    response = requests.post(uri + '/run/test/shared-job', auth=('alice', 'secret'),
+                                             json={'args': ['-c', 'print(%r)' % name]}, timeout=2)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    client = DaemonClient(uri, auth=('alice', 'secret'), http_timeout=1)
+                    for _ in range(100):
+                        detail = client.detail('test', 'test:shared-job')
+                        if detail['status'] == 'complete':
+                            break
+                        time.sleep(0.02)
+                    self.assertEqual(detail['status'], 'complete')
+                    self.assertEqual(DaemonClient(uri, auth=('bob', 'secret')).jobs(), [])
+                    clients[name] = client
+                # An authenticated but unauthorized connection fails independently.
+                clients['denied'] = DaemonClient(clients['one'].uri, auth=('alice', 'wrong'), http_timeout=1)
+                monitor = FleetMonitor(clients)
+                monitor.refresh(None, ('two', 'test', 'test:shared-job'))
+                results = []
+                deadline = time.monotonic() + 5
+                while len(results) < 3 and time.monotonic() < deadline:
+                    result = monitor.poll()
+                    if result is not None:
+                        results.append(result[2])
+                    else:
+                        time.sleep(0.01)
+                self.assertEqual(len(results), 3)
+                data = results[-1]
+                self.assertEqual([(job['daemon'], job['uid']) for job in data['jobs']],
+                                 [('one', 'test:shared-job'), ('two', 'test:shared-job')])
+                self.assertEqual(''.join(data['detail']['stream']), 'two\n')
+                self.assertTrue(data['partial'])
+                self.assertEqual(data['errors']['denied/jobs'], 'HTTP 401')
+                self.assertEqual(data['stats']['responding'], 2)
+                self.run_tui(None, ['--auth-user', 'alice', '--auth-passwd', 'secret'],
+                             dict(os.environ, PYTHONPATH=str(ROOT)),
+                             daemon_args=['--daemon', 'one=' + clients['one'].uri,
+                                          '--daemon', 'two=' + clients['two'].uri],
+                             expected_job=b'shared-job', expected_output=b'one')
+                self.assertEqual(len(clients['one'].jobs()), 1)
+                self.assertEqual(len(clients['two'].jobs()), 1)
+            finally:
+                if monitor is not None:
+                    monitor.close()
+                for proc in processes:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+
+    def run_tui(self, uri, auth_args, env, daemon_args=None,
+                expected_job=b'http-test-job', expected_output=b'hello'):
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 100, 0, 0))
         proc = subprocess.Popen([sys.executable, str(ROOT / 'bin/auton'), '--tui',
-                                 '--uri', uri, '--refresh', '0.2', '--http-timeout', '1'] + auth_args,
+                                 '--refresh', '60' if daemon_args else '0.2', '--http-timeout', '1'] +
+                                (daemon_args or ['--uri', uri]) + auth_args,
                                 stdin=slave, stdout=slave, stderr=slave,
                                 env=dict(env, TERM='xterm'), cwd=ROOT)
         os.close(slave)
         captured = bytearray()
         def until(text):
+            if text in captured:
+                return
             end = time.monotonic() + 5
             while time.monotonic() < end:
                 if select.select([master], [], [], 0.1)[0]:
@@ -46,9 +145,15 @@ class HTTPIntegrationTests(unittest.TestCase):
                     break
             self.fail('TUI did not display %r: %r' % (text, bytes(captured)))
         try:
-            until(b'http-test-job')
-            os.write(master, b'\n')
-            until(b'hello')
+            if daemon_args:
+                until(b'AUTON')
+                os.write(master, b'a')
+                until(b'one /')
+                until(b'two /')
+            until(expected_job)
+            os.write(master, b'k\n')
+            captured.clear()
+            until(expected_output)
             os.write(master, b'v')
             until(b'diagnostics')
             os.write(master, b'q')

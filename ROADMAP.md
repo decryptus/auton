@@ -72,7 +72,7 @@ Exact routes remain implementation details and must respect existing HTTP conven
 Initial read-only implementation: `auton --tui`. The **auton client** provides
 a pinned `DaemonClient` visibility adapter alongside the execution `RemoteClient`,
 a terminal-independent background monitor, and a curses presentation layer.
-Only the selected daemon is refreshed; aggregated views remain Milestone 3.
+Single-daemon inspection is the default; Milestone 3 adds explicit aggregation.
 
 The initial TUI provides:
 
@@ -108,7 +108,11 @@ autond-03    c281...    curl           FAILED
 
 ## Milestone 3 — Multi-autond client view
 
-Allow one `auton` client to query several `autond` instances and display an aggregated live view.
+Implemented: press `a` in the TUI to aggregate explicitly named `--daemon`
+connections, or open the Daemons tab. `FleetMonitor` is callable independently
+of the terminal and limits concurrent reads to four daemons. Snapshots arrive
+incrementally, with visible partial coverage and per-daemon errors. Jobs and
+endpoints retain daemon identity; detail/output is pinned to its source daemon.
 
 Important rule:
 
@@ -120,7 +124,7 @@ The aggregated view must therefore distinguish:
 - read-only aggregation of daemon state;
 - explicit multi-target execution.
 
-The first multi-daemon implementation should remain client-side and stateless.
+The implementation is client-side and stateless, with no central persistence.
 
 ## Milestone 4 — Explicit multi-target execution
 
