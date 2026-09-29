@@ -437,7 +437,9 @@ as the HTTP API. No central service is required.
 - Implemented: HTTPS guidance, private token files and origin-bound client
   credential profiles, including failover, CLI/TUI and scenarios. Missing mappings
   fail before network access; profiles never fall back to another credential.
-- Bound failed authentication attempts and audit refusals without credentials.
+- Implemented: bounded login attempts and optional private, rotating JSONL refusal
+  auditing with a global write limit. Logs contain only event/timestamp/count,
+  never submitted identifiers, request content or credentials.
 - Implemented: optional HTTPdis browser sessions with cookie rotation/revocation,
   same-origin JSON/CSRF policy, safe output rendering and security headers.
 - Implemented console: daemon state, maintenance, allowed endpoints, jobs, output, search and
@@ -528,8 +530,8 @@ Visibility, the TUI, multi-daemon reads, explicit operations/scenarios, SQLite
 storage and the optional daemon web console are implemented on master. Published
 packages are still 0.3.2; implementation does not imply release readiness.
 
-1. Close the remaining authentication gate: sanitized refusal auditing wired
-   into the daemon. Origin-bound client credential profiles are implemented.
+1. Authentication gates implemented: origin-bound profiles and bounded JSONL
+   refusal auditing. Continue release review with these features enabled.
 2. Validate the authenticated Docker quickstart and reconcile migration docs.
 3. Build auton.run with release-aware documentation and existing local captures.
 4. Configure website hosting/DNS and contact delivery.

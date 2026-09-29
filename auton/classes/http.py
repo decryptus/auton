@@ -1,5 +1,5 @@
 """Request-local Basic authentication for the httpdis transport."""
-from httpdis.ext.httpdis_json import HttpReqHandler, HttpReqErrJson
+from httpdis.ext.httpdis_json import HttpReqHandler, HttpReqErrJson, HttpReqError
 from auton.classes.authentication import PasswordAuthenticator
 from auton.classes.exceptions import AutonConfigurationError
 from auton.classes.web import authentication_request, SECURITY_HEADERS, MAX_LOGIN_BYTES
@@ -7,10 +7,15 @@ from httpdis.auth_browser import BrowserAuthProvider
 from httpdis.authentication import AuthenticationDenied
 
 
+AUDIT_STATUS_EVENTS = {401: 'auth.denied', 403: 'auth.forbidden'}
+BROWSER_AUTH_PATHS = frozenset(('/ui/auth/login', '/ui/auth/logout'))
+
+
 class AutonHttpReqHandler(HttpReqHandler):
     # Immutable process-start credential snapshot, never request identity.
     authenticator = PasswordAuthenticator()
     realm = 'Restricted'
+    auth_audit = None
 
     @classmethod
     def configure_auth(cls, filename=None, realm=None, required=False):
@@ -21,8 +26,13 @@ class AutonHttpReqHandler(HttpReqHandler):
         cls.realm = realm
 
     def authenticate(self, auth_users=None):
+        self._auth_unavailable = False
         if self.get_context().auth_provider is not None:
-            return super().authenticate(auth_users)
+            try:
+                return super().authenticate(auth_users)
+            except HttpReqError as error:
+                self._auth_unavailable = error.code == 503
+                raise
         self._SERVER.pop('HTTP_AUTH_IDENTITY', None)
         self._SERVER.pop('HTTP_AUTH_USER', None)
         self._SERVER.pop('HTTP_AUTH_PASSWD', None)
@@ -60,6 +70,14 @@ class AutonHttpReqHandler(HttpReqHandler):
         return super().data_from_payload(cmd)
 
     def end_response(self, response):
+        if self.auth_audit is not None:
+            code = response.get_code()
+            event = AUDIT_STATUS_EVENTS.get(code)
+            if code == 503 and (getattr(self, '_auth_unavailable', False)
+                    or getattr(self, '_path', None) in BROWSER_AUTH_PATHS):
+                event = 'auth.unavailable'
+            if event:
+                self.auth_audit.record(event)
         if self._browser():
             for name, value in SECURITY_HEADERS.items():
                 response.add_header(name, value)

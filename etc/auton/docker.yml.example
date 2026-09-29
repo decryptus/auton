@@ -16,6 +16,8 @@ general:
   job_storage:
     backend: sqlite
     path: /var/lib/autond/jobs/jobs.db
+  auth_audit:
+    path: /var/lib/autond/auth-audit.jsonl
   web_enabled: true
   web_origin: http://127.0.0.1:8666
   maintenance_operators: [operator]

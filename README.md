@@ -957,6 +957,56 @@ sudo -u auton autond-auth -c /etc/auton/auton.yml token revoke -i CREDENTIAL_ID
 sudo -u auton autond-auth -c /etc/auton/auton.yml user disable -u alice
 ```
 
+#### Authentication refusal audit (JSONL)
+
+Enable a separate daemon-owned journal; the Docker quickstart enables it in its
+persistent volume. Existing installations remain unchanged unless configured:
+
+```yaml
+general:
+  auth_audit:
+    path: /var/log/autond/auth.jsonl
+    max_bytes: 10485760
+    backup_count: 5
+    max_events_per_minute: 60
+```
+
+Relative paths use the main config directory. Create the parent as the daemon OS
+user; it must not be writable by other users. Files are private regular files
+(mode 0600 on creation), owned by the daemon, with no symlinks or hard links.
+The audit path must differ from job journals and SQLite stores. Use one daemon
+writer per path and reserve its numbered rotation files for this journal.
+An invalid or unsafe initial destination prevents startup.
+
+Each line contains only `schema_version`, UTC `timestamp`, `event` and `count`:
+
+```json
+{"schema_version":1,"timestamp":"2026-09-29T16:00:00.000+00:00","event":"auth.denied","count":1}
+```
+
+| Event | Meaning |
+| --- | --- |
+| `auth.denied` | HTTP 401, including missing, malformed, expired or rejected credentials. |
+| `auth.forbidden` | HTTP 403, including route/endpoint permissions, scopes and browser-origin policy. |
+| `auth.unavailable` | Authentication provider or browser login/logout returned 503; job capacity/maintenance 503 is excluded. |
+| `auth.login_throttled` | HTTPdis explicitly limited a login attempt. Its HTTP 401 is a separate `auth.denied` event. |
+| `auth.audit_suppressed` | Number of events suppressed in the previous audit window (capped at 2147483647). |
+
+No principal, client address, URL, headers, cookies, token, password, payload or
+exception message is serialized. This is a refusal/availability audit, not a
+per-user forensic history or an account-administration journal. HTTP status
+classification also applies to explicit legacy Basic mode; login throttling
+signals come from the HTTPdis SQLite authentication service.
+
+Rotation retains the active file plus `backup_count` archives. Writes are limited
+to `max_events_per_minute` (2–10000, default 60) in fixed monotonic 60-second windows,
+including any suppression summary. The summary is emitted on the next event in
+a later window; no background flush runs, and pending counters are lost on restart.
+Repeated refusals therefore cannot produce unbounded disk writes or memory use.
+A runtime write failure is counted and logged at most once per minute without
+exception text. It does not change the authentication decision; events may be
+missing. Authentication continues to fail closed when its own backend fails.
+
 #### Origin-bound client credential profiles
 
 Independent daemon databases issue independent tokens. Declare named profiles in

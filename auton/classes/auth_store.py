@@ -55,14 +55,14 @@ def authorized_principal(principal, identity, scope):
 
 class PersistentAuthentication:
     """Compose existing services after privilege drop and fork, with no default path."""
-    def __init__(self, settings, passwords=None):
+    def __init__(self, settings, passwords=None, audit=None):
         from httpdis.auth_backend import Argon2Passwords, BearerAuthProvider, LocalAuthService
         from httpdis.auth_sqlite import SQLiteAuthStore
         # Resolve hashing support before opening/creating a database.
         passwords = passwords or Argon2Passwords()
         self.store = SQLiteAuthStore(settings['path'], timeout=settings['timeout'])
         try:
-            self.service = LocalAuthService(self.store, passwords)
+            self.service = LocalAuthService(self.store, passwords, audit=audit)
             self.provider = BearerAuthProvider(self.service)
         except BaseException:
             self.store.close()
