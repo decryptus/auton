@@ -66,6 +66,22 @@ def job_result(obj, offset=None):
         return result
 
 
+def job_summary(obj):
+    """Return non-streaming metadata suitable for fleet/job listings."""
+    with obj.output_lock:
+        return {
+            'uid': obj.get_uid(),
+            'endpoint': obj.get_endpoint(),
+            'status': obj.get_status(),
+            'return_code': obj.get_return_code(),
+            'started_at': obj.get_started_at(),
+            'ended_at': obj.get_ended_at(),
+            'owner': obj.owner,
+            'output_chunks': len(obj.result),
+            'error_chunks': len(obj.errors),
+        }
+
+
 class JobService(object):
     def __init__(self, endpoints, queues, objects=None, object_factory=JobObject,
                  clock=time.time, lock=None, lock_timeout=DEFAULT_LOCK_TIMEOUT,
@@ -174,3 +190,45 @@ class JobService(object):
             obj = self.get_object(endpoint, xid)
             self.authorize(endpoint, principal, obj)
             return job_result(obj, offset)
+
+    def list_jobs(self, principal):
+        """Return visible jobs without consuming output cursors."""
+        with self._locked():
+            self.expire_results()
+            result = []
+            for obj in self.objs.values():
+                try:
+                    self.authorize(obj.get_endpoint(), principal, obj)
+                except AccessDenied:
+                    continue
+                result.append(job_summary(obj))
+            return sorted(result, key=lambda item: (item['started_at'] is None,
+                                                    item['started_at'] or 0,
+                                                    item['uid']))
+
+    def list_endpoints(self, principal):
+        """Return endpoint names visible to the authenticated principal."""
+        result = []
+        for name in sorted(self.endpoints):
+            try:
+                self.authorize(name, principal)
+            except AccessDenied:
+                continue
+            queue = self.queues.get(name)
+            queue_depth = None
+            if queue is not None and hasattr(queue, 'queue') and hasattr(queue.queue, 'qsize'):
+                queue_depth = queue.queue.qsize()
+            result.append({'name': name, 'queue_depth': queue_depth})
+        return result
+
+    def stats(self, principal):
+        """Return a compact summary derived from visible jobs/endpoints."""
+        jobs = self.list_jobs(principal)
+        counts = {}
+        for item in jobs:
+            counts[item['status']] = counts.get(item['status'], 0) + 1
+        return {
+            'jobs': len(jobs),
+            'jobs_by_status': counts,
+            'endpoints': len(self.list_endpoints(principal)),
+        }
