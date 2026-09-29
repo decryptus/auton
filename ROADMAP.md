@@ -1068,13 +1068,51 @@ on Auton; shared terminology does not require a shared execution framework.
 - Running jobs continue by default; visibility and output reads remain available.
   Define the policy for already admitted queued jobs and recheck availability
   before process launch; do not silently discard jobs or report them as running.
-- A maintenance refusal prevents scenario progression on that target, with an
-  explicit blocked/skipped reason; independent targets may continue. Do not
-  automatically retry or confuse a confirmed refusal with an ambiguous POST.
+- If no eligible configured failover origin remains, a maintenance refusal
+  prevents scenario progression on that target, with an explicit blocked/skipped
+  reason; independent targets may continue. Only the safe pre-admission failover
+  rules below permit another submission; never replay an ambiguous POST.
 - Restrict maintenance changes to explicitly authorized operators. Keep state
   local to each daemon, without Centrex or mandatory central coordination.
 - Test admission races, queued/running behavior, direct HTTP enforcement,
   authorization and partial multi-target outcomes before delivering the feature.
+
+### Ordered failover origins per target (planned)
+
+Extend the client inventory so one logical target can declare ordered replacement
+daemons. Keep the existing `name: URI` form, inline `NAME=URI` and legacy repeated
+`--uri` behavior compatible; no additional CLI flag is needed for this extension.
+
+Proposed YAML (not yet supported):
+
+```yaml
+targets:
+  deploy:
+    uris:
+      - https://autond-01.example.com
+      - https://autond-02.example.com
+```
+
+- `--target deploy` selects one logical destination with ordered failover origins.
+  Multiple targets still mean explicit execution on each target; replacement
+  origins are never implicitly broadcast destinations or a target group.
+- Validate the complete nonempty, bounded URI list before execution, using the
+  same origin checks and duplicate-origin protections as individual targets.
+- Try the next origin only when connection failure proves no submission could
+  have been accepted, or a trusted maintenance precheck/explicit daemon refusal
+  establishes that no job was admitted. A generic HTTP 503 is not such proof.
+- Do not fail over after an ambiguous POST, read timeout, lost response or known
+  admission. Once admitted, pin status and output reads to the accepting daemon;
+  expose unknown outcomes and the contacted origin for manual reconciliation.
+- Record attempted origins, safe refusal/failure reasons and the accepting origin
+  under the logical target result. Bound all attempts by the operation budget.
+- Replacement daemons must be configured by the operator to perform equivalent
+  work with appropriate endpoint permissions and shared dependencies. Do not
+  assume another host can replace a command acting on a specific machine.
+- For scenarios, define and test origin affinity across steps before enabling
+  failover: a step depending on daemon-local state must not silently move hosts.
+- Cover maintenance/admission races, unreachable origins, exhausted lists,
+  ambiguous responses, pinned observation and legacy compatibility in tests.
 
 ## Milestone 6 — Reliability and lifecycle
 
