@@ -41,6 +41,7 @@ class JobObject(object): # pylint: disable=useless-object-inheritance
         self.persistence_error = False
         self.execution_uncertain = False
         self.launch_cancelled = False
+        self.cancel_requested = False
         self.admitted_at = None
         self.outcome     = None
         self.outcome_reason = None

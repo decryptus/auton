@@ -8,7 +8,7 @@ from httpdis.authentication import AuthenticationDenied
 
 
 AUDIT_STATUS_EVENTS = {401: 'auth.denied', 403: 'auth.forbidden'}
-BROWSER_AUTH_PATHS = frozenset(('/ui/auth/login', '/ui/auth/logout'))
+BROWSER_AUTH_PATHS = frozenset(('/ui/auth/login', '/ui/auth/logout', '/ui/auth/oidc', '/oidc/callback'))
 
 
 class AutonHttpReqHandler(HttpReqHandler):

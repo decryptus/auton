@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /opt/auton
 COPY . .
-RUN AUTON_PACKAGE=autond pip install --no-cache-dir '.[auth]'
+RUN AUTON_PACKAGE=autond pip install --no-cache-dir '.[auth,oidc,redis]'
 COPY docker-run.sh /run.sh
 COPY etc/auton/modules /etc/auton/modules
 COPY etc/auton/auton.yml.example /etc/auton/auton.yml

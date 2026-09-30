@@ -42,6 +42,12 @@ def history_config(general, directory=None):
     if 'job_storage' not in general:
         return None
     cfg = general['job_storage']
+    if isinstance(cfg, dict) and cfg.get('backend') == 'redis':
+        from auton.classes.job_redis import redis_settings
+        try:
+            return redis_settings(cfg)
+        except ValueError as error:
+            raise AutonConfigurationError(str(error)) from None
     if not isinstance(cfg, dict) or set(cfg) - HISTORY_FIELDS or cfg.get('backend') != 'sqlite':
         raise AutonConfigurationError('job_storage requires backend: sqlite and only path/timeout options')
     path = cfg.get('path')
@@ -75,6 +81,46 @@ def restore(record, max_output_bytes):
     obj.output_size = sum(len(part.encode('utf-8')) for part in obj.result + obj.errors)
     obj.clear_input()
     return obj
+
+
+def validate_snapshot(record, max_output_bytes):
+    if not isinstance(record, dict) or set(record) != SNAPSHOT_FIELDS:
+        raise ValueError('invalid job snapshot fields')
+    for name in ('uid', 'endpoint', 'execution_id'):
+        if not isinstance(record[name], str) or not record[name] or len(record[name]) > 1024:
+            raise ValueError('invalid job identity')
+    if not record['uid'].startswith(record['endpoint'] + ':'):
+        raise ValueError('inconsistent job identity')
+    if record['owner'] is not None and (not isinstance(record['owner'], str) or len(record['owner']) > 1024):
+        raise ValueError('invalid job owner')
+    if record['status'] not in (STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE):
+        raise ValueError('invalid job status')
+    if record['return_code'] is not None and type(record['return_code']) is not int:
+        raise ValueError('invalid return code')
+    for name in ('admitted_at', 'started_at', 'ended_at'):
+        value = record[name]
+        if value is not None and (type(value) not in (float, int) or not math.isfinite(value)):
+            raise ValueError('invalid job timestamp')
+    if record['status'] == STATUS_COMPLETE and record['ended_at'] is None:
+        raise ValueError('missing completion time')
+    for name in ('outcome', 'outcome_reason'):
+        if record[name] is not None and (not isinstance(record[name], str) or len(record[name]) > 1024):
+            raise ValueError('invalid outcome')
+    if type(record['execution_uncertain']) is not bool:
+        raise ValueError('invalid uncertainty marker')
+    for name in ('result', 'errors'):
+        if not isinstance(record[name], list) or any(not isinstance(part, str) for part in record[name]):
+            raise ValueError('invalid output')
+    # The worker may add a bounded diagnostic after exhausting its output budget.
+    if sum(len(part.encode('utf-8')) for part in record['result'] + record['errors']) > max_output_bytes + MAX_DIAGNOSTIC_BYTES:
+        raise ValueError('stored output exceeds configured limit')
+
+def encode_snapshot(record, max_output_bytes, max_record_bytes):
+    validate_snapshot(record, max_output_bytes)
+    data = json.dumps(record, ensure_ascii=True, allow_nan=False, separators=(',', ':'))
+    if len(data.encode('utf-8')) > max_record_bytes:
+        raise ValueError('job snapshot too large')
+    return data
 
 
 class SQLiteJobStore:
@@ -173,43 +219,10 @@ class SQLiteJobStore:
                         raise JobStoreUnavailable('job storage close failed') from None
 
     def _validate(self, record):
-        if not isinstance(record, dict) or set(record) != SNAPSHOT_FIELDS:
-            raise ValueError('invalid job snapshot fields')
-        for name in ('uid', 'endpoint', 'execution_id'):
-            if not isinstance(record[name], str) or not record[name] or len(record[name]) > 1024:
-                raise ValueError('invalid job identity')
-        if not record['uid'].startswith(record['endpoint'] + ':'):
-            raise ValueError('inconsistent job identity')
-        if record['owner'] is not None and (not isinstance(record['owner'], str) or len(record['owner']) > 1024):
-            raise ValueError('invalid job owner')
-        if record['status'] not in (STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE):
-            raise ValueError('invalid job status')
-        if record['return_code'] is not None and type(record['return_code']) is not int:
-            raise ValueError('invalid return code')
-        for name in ('admitted_at', 'started_at', 'ended_at'):
-            value = record[name]
-            if value is not None and (type(value) not in (float, int) or not math.isfinite(value)):
-                raise ValueError('invalid job timestamp')
-        if record['status'] == STATUS_COMPLETE and record['ended_at'] is None:
-            raise ValueError('missing completion time')
-        for name in ('outcome', 'outcome_reason'):
-            if record[name] is not None and (not isinstance(record[name], str) or len(record[name]) > 1024):
-                raise ValueError('invalid outcome')
-        if type(record['execution_uncertain']) is not bool:
-            raise ValueError('invalid uncertainty marker')
-        for name in ('result', 'errors'):
-            if not isinstance(record[name], list) or any(not isinstance(part, str) for part in record[name]):
-                raise ValueError('invalid output')
-        # The worker may add a bounded diagnostic after exhausting its output budget.
-        if sum(len(part.encode('utf-8')) for part in record['result'] + record['errors']) > self.max_output_bytes + MAX_DIAGNOSTIC_BYTES:
-            raise ValueError('stored output exceeds configured limit')
+        validate_snapshot(record, self.max_output_bytes)
 
     def _encode(self, record):
-        self._validate(record)
-        data = json.dumps(record, ensure_ascii=True, allow_nan=False, separators=(',', ':'))
-        if len(data.encode('utf-8')) > self.max_record_bytes:
-            raise ValueError('job snapshot too large')
-        return data
+        return encode_snapshot(record, self.max_output_bytes, self.max_record_bytes)
 
     def save(self, record):
         with self._transaction() as cursor:
@@ -257,3 +270,10 @@ class SQLiteJobStore:
             if self.descriptor is not None:
                 os.close(self.descriptor)
                 self.descriptor = None
+
+
+def open_job_store(settings, max_output_bytes=1048576):
+    if settings['backend'] == 'redis':
+        from auton.classes.job_redis import RedisJobStore
+        return RedisJobStore(settings['url'], settings['namespace'], settings['timeout'], max_output_bytes)
+    return SQLiteJobStore(settings['path'], settings['timeout'], max_output_bytes)

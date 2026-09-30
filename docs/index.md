@@ -9,3 +9,5 @@
    1.0-readiness
    architecture-review-2026-09-27
    pypi
+   next-release-work
+   release-1.2.0

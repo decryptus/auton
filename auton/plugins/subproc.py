@@ -28,7 +28,7 @@ from sonicprobe import helpers
 from auton.classes.exceptions import (AutonConfigurationError,
                                       AutonTargetUnauthorized,
                                       AutonTargetFailed,
-                                      AutonTargetTimeout)
+                                      AutonTargetTimeout, AutonTargetCancelled)
 from auton.classes.plugins import AutonPlugBase, PLUGINS
 from auton.classes.availability import Availability, LaunchStopped
 
@@ -38,6 +38,7 @@ LOG = logging.getLogger('auton.plugins.subproc')
 class AutonSubProcPlugin(AutonPlugBase):
     PLUGIN_NAME = 'subproc'
     DEFER_LAUNCH_GATE = True
+    SUPPORTS_CANCELLATION = True
 
     def __init__(self, name):
         AutonPlugBase.__init__(self, name)
@@ -66,6 +67,8 @@ class AutonSubProcPlugin(AutonPlugBase):
                 decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
                 selector.register(pipe, selectors.EVENT_READ, (callback, decoder))
             while selector.get_map() or proc.poll() is None:
+                if obj.cancel_requested:
+                    raise AutonTargetCancelled('job cancelled by its owner', code=130)
                 if self._killed:
                     raise AutonTargetFailed('daemon stopping', code=130)
                 remaining = deadline - time.monotonic()
@@ -324,6 +327,8 @@ class AutonSubProcPlugin(AutonPlugBase):
             if proc.returncode:
                 raise subprocess.CalledProcessError(proc.returncode, args[0])
         except LaunchStopped:
+            if obj.cancel_requested:
+                raise AutonTargetCancelled('job cancelled before execution', code=130) from None
             raise AutonTargetFailed('daemon stopped before execution', code=130) from None
         except (AutonTargetFailed, AutonTargetTimeout, AutonTargetUnauthorized):
             raise

@@ -21,10 +21,12 @@ class VisibilityError(Exception):
 
 
 class DaemonClient:
-    def __init__(self, uri, auth=None, http_timeout=DEFAULT_HTTP_TIMEOUT, session=None):
+    def __init__(self, uri, auth=None, http_timeout=DEFAULT_HTTP_TIMEOUT, session=None, transport=None):
         origin = normalize_origin(uri)
         if not math.isfinite(http_timeout) or http_timeout <= 0:
             raise ValueError('http-timeout must be positive')
+        from auton_client.transport import validate_transport
+        self.transport = validate_transport(transport, [origin])
         self.uri = origin
         from auton_client.credentials import bind_credentials
         self.auth = bind_credentials(auth, [origin])
@@ -37,7 +39,7 @@ class DaemonClient:
             response = self.session.get(self.uri + path, params=params,
                                         auth=self.auth, timeout=self.http_timeout,
                                         headers=RemoteClient._build_headers(),
-                                        allow_redirects=False)
+                                        allow_redirects=False, **self.transport)
             if response.status_code != 200:
                 raise VisibilityError('HTTP %s' % response.status_code)
             data = response.json()
@@ -81,6 +83,19 @@ class DaemonClient:
                 or not isinstance(item.get('name'), str)
                 or ('description' in item and not isinstance(item['description'], str)) for item in data):
             raise VisibilityError('invalid endpoints response')
+        for item in data:
+            schema = item.get('parameters')
+            if schema is None:
+                continue
+            if (not isinstance(schema, dict) or schema.get('version') != 1
+                    or not isinstance(schema.get('args'), list) or len(schema['args']) > 64):
+                raise VisibilityError('invalid endpoint parameter schema')
+            for field in schema['args']:
+                if (not isinstance(field, dict) or not isinstance(field.get('name'), str)
+                        or not isinstance(field.get('description', ''), str)
+                        or not isinstance(field.get('choices', []), list)
+                        or any(not isinstance(value, str) for value in field.get('choices', []))):
+                    raise VisibilityError('invalid endpoint parameter fields')
         return data
 
     def stats(self):

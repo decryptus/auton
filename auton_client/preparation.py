@@ -6,6 +6,7 @@ import json
 
 from auton_client.operations import OperationService
 from auton_client.export import export_result
+from auton_client.reconcile import ReconciliationService, load_report
 from auton_client.scenarios import ScenarioService, select_scenarios
 from auton_client.connections import select_connections, target_origins
 
@@ -37,10 +38,22 @@ class PreparationView:
         self.endpoints = []
         self.progress = {'revision': 0, 'rows': [], 'operation_id': None}
         self.export_path = ''
+        self.import_path = ''
+        self.parameter_catalogue = {}
+        self.parameter_fields = []
+        self.parameter_values = []
+        self.parameter_index = 0
+        self.parameter_input = ''
 
     def update(self, snapshots):
         self.endpoints = sorted({item['name'] for data in snapshots.values()
                                  for item in data.get('endpoints', [])})
+        catalogues = {}
+        for data in snapshots.values():
+            for item in data.get('endpoints', []):
+                catalogues.setdefault(item['name'], set()).add(json.dumps(item.get('parameters'), sort_keys=True))
+        self.parameter_catalogue = {name: json.loads(next(iter(values)))
+                                    for name, values in catalogues.items() if len(values) == 1}
         if self.mode == 'running':
             self.progress = self.session.progress.snapshot()
         try:
@@ -106,10 +119,48 @@ class PreparationView:
         self.mode, self.scroll = 'confirm', 0
 
     def handle(self, key):
+        if self.editing == 'parameter_input':
+            if key == 27:
+                self.editing = None
+            elif key in (10, 13):
+                field = self.parameter_fields[self.parameter_index]
+                value = self.parameter_input
+                if field.get('required', True) and not value:
+                    self.error = 'This parameter is required.'
+                    return True
+                if value and field.get('choices') and value not in field['choices']:
+                    self.error = 'Choose one of the published values.'
+                    return True
+                self.parameter_values.append(value)
+                self.parameter_index += 1
+                self.parameter_input, self.error = '', ''
+                if self.parameter_index == len(self.parameter_fields):
+                    while (self.parameter_values and not self.parameter_values[-1]
+                           and not self.parameter_fields[len(self.parameter_values) - 1].get('required', True)):
+                        self.parameter_values.pop()
+                    self.input = json.dumps({'args': self.parameter_values, 'env': {}})
+                    self.editing = None
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                self.parameter_input = self.parameter_input[:-1]
+            elif 32 <= key <= 126 and len(self.parameter_input) < MAX_INPUT:
+                self.parameter_input += chr(key)
+            return True
         if self.editing is not None:
             if key in (10, 13, 27):
+                importing = self.editing == 'import_path' and key != 27
                 exporting = self.editing == 'export_path' and key != 27
                 self.editing = None
+                if importing:
+                    try:
+                        targets = select_connections(self.selected[0], self.selected[1], self.connections, self.groups)
+                        settings = {key: self.settings[key] for key in ('auth', 'http_timeout', 'timeout', 'transport')
+                                    if key in self.settings}
+                        self.service = ReconciliationService(load_report(self.import_path), targets, **settings)
+                        self.session.start(self.service)
+                        self.result = self.result_lines = None
+                        self.mode, self.error, self.scroll = 'running', '', 0
+                    except (OSError, ValueError) as error:
+                        self.error = 'Cannot reconcile report: ' + str(error)
                 if exporting:
                     try:
                         export_result(self.result, self.export_path)
@@ -163,7 +214,20 @@ class PreparationView:
             elif key in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
                 self.scroll = max(0, self.scroll - (10 if key == curses.KEY_PPAGE else 1))
             return True
-        if key == 9:
+        if key == ord('p'):
+            schema = self.parameter_catalogue.get(self.selected[4][0]) if len(self.selected[4]) == 1 else None
+            if not schema or not schema.get('args'):
+                self.error = 'Select one endpoint with a consistent published parameter schema.'
+            else:
+                self.parameter_fields = schema['args']
+                self.parameter_values, self.parameter_index = [], 0
+                self.parameter_input, self.error = '', ''
+                self.editing = 'parameter_input'
+        elif key == ord('r'):
+            self.editing = 'import_path'
+            self.import_path = ''
+            self.error = ''
+        elif key == 9:
             self.section = (self.section + 1) % len(SECTIONS)
             self.index = 0
             self.search = ''
@@ -199,10 +263,23 @@ class PreparationView:
         return True
 
     def lines(self):
+        if self.editing == 'parameter_input':
+            field = self.parameter_fields[self.parameter_index]
+            return ['GUIDED ARGUMENTS - Enter next; Esc cancels without changing inputs',
+                    'This form replaces args and clears env; server validation remains authoritative.',
+                    '%s/%s: %s (%s, %s)' % (self.parameter_index + 1, len(self.parameter_fields),
+                        field['name'], field.get('type', 'string'), 'required' if field.get('required', True) else 'optional'),
+                    field.get('description', ''), 'Choices: ' + ', '.join(field.get('choices', [])),
+                    'Value: ' + self.parameter_input]
+        if self.editing == 'import_path':
+            return ['RECONCILE REPORT - Enter reads; Esc cancels',
+                    'Select trusted targets first. No submission or scenario continuation.',
+                    'Report path: ' + self.import_path]
         if self.mode == 'confirm':
             return ['CONFIRM EXECUTION - y submits; n/Esc returns'] + self.preview
         if self.mode == 'running':
-            lines = ['EXECUTING - x stops observation, not remote jobs',
+            label = 'READING SAVED JOBS' if isinstance(self.service, ReconciliationService) else 'EXECUTING'
+            lines = [label + ' - x stops observation, not remote jobs',
                      'Operation: ' + str(self.progress['operation_id']),
                      'Observed states; pending means not yet submitted.']
             for row in self.progress['rows']:
@@ -221,10 +298,12 @@ class PreparationView:
             lines = ['OPERATION RESULT - w exports JSON; Esc returns to monitor']
             if not self.result:
                 return lines
+            if self.result.get('reconciled'):
+                lines.append('READ-ONLY RECONCILIATION - durations are from the saved observation')
             lines.append('%s | %s' % (self.result['operation_id'], self.result['status']))
             for target in self.result['targets']:
-                lines.append('%s | %s | %sms' % (target['target'], target['status'], target['duration_ms']))
-                lines.append('  Origin: ' + target['uri'])
+                lines.append('%s | %s | %sms' % (target['target'], target['status'], target.get('duration_ms', '?')))
+                lines.append('  Origin: ' + str(target.get('uri', '-')))
                 steps = [(scenario['name'], step) for scenario in target.get('scenarios', [])
                          for step in scenario['steps']] if 'scenarios' in target else [('', target)]
                 for scenario, step in steps:
@@ -249,6 +328,6 @@ class PreparationView:
                 ' | '.join('[' + name + ']' if i == self.section else name for i, name in enumerate(SECTIONS)),
                 'Selected targets/groups: %s/%s; scenarios/groups: %s/%s; endpoints: %s' %
                 tuple(len(selected) for selected in self.selected),
-                'Search (/): ' + self.search, 'Inputs (i, JSON): ' + self.input] + [
+                'Search (/): ' + self.search, 'Inputs (i, JSON): ' + self.input, 'p guided arguments | r reconcile a saved report'] + [
                 ('> ' if i == self.index else '  ') + ('[x] ' if name in self.selected[self.section] else '[ ] ') + name
                 for i, name in enumerate(rows)]

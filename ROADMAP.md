@@ -69,7 +69,7 @@ Endpoint discovery is implemented through the existing authenticated `/endpoints
 catalogue and current endpoint ACLs. Optional explicitly published descriptions
 appear in TUI and web selection; private plugin configuration is never serialized.
 Endpoints without metadata keep their previous response shape. Parameter schemas
-and generated forms remain planned, with execution-time validation required.
+and generated forms are implemented in the 1.2.0 release, with execution-time validation.
 
 Exact routes remain implementation details and must respect existing HTTP conventions.
 
@@ -397,9 +397,10 @@ targets:
 - Scenario affinity is implemented: the first successful step pins the accepting
   daemon for every remaining step/scenario in that invocation. Later failure or
   maintenance stops that target; no cross-host continuation is inferred.
-- TUI execution shows chains and attempted origins. Monitoring deliberately stays
-  on primary origins; select physical target names to inspect replacement daemons.
-  A richer origin-aware monitoring view remains future work.
+- TUI execution shows chains and attempted origins. Monitoring now reads
+  across all explicitly selected origins: `target` is the primary, `target@2` the
+  second origin, and so on. Read aggregation is bounded and retains each physical
+  origin; execution still selects one logical target, with no implicit broadcast.
 - Cover maintenance/admission races, unreachable origins, exhausted lists,
   ambiguous responses, pinned observation and legacy compatibility in tests.
 
@@ -423,8 +424,11 @@ or transactional durability. Real terminal captures are included in the README.
 - preserve process-group cleanup and output limits;
 - keep ACL checks both at admission and execution.
 
-Persistent job storage is optional; the default remains in memory. Redis is a later
-adapter, with independent auth/history configuration and mixed backends when supported.
+Persistent job storage is optional; the default remains in memory. Redis remains optional. Reuse `dwho.adapters.redis.DWhoAdapterRedis` for connections
+and Redis operations; do not create a competing low-level adapter in Auton. Keep
+job retention, recovery and ownership policy in Auton application services. Review
+timeouts, atomicity, isolation and lifecycle before enabling the backend, with
+independent auth/history configuration and mixed backends when supported.
 
 ## 1.0 gate — Authentication and local daemon web console
 
@@ -454,9 +458,10 @@ as the HTTP API. No central service is required.
   ownership and maintenance operator checks remain in force. Basic stays available
   as an explicit compatibility mode.
 - Authentication state and optional local job history survive restart in separate
-  SQLite files. Interrupted jobs are never replayed. Redis is deferred; configure
-  the two stores independently and allow mixed backends once both are supported.
-- SSO/OIDC and mTLS remain separately scoped extensions.
+  SQLite files. Interrupted jobs are never replayed. The 1.2.0 release adds optional DWho-backed Redis job history;
+  authentication remains a separate SQLite store.
+- The 1.2.0 release implements opt-in OIDC browser SSO and native mTLS,
+  with explicit local account authorization; see the working acceptance checklist.
 
 ## Milestone 7 — Website
 
@@ -528,18 +533,24 @@ Before a future major stable release:
 
 ## Current priorities
 
-Auton 1.0.2 client and daemon packages are published, with matching Docker images
-and the website pinned to that release. The 1.0 gate is complete; its reviews
-remain evidence for the release, not an outstanding publication checklist.
-The 1.0.2 patch preserves job references after uncertain submission outcomes.
+Auton 1.2.0 completes the authorized work below. Live TUI progress and private
+JSON export were introduced in 1.1.0. The 1.0 readiness review is historical evidence.
 
-1. Release 1.1.0 adds live per-target/per-step TUI progress and explicit JSON
-   result export; publication remains gated by CI and installed-artifact acceptance.
-2. Keep installed-package, Python matrix, Docker/Compose, browser and documentation
-   checks as release gates, including regeneration of the website's pinned captures.
-3. Scope cancellation and durable scenario continuation separately; neither is
-   implied by stopping observation or exporting an operation result.
-4. Contact-form delivery remains optional follow-up; the contact link works already.
+The 1.2.0 release is prepared in PR #36. Package/image publication and the final
+website source-pin update are verified separately after merge.
+See [the working checklist](docs/next-release-work.md) for the complete authorized
+scope, verification evidence and publication handoff:
 
-See [the 1.0 readiness review](docs/1.0-readiness.md) and
-[release/upgrade guide](docs/release-1.0.md) for evidence and boundaries.
+1. Read-only report reconciliation and replacement-origin monitoring.
+2. Guided endpoint parameters with server-side validation.
+3. Explicit owner-authorized cancellation, separate from stopping observation.
+4. Detached control-host workers with durable observation checkpoints and no replay.
+5. Explicit error continuation, optional DWho-backed Redis history, SSO/OIDC and mTLS.
+6. Python 3.13, reproducible wheels, retention and final interface/documentation review.
+
+Installed-package, Python matrix, Docker/Compose, real terminal, browser, Redis and
+documentation checks remain release gates. Website captures must be regenerated
+from the final pinned release. Development pauses after the authorized work is
+finished and accepted; a working branch is not delivery.
+
+The contact form remains outside this set, pending delivery configuration.

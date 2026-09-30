@@ -62,6 +62,21 @@ class ScenarioTests(unittest.TestCase):
             self.assertEqual(one['scenarios'][1]['status'], 'skipped')
             self.assertEqual(two['status'], 'completed')
 
+    def test_continue_on_error_is_explicit_and_never_continues_unknown(self):
+        definition = scenario('check', 'deploy')
+        definition['steps'][0]['continue_on_error'] = True
+        for state, expected in (('failed', ['check', 'deploy']), ('unknown', ['check'])):
+            calls = []
+            result = ScenarioService({'one': 'http://one'}, {'deploy': definition},
+                client_factory=factory_with(calls, ('http://one', 'check', state))).run()
+            self.assertEqual([call[1] for call in calls], expected)
+            self.assertEqual(result['status'], 'failed' if state == 'failed' else 'incomplete')
+            self.assertEqual(result['targets'][0]['scenarios'][0]['steps'][0]['continued_after_error'],
+                             state == 'failed')
+        definition['steps'][0]['continue_on_error'] = 'yes'
+        with self.assertRaisesRegex(ValueError, 'boolean'):
+            validate_scenarios({'deploy': definition})
+
     def test_output_limit_is_shared_by_all_steps_on_a_target(self):
         calls = []
         output = 'x' * (MAX_RETAINED_OUTPUT_BYTES // 2 + 1)

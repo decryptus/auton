@@ -27,13 +27,13 @@ See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including th
 
 ## Quickstart
 
-This quickstart uses **Auton 1.1.0**, including SQLite authentication, durable
+This quickstart uses **Auton 1.2.0**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.1.0
+git checkout v1.2.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -99,13 +99,13 @@ A successful greeting has `status: complete`, `return_code: 0` and
 successful execution. If submission times out, inspect the same job ID before
 considering another submission.
 
-For the CLI, install the client in a Python 3.10–3.12 virtual environment and run
+For the CLI, install the client in a Python 3.10–3.13 virtual environment and run
 another greeting using that same token:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.1.0
+python -m pip install auton==1.2.0
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -116,9 +116,10 @@ HTTP, CLI and web access share the same identity and retained job history.
 
 ## Runtime and reliability notes
 
-Auton 1.0 targets Linux/Unix with Python **3.10–3.12**. Python 2 support is
-removed. Python 3.13+ is not supported yet because the daemon still imports
-`crypt`. Python 3.12 installs the `pyasyncore` compatibility dependency.
+Auton 1.0 targets Linux/Unix with Python **3.10–3.13**. Python 2 support is
+removed. Python 3.13 uses `legacycrypt` and HTTPdis's `legacy-cgi` compatibility
+dependency. Python 3.12+ installs `pyasyncore`. Newer Python versions remain outside
+the tested support range.
 
 The Docker image now installs **this checkout**, runs as the `auton` user, and
 Compose publishes port 8666 on **127.0.0.1 only**. The quickstart uses required
@@ -216,7 +217,7 @@ endpoints:
       timeout: 5
 ```
 
-Only `name` and the explicitly declared `description` are returned, after current
+Only `name` and explicitly declared discovery metadata are returned, after current
 endpoint ACL checks. Without a description the existing `{"name": "hello"}`
 response is unchanged. Descriptions are plain, single-line printable text, at most
 512 characters; unknown discovery fields and invalid values fail configuration
@@ -228,8 +229,9 @@ The TUI displays and searches descriptions; the web console displays them as tex
 including in its endpoint selector. Execution still requires `run` and endpoint
 permission at admission and execution time. Legacy/anonymous configurations retain
 their existing authentication policy; discovery does not silently strengthen it.
-Parameter schemas and generated input forms remain future work: no arguments,
-constraints or defaults are inferred from the executable's private configuration.
+Auton 1.2.0 also supports explicit parameter schemas and generated
+forms (see below). No arguments, constraints or defaults are inferred from the
+executable's private configuration.
 
 ### Local daemon visibility
 
@@ -680,8 +682,8 @@ silently retried against another daemon.
 explicit `--uri`. One `--uri` (or one `AUTON_URI` value) is accepted as a shortcut.
 Multiple execution `--uri` values remain **failover**, not daemon selection or
 broadcast. Opening the TUI never submits commands. Execution requires the
-separate preparation screen and an explicit confirmation; remote cancellation
-is not implemented.
+separate preparation screen and an explicit confirmation; remote cancellation is a separate CLI/web action in 1.2.0,
+not a side effect of leaving the TUI.
 
 | Key | Action |
 | --- | --- |
@@ -860,14 +862,15 @@ result retention.
 ### Development
 
 ```sh
-python -m pip install -r requirements-autond.txt
+AUTON_PACKAGE=autond python -m pip install '.[auth,oidc,redis]' -r requirements-auton.txt
+python .github/scripts/check-test-collection.py --runner unittest tests
 python -m unittest discover -s tests -v
 AUTON_PACKAGE=autond python -m pip wheel --no-deps . -w dist/server
 AUTON_PACKAGE=auton python -m pip wheel --no-deps . -w dist/client
 ```
 
 The test suite includes real subprocesses and an HTTP client/server integration
-with authentication. CI runs Python 3.10, 3.11 and 3.12 and builds the Docker image.
+with authentication. CI runs Python 3.10, 3.11, 3.12 and 3.13 and builds the Docker image.
 Docker builds track the checkout's code; dependencies and the base image are not
 fully locked, so builds are not yet bit-for-bit reproducible.
 
@@ -999,7 +1002,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.1.0`, or use the Docker image, which includes the authentication
+`autond[auth]==1.2.0`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
@@ -1177,7 +1180,7 @@ Keep the local database and backups private; this is hashed credentials, not an
 encrypted database. The parent must be owned by the daemon and not writable by
 other users, and the database must be a private regular file. Incompatible schemas,
 unsafe permissions and backend errors fail closed. Never replace the file beneath
-a running daemon. Stop all writers before copying a backup. Redis remains planned.
+a running daemon. Stop all writers before copying a backup. Redis job history is available in 1.2.0; authentication remains SQLite.
 An optional browser console is available with SQLite authentication; see below.
 Bearer-only configurations and explicit legacy Basic authentication remain usable
 without enabling the console. TOTP and SSO are not supplied in this release.
@@ -1594,8 +1597,8 @@ with suitable ownership if history must survive container replacement.
 The SQLite adapter reuses Sonicprobe AnySQL with automatic reconnection/replay
 disabled. Authentication and job history require **separate database files**;
 Basic authentication also works with SQLite jobs. With no `job_storage` section,
-the historical in-memory behavior is unchanged. Redis and mixed backends are
-future extensions; no Redis configuration is accepted yet.
+the historical in-memory behavior is unchanged. Auton 1.2.0 also accepts Redis job history through DWho (see below),
+independently of SQLite authentication.
 
 Jobs are committed at admission, before execution, and at completion. Terminal
 stdout/stderr chunks, result codes, timestamps, execution identity and ownership
@@ -1735,3 +1738,246 @@ The script creates the documentation captures; this is not a public execution de
 ![Autond jobs and output](https://auton.run/manual-captures/web-console.png)
 
 ![Autond mobile maintenance view](https://auton.run/manual-captures/web-mobile.png)
+
+### Reconcile a saved operation report
+
+A saved JSON observation can be checked again without submitting jobs or resuming
+skipped scenario steps. Explicit target selections are a trust boundary: every
+contacted origin must belong to the selected target in the current inventory.
+Credentials are loaded from the current configuration, never from the report.
+
+```sh
+umask 077
+auton -c targets.yml -t production --reconcile observation.json > observation-current.json
+```
+
+Input JSON is limited to 16 MiB, with at most 8 MiB of refreshed output retained
+across the snapshot. Larger exports must be split by operation/target before
+reconciliation; this limit is checked before network access.
+
+This performs one bounded, read-only snapshot. A missing, expired or inaccessible
+job remains **unknown**; it is never considered safe to replay. Already skipped,
+rejected or unsubmitted steps remain unchanged. Outputs are refreshed from the
+same daemon and job identity; saved observation durations are retained and labeled
+as such in the TUI. The original report is not modified. Do not redirect
+to the input report. Exit status is zero only when all observed work is completed
+successfully. `--operation-timeout` bounds the overall observation budget between
+requests, and `--http-timeout` bounds each HTTP request.
+
+In the TUI preparation screen (`e`), select trusted targets/groups, then press `r`
+and enter a saved report path. This reads existing jobs without an execution
+confirmation or submission. Use `w` on the resulting observation to save a new
+private JSON file. Saving a report is explicit; a client that exited before export
+has no automatically recoverable report.
+
+### Replacement-origin monitoring
+
+The TUI reads every origin of the explicitly selected target chains. `deploy`
+identifies the primary origin and `deploy@2` the second origin, with ranks continuing
+in inventory order. Detail/output reads stay pinned to the selected physical
+origin. At most 128 origins may be selected, with four concurrent read workers.
+Execution preparation still uses logical target names: this view does not turn a
+failover chain into broadcast execution. Aliases that share a physical origin show
+that origin separately; aggregate counts are counts of displayed connections.
+
+### Explicit continuation after a failed step
+
+A scenario step may set `continue_on_error: true`. The default remains `false`.
+Continuation applies only to a confirmed terminal failure, preserves that failure
+in the final result and pins later steps to the same daemon. Unknown outcomes,
+refusals and observation timeouts always stop the target's sequence. This option
+never retries a job, rolls back work or converts failure into success.
+
+### Published positional parameters
+
+An endpoint can explicitly publish a bounded argument contract. Only this public
+metadata is returned by `/endpoints`, after endpoint authorization. No private
+plugin configuration is published.
+
+```yaml
+discovery:
+  description: Check one service
+  parameters:
+    version: 1
+    args:
+      - name: service
+        choices: [web, database]
+      - name: attempts
+        type: integer
+        required: false
+```
+
+Each field is one literal positional argument. Supported types are `string`
+(default), `integer` and `boolean` (`true`/`false` text). Fields may declare
+`description`, `choices`, `max_length` (1–4096) and `required` (default true).
+Optional fields must be trailing; at most 64 fields are allowed. The daemon rejects
+missing, extra or invalid arguments before admission, and validates again in the
+worker. Endpoints without a schema retain their existing input behavior. This
+schema describes positional arguments only, not environment variables or uploads.
+
+The web console builds a form. In TUI preparation, select an endpoint and press
+`p` for guided input; Escape leaves the previous input unchanged. The guided TUI
+form replaces arguments and clears the environment. Conflicting published schemas
+cannot be combined into a guided form. Execution still requires the normal preview
+and confirmation. Raw CLI arguments remain available and receive the same server
+validation.
+
+### Explicit job cancellation
+
+An authenticated job owner can request cancellation with the new `cancel` scope;
+existing tokens are not silently granted that permission. With Basic authentication,
+the authenticated owner and endpoint ACL are checked. The bundled `subproc` adapter
+supports cancellation; other adapters must explicitly support it.
+
+```sh
+auton --mode cancel --uri https://node.example.com --endpoint backup \
+  --uid 00000000-0000-0000-0000-000000000001 -k operator.token
+```
+
+The request is pinned to one daemon and is never retried automatically. A queued
+job is prevented from launching, including during maintenance. A running subprocess
+and its process group are terminated before terminal state is reported. The response
+may show `cancel_requested: true` while cleanup is still underway; inspect the job
+to confirm `outcome: job.cancelled`. Cancellation cannot undo already completed
+effects, and a job that wins the completion race retains its actual result.
+
+The web job detail offers a separate confirmation for cancellation. Stopping
+observation in CLI/TUI remains unrelated to cancellation. Existing installations
+must add the `POST /cancel/<endpoint>/<id>` route from the bundled module YAML.
+
+### Unattended scenarios on a control host
+
+```sh
+auton -c targets.yml -g production -s maintenance \
+  --operation-timeout 3600 --detach-dir /private/new-operation
+```
+
+`--detach-dir` starts an explicit detached Unix worker on the current control host.
+The foreground command returns after detachment; closing its terminal does not
+stop the sequence. The worker runs the same validated application service, with
+its existing credentials in memory. No permanent scheduler or central daemon is
+required. Keep the control host running: this mode does not migrate execution to
+another machine or restart the worker automatically after a host failure.
+
+The directory must be new; it is created with mode 0700. `observation.json` is
+atomically replaced with private 0600 checkpoints and, on completion, the final
+result. Checkpoints contain job references and states, not credentials or input
+payloads. A checkpoint is written before each submission; an interrupted or lost
+response remains uncertain. If checkpoint persistence fails, later submissions
+are stopped. A partial checkpoint omits command output until the final result;
+use `--reconcile` with the current trusted inventory to read retained daemon output.
+There is no automatic command replay or continuation after a worker crash.
+
+### Optional Redis job history through DWho
+
+Install `autond[redis]` and explicitly configure a Redis namespace per daemon:
+
+```yaml
+general:
+  job_storage:
+    backend: redis
+    url: redis://127.0.0.1:6379/0
+    namespace: autond-one
+    timeout: 3
+```
+
+Connections are provided by `dwho.adapters.redis.DWhoAdapterRedis`. Auton supplies
+only its job snapshot, retention and recovery policy. A renewable ownership lease
+and atomic fenced writes prevent simultaneous daemons from writing one namespace.
+Connection/read timeouts are bounded, automatic client retries are disabled, and
+loss of storage/lease blocks subsequent persistence and admission. Losing a lease
+cannot prove that an external command stopped: unfinished jobs recover as
+interrupted/uncertain and are never replayed.
+
+Use a private Redis service, a unique namespace, suitable Redis ACLs and `rediss://`
+for remote encrypted access. Redis persistence, backups and eviction policy remain
+operator responsibilities; do not use an evicting cache for durable history. Job
+history is optional; the default remains memory and SQLite remains supported.
+Authentication remains separately configured with its existing SQLite backend.
+
+
+### Mutual TLS (since 1.2.0)
+
+Native HTTPS can require a client certificate in addition to the existing
+application identity. Enable required authentication and provide certificate files:
+
+```yaml
+general:
+  auth_mode: required
+  tls:
+    certificate: server-chain.pem
+    private_key: server.key
+    client_ca: client-ca.pem
+```
+
+Paths are relative to the daemon configuration file. The server requires TLS 1.2
+or newer and a client chain trusted by `client_ca`. Certificate names do not grant
+endpoint rights: Basic credentials or an application token/session are still
+required. Protect private keys with private file permissions. Credentials are
+loaded before privilege drop; renewal requires a controlled daemon restart.
+
+CLI/TUI connections accept `--ca-file CA.pem --client-cert client.pem
+--client-key client.key`. These settings also apply to failover, detached workers,
+reconciliation and cancellation. Every selected origin must use HTTPS. Server
+certificate verification cannot be disabled. For browser access, install the
+client certificate in the browser or use a separately secured TLS ingress.
+
+### Browser SSO with OIDC (since 1.2.0)
+
+Install `autond[oidc]` (the Docker image includes it). Configure the
+existing SQLite accounts and HTTPS web console first, then add an explicit OIDC
+provider. Example values below are placeholders, not a working provider:
+
+```yaml
+general:
+  oidc:
+    issuer: https://identity.example/tenant
+    authorization_endpoint: https://identity.example/tenant/authorize
+    token_endpoint: https://identity.example/tenant/token
+    client_id: auton-console
+    client_secret_file: oidc-client.secret  # omit for a public PKCE client
+    jwks_file: oidc-public-keys.json
+    subjects:
+      opaque-provider-subject: operator
+```
+
+Register exactly `https://YOUR-AUTON-ORIGIN/oidc/callback` with the provider.
+Use authorization code flow with PKCE S256 and RS256 ID tokens. The secret file
+must have private permissions (`0600`); it is read at startup. The operator
+supplies the issuer's public RSA signing keys as a JWKS file. Include overlapping
+keys during rotation, update the file and restart: there is no automatic discovery
+or remote key fetch. No URLs from token headers are fetched. HTTPS issuer and
+endpoint URLs are required; token exchanges have bounded timeouts and no retry
+or redirect. Public clients and confidential `client_secret_basic` clients are
+supported; other token authentication methods are not.
+
+The console displays **Sign in with SSO** only when configured. One-use state,
+a browser-bound HttpOnly cookie, nonce, issuer, audience, signature and expiry are
+checked. A subject must map explicitly to an **existing enabled local account**.
+Auton rechecks that account on each request, including revision and current
+permissions. Provider roles never grant local permissions, and SSO never creates
+accounts. Provision a strong random local password if the account should normally
+use SSO; local password login remains available as an independent login method.
+
+SSO sessions stay in bounded daemon memory (maximum 1,024 sessions, 128 pending
+five-minute login flows, four simultaneous token exchanges). They expire at the
+earlier of ID-token expiry or one hour, with a 15-minute idle limit. Restarting
+the daemon signs SSO users out. Sign out ends the local session; it does not sign
+the user out of the identity provider. There is no refresh token, provider logout
+propagation, device flow or automatic CLI login. CLI/cron continues to use explicit
+local bearer tokens or Basic credentials, optionally with mTLS.
+
+### Idle result retention and build verification
+
+The daemon now sweeps expired terminal results even without incoming API reads.
+It preserves queued/running work, deletes durable snapshots under the same service
+lock as admission, and degrades health/admission if persistent deletion fails.
+A sweep runs at most every 60 seconds (sooner for a shorter configured TTL), with
+at most 16 deletions and a one-second budget checked between storage operations.
+A large backlog can therefore take several sweeps. Retention does not securely
+erase database backups or provide a forensic deletion guarantee.
+
+Auton 1.2.0 supports Python 3.10–3.13. CI compares wheel bytes from two separate
+build directories with the same source, tool versions and `SOURCE_DATE_EPOCH`.
+This checks reproducibility within that environment; it does not claim identical
+artifacts across arbitrary operating systems or dependency versions.

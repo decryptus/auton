@@ -1,7 +1,10 @@
 """Local credential verification and explicit daemon authentication policy."""
 import base64
 import binascii
-import crypt
+try:
+    import crypt
+except ImportError:
+    import legacycrypt as crypt
 import hashlib
 import hmac
 import ipaddress

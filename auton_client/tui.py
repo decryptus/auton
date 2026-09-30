@@ -20,6 +20,18 @@ DEFAULT_REFRESH = 2.0
 STATUS_LABELS = {'new': 'queued', 'processing': 'running', 'complete': 'completed'}
 
 
+def status_label(job):
+    if job.get('execution_uncertain'):
+        return 'unknown'
+    if job.get('outcome') == 'job.cancelled':
+        return 'cancelled'
+    if job.get('cancel_requested') and job['status'] != 'complete':
+        return 'cancelling'
+    if job['status'] == 'complete' and job.get('return_code') not in (0, None):
+        return 'failed'
+    return STATUS_LABELS[job['status']]
+
+
 def safe_text(value):
     """Do not interpret terminal controls supplied by commands or remote metadata."""
     return ''.join(char if char.isprintable() else ' ' for char in str(value))
@@ -63,6 +75,7 @@ class OperatorView:
         self.preparation_wrapped = None
         self.preparation_wrap_key = None
         self.primary_only = False
+        self.origin_aware = False
 
     @property
     def daemon(self):
@@ -244,16 +257,17 @@ class OperatorView:
             line(0, 'AUTON %s | %s' % (__version__, panel.mode.upper()), curses.A_BOLD)
             line(1, panel.error, curses.A_BOLD)
             values = panel.lines()
-            if panel.mode == 'select':
-                for y, value in enumerate(values[:5], 2):
+            if panel.mode == 'select' and panel.editing not in ('import_path', 'parameter_input'):
+                for y, value in enumerate(values[:6], 2):
                     line(y, value)
-                available = height - 8
+                available = height - 9
                 start = max(0, panel.index - available + 1)
-                for y, value in enumerate(values[5 + start:5 + start + available], 7):
+                for y, value in enumerate(values[6 + start:6 + start + available], 8):
                     line(y, value)
             else:
                 wrap_key = (id(panel.result), panel.mode, width, id(panel.service),
-                            panel.progress['revision'], panel.editing, panel.export_path)
+                            panel.progress['revision'], panel.editing, panel.export_path, panel.import_path,
+                            panel.parameter_index, panel.parameter_input)
                 if self.preparation_wrap_key != wrap_key:
                     self.preparation_wrapped = [part for value in values for part in
                         (textwrap.wrap(safe_text(value), width - 1, replace_whitespace=False) or [''])]
@@ -286,7 +300,7 @@ class OperatorView:
             coverage = 'Jobs coverage %s/%s | ' % (stats.get('responding', 0), len(self.monitor.clients))
         line(4, coverage + (' | '.join('%s: %s' % item for item in errors.items()) if errors else
              ('Refreshing...' if self.monitor.worker is not None else 'Last refresh completed')))
-        available = height - 8
+        available = height - 9
         if self.view == 2:
             job = self.selected_job()
             detail = self.data.get('detail', {})
@@ -324,18 +338,18 @@ class OperatorView:
                             value += ' — ' + item['description']
                     else:
                         value = '%-11s %-5s %s' % (
-                            STATUS_LABELS[item['status']], item.get('return_code'), item['uid'])
+                            status_label(item), item.get('return_code'), item['uid'])
                     if self.daemon is None:
                         value = item['daemon'] + ' / ' + value
                 line(6 + i - start, value, curses.A_REVERSE if i == self.index else 0)
         line(height - 2, 'Tab view | Enter open | j/k move | / search | s state | c clear')
-        line(height - 1, ('Primary origins monitored | ' if self.primary_only else '') +
+        line(height - 1, ('All origins monitored (@N = replacement rank) | ' if self.origin_aware else '') +
              'e prepare | r refresh | p pause | v stdout/stderr | q quit')
         screen.refresh()
 
 
 def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None, selected=None,
-        groups=None, scenarios=None, scenario_groups=None):
+        groups=None, scenarios=None, scenario_groups=None, transport=None):
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError('TUI requires an interactive terminal')
     if not math.isfinite(refresh) or refresh < 0.2:
@@ -343,19 +357,19 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     connections = daemon_specs(specs, uris, configured) if selected is None else selected
     if not connections:
         raise ValueError("selection contains no targets")
-    from auton_client.connections import target_origins
+    from auton_client.connections import target_origins, monitoring_origins
     from auton_client.credentials import bind_credentials
     auth = bind_credentials(auth, [uri for target in connections.values() for uri in target_origins(target)])
-    clients = {name: DaemonClient(target_origins(uri)[0], auth, http_timeout)
-               for name, uri in connections.items()}
+    origins = monitoring_origins(connections)
+    clients = {name: DaemonClient(uri, auth, http_timeout, transport=transport) for name, uri in origins.items()}
     monitor = FleetMonitor(clients)
     from auton_client.preparation import PreparationView
     from auton_client.session import ExecutionSession
     session = ExecutionSession()
     preparation = PreparationView(connections, groups or {}, scenarios or {}, scenario_groups or {},
-                                  session, dict(auth=auth, http_timeout=http_timeout))
+                                  session, dict(auth=auth, http_timeout=http_timeout, transport=transport))
     view = OperatorView(monitor, refresh, preparation=preparation)
-    view.primary_only = any(len(target_origins(value)) > 1 for value in connections.values())
+    view.origin_aware = any(len(target_origins(value)) > 1 for value in connections.values())
     def display(screen):
         screen.keypad(True)
         screen.timeout(100)

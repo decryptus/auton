@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """auton"""
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 
 import argparse
 import os
@@ -42,6 +42,13 @@ def argv_parse_check():
     parser        = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--config', help='Client YAML inventory; targets must still be selected explicitly')
+    parser.add_argument('--ca-file', help='CA bundle for HTTPS server verification')
+    parser.add_argument('--client-cert', help='Client certificate chain for mutual TLS')
+    parser.add_argument('--client-key', help='Private key matching --client-cert')
+    parser.add_argument('--detach-dir', metavar='NEW_DIRECTORY',
+                        help='Start an unattended worker on this host and save private observations')
+    parser.add_argument('--reconcile', metavar='REPORT.json',
+                        help='Read current states from a saved report; never submit or resume jobs')
     parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
     parser.add_argument('--daemon', action='append', default=[], metavar='SELECTOR[=URI]',
                         help='TUI target name/glob/~regex from --config or NAME=URI')
@@ -122,8 +129,8 @@ def argv_parse_check():
     parser.add_argument("--mode",
                         dest      = 'mode',
                         default   = 'autorun',
-                        choices   = ('autorun', 'run', 'status'),
-                        help      = "Auton mode: autorun, run, status, instead of %(default)s")
+                        choices   = ('autorun', 'run', 'status', 'cancel'),
+                        help      = "Auton mode: autorun, run, status, cancel, instead of %(default)s")
     parser.add_argument("-e",
                         action    = 'append',
                         dest      = 'envvars',
@@ -188,6 +195,11 @@ def argv_parse_check():
             parser.error('--no-return-code cannot hide multi-target failures')
     if (options.tui or not (options.target or options.target_group)) and (options.operation_id or options.parallel != 4 or options.operation_timeout != 300):
         parser.error('operation options require execution with --target or --target-group')
+    if options.mode == 'cancel':
+        if (options.uid is None or len(options.uri) != 1 or not options.endpoint
+                or options.args or options.argfiles or options.margs or options.margsfiles
+                or options.envvars or options.envfiles or options.imp_envvars or options.load_envfiles):
+            parser.error('cancel requires one explicit --uri, --endpoint and --uid, without execution inputs')
     if options.uid is None:
         options.uid = str(uuid.uuid4())
 
@@ -200,6 +212,15 @@ def argv_parse_check():
                 or options.margsfiles or options.envvars or options.envfiles
                 or options.imp_envvars or options.load_envfiles):
             parser.error('--tui prepares execution interactively; CLI payload options are incompatible')
+
+    if options.detach_dir and (options.tui or options.reconcile or not (options.target or options.target_group)):
+        parser.error('--detach-dir requires explicit CLI execution targets and cannot reconcile or open TUI')
+    if options.reconcile:
+        if (options.tui or not (options.target or options.target_group) or options.endpoint
+                or options.scenario or options.scenario_group or options.operation_id
+                or options.args or options.argfiles or options.margs or options.margsfiles
+                or options.envvars or options.envfiles or options.imp_envvars or options.load_envfiles):
+            parser.error('--reconcile requires explicit targets and cannot include execution or TUI options')
 
     scenario_mode = bool(options.scenario or options.scenario_group)
     if scenario_mode:
@@ -251,6 +272,11 @@ def argv_parse_check():
         except ValueError as error:
             parser.error(str(error))
 
+    from auton_client.transport import transport_from_options
+    try:
+        options.transport = transport_from_options(options)
+    except ValueError as error:
+        parser.error(str(error))
     return options
 
 
@@ -331,7 +357,8 @@ class AutonClient(RemoteClient, PayloadBuilder):
         PayloadBuilder.__init__(self, options)
         auth = credentials_from_options(options)
         RemoteClient.__init__(self, options.uri, options.endpoint, options.uid,
-                              payload=self.payload, auth=auth, http_timeout=options.http_timeout)
+                              payload=self.payload, auth=auth, http_timeout=options.http_timeout,
+                              transport=options.transport)
 
     @staticmethod
     def _show_results(data):
@@ -361,7 +388,7 @@ def main(options):
                               configured=options.configured_targets, selected=options.selected_targets,
                               groups=options.configured_groups,
                               scenarios=options.selected_scenarios if options.selected_scenarios is not None else options.configured_scenarios,
-                              scenario_groups=options.configured_scenario_groups)
+                              scenario_groups=options.configured_scenario_groups, transport=options.transport)
         except ImportError:
             print('Auton TUI requires Python curses support.', file=sys.stderr)
             return_code = 1
@@ -390,20 +417,36 @@ def main(options):
     rc      = 0
 
     try:
-        if options.target or options.target_group:
+        if options.reconcile:
+            from auton_client.reconcile import ReconciliationService, load_report
+            result = ReconciliationService(load_report(options.reconcile), options.selected_targets,
+                auth=credentials_from_options(options), http_timeout=options.http_timeout,
+                timeout=options.operation_timeout, transport=options.transport).run()
+            print(json.dumps(result))
+            rc = int(result['status'] != 'completed')
+        elif options.mode == 'cancel':
+            from auton_client.execution import cancel_job
+            rc = cancel_job(options.uri[0], options.endpoint, options.uid,
+                            credentials_from_options(options), options.http_timeout, transport=options.transport)
+        elif options.target or options.target_group:
             from auton_client.operations import OperationService
             auth = credentials_from_options(options)
             settings = dict(auth=auth, http_timeout=options.http_timeout, parallel=options.parallel,
-                            timeout=options.operation_timeout, delay=options.delay)
+                            timeout=options.operation_timeout, delay=options.delay, transport=options.transport)
             if options.selected_scenarios:
                 from auton_client.scenarios import ScenarioService
                 operation = ScenarioService(options.selected_targets, options.selected_scenarios, **settings)
             else:
                 operation = OperationService(options.selected_targets, options.endpoint,
                                              payload=PayloadBuilder(options).payload, **settings)
-            result = operation.run(options.operation_id)
+            if options.detach_dir:
+                from auton_client.detached import start_detached
+                result = start_detached(operation, options.detach_dir, options.operation_id)
+                rc = 0
+            else:
+                result = operation.run(options.operation_id)
+                rc = int(result['status'] != 'completed')
             print(json.dumps(result))
-            rc = int(result['status'] != 'completed')
         else:
             auton = AutonClient(options)
             rc = getattr(auton, "do_%s" % options.mode)()

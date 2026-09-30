@@ -12,14 +12,14 @@ from urllib3.exceptions import NewConnectionError
 from sonicprobe.libs import urisup
 
 SYSLOG_NAME = 'auton'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 DEFAULT_DELAY = 0.5
 DEFAULT_HTTP_TIMEOUT = 30
 
 
 class RemoteClient(object):
     def __init__(self, uris, endpoint, uid, payload=None, auth=None,
-                 http_timeout=DEFAULT_HTTP_TIMEOUT, session=None, sleep=time.sleep):
+                 http_timeout=DEFAULT_HTTP_TIMEOUT, session=None, sleep=time.sleep, transport=None):
         if not uris:
             raise ValueError('missing variable AUTON_URI')
         if not uid:
@@ -34,6 +34,8 @@ class RemoteClient(object):
         self.payload = copy.deepcopy(payload or {})
         from auton_client.credentials import bind_credentials
         self._auth = bind_credentials(auth, self.uris)
+        from auton_client.transport import validate_transport
+        self.transport = validate_transport(transport, self.uris)
         self.http_timeout = http_timeout
         self.session = requests if session is None else session
         self.sleep = sleep
@@ -97,6 +99,7 @@ class RemoteClient(object):
                                          auth = self._auth,
                                          headers = self._build_headers(),
                                          timeout = self.http_timeout,
+                                         **self.transport,
                                          allow_redirects = False,
                                          json = self.payload)
                     self.uri = uri
@@ -136,6 +139,7 @@ class RemoteClient(object):
                                            auth = self._auth,
                                            headers = self._build_headers({'X-Auton-Output-Offset': str(self.output_offset)}),
                                            timeout = self.http_timeout,
+                                         **self.transport,
                                            allow_redirects = False)
                         if req.status_code == 404:
                             req.close()
@@ -153,6 +157,7 @@ class RemoteClient(object):
                                    auth = self._auth,
                                    headers = self._build_headers({'X-Auton-Output-Offset': str(self.output_offset)}),
                                    timeout = self.http_timeout,
+                                         **self.transport,
                                    allow_redirects = False)
                 req.raise_for_status()
 

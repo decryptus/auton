@@ -8,21 +8,27 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python: ['3.10', '3.11', '3.12']
+        python: ['3.10', '3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - run: sudo apt-get update && sudo apt-get install -y libmagic1 libcurl4-openssl-dev libssl-dev
-      - run: AUTON_PACKAGE=autond python -m pip install '.[auth]' -r requirements-auton.txt
+      - run: AUTON_PACKAGE=autond python -m pip install '.[auth,oidc]' -r requirements-auton.txt
       - name: Verify test collection
         run: python .github/scripts/check-test-collection.py --runner unittest tests
       - run: python -m unittest discover -s tests -v
       - run: AUTON_PACKAGE=autond python -m pip wheel --no-deps . -w dist/server
       - run: AUTON_PACKAGE=auton python -m pip wheel --no-deps . -w dist/client
       - run: python .github/scripts/check-client-wheel.py
+      - name: Verify reproducible wheels in the same build environment
+        if: matrix.python == '3.12'
+        run: |
+          python -m pip install build wheel 'setuptools>=68,<81'
+          python .github/scripts/check-reproducible-wheels.py
       - name: Check real terminal progress and export
         if: matrix.python == '3.12'
         run: |
@@ -55,13 +61,15 @@ jobs:
         with:
           node-version: '24'
       - run: sudo apt-get update && sudo apt-get install -y libmagic1 libcurl4-openssl-dev libssl-dev
-      - run: AUTON_PACKAGE=autond python -m pip install '.[auth]'
+      - run: AUTON_PACKAGE=autond python -m pip install '.[auth,oidc]'
       - run: npm install --prefix /tmp/auton-browser-tools playwright@1.62.1
       - name: Check real browser flows and capture the console
         env:
           NODE_PATH: /tmp/auton-browser-tools/node_modules
           AUTON_BROWSER_EXECUTABLE: /usr/bin/google-chrome
-        run: node scripts/check_web_console.cjs
+        run: |
+          node scripts/check_web_console.cjs
+          node scripts/check_oidc_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -98,3 +106,27 @@ jobs:
           readme = Path('README.md').read_text()
           assert not re.search(r'\]\(docs/(?:images|screenshots)/', readme)
           PY
+
+  redis-history:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      AUTON_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y libmagic1 libcurl4-openssl-dev libssl-dev
+      - run: AUTON_PACKAGE=autond python -m pip install '.[auth,redis,oidc]' -r requirements-auton.txt
+      - run: python .github/scripts/check-test-collection.py --runner unittest tests
+      - run: python -m unittest discover -s tests -v

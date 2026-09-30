@@ -18,7 +18,7 @@ MAX_SELECTED_STEPS = 128
 MAX_STEP_INPUT_BYTES = 65536
 MAX_DESCRIPTION_LENGTH = 512
 SCENARIO_FIELDS = frozenset(('version', 'description', 'steps'))
-STEP_FIELDS = frozenset(('name', 'endpoint', 'args', 'env'))
+STEP_FIELDS = frozenset(('name', 'endpoint', 'args', 'env', 'continue_on_error'))
 OUTPUT_FIELDS = ('stdout', 'stderr')
 
 
@@ -42,6 +42,8 @@ def validate_scenarios(scenarios):
         for step in steps:
             if not isinstance(step, dict) or not set(step) <= STEP_FIELDS:
                 raise ValueError('invalid scenario step fields')
+            if type(step.get('continue_on_error', False)) is not bool:
+                raise ValueError('continue_on_error must be a boolean')
             validate_connection_name(step.get('name'))
             if step['name'] in names:
                 raise ValueError('duplicate step name')
@@ -134,7 +136,14 @@ class ScenarioService:
                                         for chunk in result[field])
                 target['output_truncated'] |= result['output_truncated']
                 if result['status'] != 'completed':
-                    blocked = scenario + '/' + step_name
+                    definition = next(step for step in self.scenarios[scenario]['steps'] if step['name'] == step_name)
+                    continuing = (result['status'] == 'failed' and result.get('outcome') != 'job.cancelled'
+                                  and definition.get('continue_on_error', False))
+                    result['continued_after_error'] = continuing
+                    if continuing:
+                        origin = result['uri']
+                    else:
+                        blocked = scenario + '/' + step_name
                     current['status'] = target['status'] = result['status']
             if blocked and result['status'] == 'skipped' and progress is not None:
                 progress.update((name, scenario, step_name), result)
