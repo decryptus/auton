@@ -121,6 +121,10 @@ const {chromium} = require('playwright');
     assert.equal(await page.locator('#notice').getAttribute('data-tone'), 'error');
     assert.equal(await page.locator('#notice').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(255, 241, 242)');
     await login('reader');
+    // Login reveals the panel before its asynchronous refresh finishes.
+    // Wait for the reader's rendered controls, not the previous Ready label.
+    await page.waitForFunction(() => document.querySelector('#new-job').disabled &&
+      document.querySelector('#jobs').children.length === 0);
     assert.equal(await page.locator('#new-job').isDisabled(), true);
     assert.equal(await page.locator('#maintenance-controls').isVisible(), false);
     assert.equal(await page.locator('#jobs tr').count(), 0);
