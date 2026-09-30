@@ -1,3 +1,16 @@
+auton (1.0.0) stable; urgency=medium
+
+  * Deliver CLI/TUI visibility, authenticated discovery and the optional daemon Web console.
+  * Add explicit targets/groups, ordered failover, scenarios/groups and per-target results.
+  * Enforce maintenance admission, endpoint ACLs and ownership without ambiguous POST replay.
+  * Add independent SQLite authentication and local job-history stores, without job replay.
+  * Add Argon2 accounts, scoped tokens, browser sessions, CSRF and origin-bound credentials.
+  * Add bounded rotating JSONL lifecycle and authentication-refusal journals.
+  * Document authenticated Compose installation, 0.3.2 migration and known lifecycle limits.
+  * Publish separate matching client/daemon packages and a tested non-root Docker image.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Wed, 30 Sep 2026 08:00:00 +0200
+
 auton (0.3.2) unstable; urgency=medium
 
   * Extract job admission, ownership, capacity and result retention into a neutral service.
