@@ -1735,3 +1735,47 @@ The script creates the documentation captures; this is not a public execution de
 ![Autond jobs and output](https://auton.run/manual-captures/web-console.png)
 
 ![Autond mobile maintenance view](https://auton.run/manual-captures/web-mobile.png)
+
+### Reconcile a saved operation report
+
+A saved JSON observation can be checked again without submitting jobs or resuming
+skipped scenario steps. Explicit target selections are a trust boundary: every
+contacted origin must belong to the selected target in the current inventory.
+Credentials are loaded from the current configuration, never from the report.
+
+```sh
+umask 077
+auton -c targets.yml -t production --reconcile observation.json > observation-current.json
+```
+
+This performs one bounded, read-only snapshot. A missing, expired or inaccessible
+job remains **unknown**; it is never considered safe to replay. Already skipped,
+rejected or unsubmitted steps remain unchanged. Outputs are refreshed from the
+same daemon and job identity; the original report is not modified. Do not redirect
+to the input report. Exit status is zero only when all observed work is completed
+successfully. `--operation-timeout` bounds the overall observation budget between
+requests, and `--http-timeout` bounds each HTTP request.
+
+In the TUI preparation screen (`e`), select trusted targets/groups, then press `r`
+and enter a saved report path. This reads existing jobs without an execution
+confirmation or submission. Use `w` on the resulting observation to save a new
+private JSON file. Saving a report is explicit; a client that exited before export
+has no automatically recoverable report.
+
+### Replacement-origin monitoring
+
+The TUI reads every origin of the explicitly selected target chains. `deploy`
+identifies the primary origin and `deploy@2` the second origin, with ranks continuing
+in inventory order. Detail/output reads stay pinned to the selected physical
+origin. At most 128 origins may be selected, with four concurrent read workers.
+Execution preparation still uses logical target names: this view does not turn a
+failover chain into broadcast execution. Aliases that share a physical origin show
+that origin separately; aggregate counts are counts of displayed connections.
+
+### Explicit continuation after a failed step
+
+A scenario step may set `continue_on_error: true`. The default remains `false`.
+Continuation applies only to a confirmed terminal failure, preserves that failure
+in the final result and pins later steps to the same daemon. Unknown outcomes,
+refusals and observation timeouts always stop the target's sequence. This option
+never retries a job, rolls back work or converts failure into success.

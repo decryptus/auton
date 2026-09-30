@@ -193,3 +193,19 @@ def resolve_targets(entries):
             depths[name] = depth
         return resolved[name]
     return {name: resolve(name, ()) for name in entries}
+
+
+MAX_MONITORED_ORIGINS = 128
+
+
+def monitoring_origins(targets):
+    """Expand selected logical chains for reads only, preserving target/rank identity."""
+    result = {}
+    for name, value in targets.items():
+        validate_connection_name(name)
+        for index, origin in enumerate(target_origins(value)):
+            alias = name if index == 0 else '%s@%s' % (name, index + 1)
+            result[alias] = origin
+            if len(result) > MAX_MONITORED_ORIGINS:
+                raise ValueError('select at most 128 origins for monitoring')
+    return result

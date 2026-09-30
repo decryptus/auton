@@ -146,3 +146,18 @@ class TargetFailoverTests(unittest.TestCase):
                                   client_factory=factory, delay=0).run()
         self.assertEqual(calls, ['http://one'])
         self.assertEqual(result['targets'][0]['status'], 'unknown')
+
+
+class MonitoringOriginTests(unittest.TestCase):
+    def test_read_expansion_preserves_logical_execution_targets(self):
+        from auton_client.connections import monitoring_origins, target_origins
+        targets = {'deploy': {'uris': ['http://one', 'http://two']}, 'db': 'http://db'}
+        self.assertEqual(monitoring_origins(targets),
+                         {'deploy': 'http://one', 'deploy@2': 'http://two', 'db': 'http://db'})
+        self.assertEqual(list(targets), ['deploy', 'db'])
+        self.assertEqual(target_origins(targets['deploy']), ['http://one', 'http://two'])
+
+    def test_monitoring_bounds_total_expanded_origins(self):
+        from auton_client.connections import monitoring_origins
+        with self.assertRaisesRegex(ValueError, '128'):
+            monitoring_origins({'node-%s' % i: 'http://node-%s' % i for i in range(129)})

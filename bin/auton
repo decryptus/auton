@@ -42,6 +42,8 @@ def argv_parse_check():
     parser        = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--config', help='Client YAML inventory; targets must still be selected explicitly')
+    parser.add_argument('--reconcile', metavar='REPORT.json',
+                        help='Read current states from a saved report; never submit or resume jobs')
     parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
     parser.add_argument('--daemon', action='append', default=[], metavar='SELECTOR[=URI]',
                         help='TUI target name/glob/~regex from --config or NAME=URI')
@@ -200,6 +202,13 @@ def argv_parse_check():
                 or options.margsfiles or options.envvars or options.envfiles
                 or options.imp_envvars or options.load_envfiles):
             parser.error('--tui prepares execution interactively; CLI payload options are incompatible')
+
+    if options.reconcile:
+        if (options.tui or not (options.target or options.target_group) or options.endpoint
+                or options.scenario or options.scenario_group or options.operation_id
+                or options.args or options.argfiles or options.margs or options.margsfiles
+                or options.envvars or options.envfiles or options.imp_envvars or options.load_envfiles):
+            parser.error('--reconcile requires explicit targets and cannot include execution or TUI options')
 
     scenario_mode = bool(options.scenario or options.scenario_group)
     if scenario_mode:
@@ -390,7 +399,14 @@ def main(options):
     rc      = 0
 
     try:
-        if options.target or options.target_group:
+        if options.reconcile:
+            from auton_client.reconcile import ReconciliationService, load_report
+            result = ReconciliationService(load_report(options.reconcile), options.selected_targets,
+                auth=credentials_from_options(options), http_timeout=options.http_timeout,
+                timeout=options.operation_timeout).run()
+            print(json.dumps(result))
+            rc = int(result['status'] != 'completed')
+        elif options.target or options.target_group:
             from auton_client.operations import OperationService
             auth = credentials_from_options(options)
             settings = dict(auth=auth, http_timeout=options.http_timeout, parallel=options.parallel,

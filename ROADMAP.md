@@ -397,9 +397,10 @@ targets:
 - Scenario affinity is implemented: the first successful step pins the accepting
   daemon for every remaining step/scenario in that invocation. Later failure or
   maintenance stops that target; no cross-host continuation is inferred.
-- TUI execution shows chains and attempted origins. Monitoring deliberately stays
-  on primary origins; select physical target names to inspect replacement daemons.
-  A richer origin-aware monitoring view remains future work.
+- TUI execution shows chains and attempted origins. Monitoring now reads
+  across all explicitly selected origins: `target` is the primary, `target@2` the
+  second origin, and so on. Read aggregation is bounded and retains each physical
+  origin; execution still selects one logical target, with no implicit broadcast.
 - Cover maintenance/admission races, unreachable origins, exhausted lists,
   ambiguous responses, pinned observation and legacy compatibility in tests.
 
@@ -423,8 +424,11 @@ or transactional durability. Real terminal captures are included in the README.
 - preserve process-group cleanup and output limits;
 - keep ACL checks both at admission and execution.
 
-Persistent job storage is optional; the default remains in memory. Redis is a later
-adapter, with independent auth/history configuration and mixed backends when supported.
+Persistent job storage is optional; the default remains in memory. Redis remains optional. Reuse `dwho.adapters.redis.DWhoAdapterRedis` for connections
+and Redis operations; do not create a competing low-level adapter in Auton. Keep
+job retention, recovery and ownership policy in Auton application services. Review
+timeouts, atomicity, isolation and lifecycle before enabling the backend, with
+independent auth/history configuration and mixed backends when supported.
 
 ## 1.0 gate — Authentication and local daemon web console
 

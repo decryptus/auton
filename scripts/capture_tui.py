@@ -186,6 +186,18 @@ def main():
             assert json.loads(exported.read_text()) == result
             os.write(master, b'\x1b')
             wait_for('READ ONLY')
+            before = [requests.get(uri + '/jobs', timeout=2).json()['jobs'] for uri in targets.values()]
+            os.write(master, b'er')
+            wait_for('RECONCILE REPORT')
+            os.write(master, str(exported).encode() + b'\n')
+            wait_for('OPERATION RESULT')
+            wait_for('Verification passed')
+            render(screen, 'tui-reconciled.png')
+            after = [requests.get(uri + '/jobs', timeout=2).json()['jobs'] for uri in targets.values()]
+            assert [[job['uid'] for job in jobs] for jobs in after] == [[job['uid'] for job in jobs] for jobs in before]
+            assert json.loads(exported.read_text()) == result
+            os.write(master, b'\x1b')
+            wait_for('READ ONLY')
             os.write(master, b'q')
             if tui.wait(timeout=3) != 0:
                 raise RuntimeError('TUI exited unsuccessfully')
