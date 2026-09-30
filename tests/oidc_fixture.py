@@ -6,7 +6,7 @@ import ssl
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit, urlencode
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -24,6 +24,17 @@ class IdentityProvider:
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *args):
                 pass
+            def do_GET(self):
+                flow = {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()}
+                if flow.get('redirect_uri') != getattr(provider, 'redirect_uri', None):
+                    self.send_error(400)
+                    return
+                provider.flow = flow
+                self.send_response(303)
+                self.send_header('Location', flow['redirect_uri'] + '?' + urlencode(dict(
+                    code='test-code', state=flow['state'], iss=provider.uri)))
+                self.end_headers()
+
             def do_POST(self):
                 provider.calls += 1
                 data = parse_qs(self.rfile.read(int(self.headers['Content-Length'])).decode())

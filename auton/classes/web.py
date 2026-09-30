@@ -146,8 +146,11 @@ class WebConsole:
         # This is an intentional cross-site top-level GET from the trusted IdP.
         # Do not apply same-origin fetch policy; bind it to a one-use state cookie.
         values = authentication_request(request)
-        for name in AUTH_HEADER_NAMES:
-            values.header(name)
+        try:
+            for name in AUTH_HEADER_NAMES:
+                values.header(name)
+        except AuthenticationDenied:
+            raise HttpReqErrJson(401, 'SSO callback rejected') from None
         if values.header('host', '').lower() != self.provider.authority or values.header('authorization') is not None:
             raise HttpReqErrJson(401, 'SSO callback rejected')
         try:

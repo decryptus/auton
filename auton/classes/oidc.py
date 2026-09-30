@@ -13,7 +13,7 @@ from pathlib import Path
 import secrets
 import threading
 import time
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode, urlsplit, quote
 
 import requests
 from httpdis.authentication import AuthenticationDenied, AuthenticationUnavailable, Identity
@@ -158,7 +158,7 @@ class OIDCService:
     def _exchange(self, code, verifier):
         payload = dict(grant_type='authorization_code', code=code, redirect_uri=self.redirect_uri,
                        client_id=self.settings['client_id'], code_verifier=verifier)
-        auth = (self.settings['client_id'], self.secret) if self.secret is not None else None
+        auth = (quote(self.settings['client_id'], safe=''), quote(self.secret, safe='')) if self.secret is not None else None
         try:
             # No redirects/retries; a code exchange is not safely replayable.
             with requests.post(self.settings['token_endpoint'], data=payload, auth=auth,

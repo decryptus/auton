@@ -47,18 +47,19 @@ class WebDaemon:
         self.proc = subprocess.Popen([sys.executable, str(ROOT / 'bin/autond'), '-f', '-c', str(self.path / 'auton.yml'),
             '-p', str(self.path / 'daemon.pid'), '--logfile', str(self.path / 'daemon.log')],
             env=dict(os.environ, PYTHONPATH=str(ROOT)), cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        last_error = 'no response'
         for _ in range(150):
             try:
                 response = requests.get(self.uri + '/ui/', timeout=0.2)
                 if response.status_code == 200:
                     return self
-            except requests.RequestException:
-                pass
+            except requests.RequestException as error:
+                last_error = str(error)
             if self.proc.poll() is not None:
                 break
             time.sleep(0.02)
         self.stop()
-        raise RuntimeError('daemon failed to start: ' + (self.path / 'daemon.log').read_text())
+        raise RuntimeError('daemon failed to start (' + last_error + '): ' + (self.path / 'daemon.log').read_text())
 
     def stop(self):
         if self.proc is not None and self.proc.poll() is None:

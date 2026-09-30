@@ -29,6 +29,7 @@ class ReconciliationTests(unittest.TestCase):
                 calls.append((endpoint, uid))
                 return {'status': 'complete', 'return_code': 0, 'stream': ['new'], 'errors': []}
         report = self.report()
+        report['targets'][0]['attempts'] = [{'uri': report['targets'][0]['uri'], 'status': 'accepted', 'reason': None}]
         original = copy.deepcopy(report)
         service = self.service(report, client_factory=Reader)
         result = service.run()
@@ -46,6 +47,10 @@ class ReconciliationTests(unittest.TestCase):
             self.service(report, client_factory=lambda *a, **kw: calls.append(a))
         report = self.report()
         report['targets'].append({'target': 'missing'})
+        with self.assertRaises(ValueError):
+            self.service(report, client_factory=lambda *a, **kw: calls.append(a))
+        report = self.report()
+        report['targets'][0]['attempts'] = ['malformed']
         with self.assertRaises(ValueError):
             self.service(report, client_factory=lambda *a, **kw: calls.append(a))
         self.assertEqual(calls, [])

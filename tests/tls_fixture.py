@@ -15,6 +15,11 @@ def certificates(path):
           .public_key(ca_key.public_key()).serial_number(x509.random_serial_number())
           .not_valid_before(now - datetime.timedelta(minutes=1)).not_valid_after(now + datetime.timedelta(hours=1))
           .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+          .add_extension(x509.KeyUsage(digital_signature=True, content_commitment=False, key_encipherment=False,
+                                      data_encipherment=False, key_agreement=False, key_cert_sign=True, crl_sign=True,
+                                      encipher_only=None, decipher_only=None), critical=True)
+          .add_extension(x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()), critical=False)
+          .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
           .sign(ca_key, hashes.SHA256()))
     (path / 'ca.pem').write_bytes(ca.public_bytes(serialization.Encoding.PEM))
     for name, usage in [('server', ExtendedKeyUsageOID.SERVER_AUTH), ('client', ExtendedKeyUsageOID.CLIENT_AUTH)]:
@@ -23,8 +28,13 @@ def certificates(path):
                 .issuer_name(ca_name).public_key(key.public_key()).serial_number(x509.random_serial_number())
                 .not_valid_before(now - datetime.timedelta(minutes=1)).not_valid_after(now + datetime.timedelta(hours=1))
                 .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+                .add_extension(x509.KeyUsage(digital_signature=True, content_commitment=False, key_encipherment=True,
+                                            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False,
+                                            encipher_only=None, decipher_only=None), critical=True)
+                .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+                .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
                 .add_extension(x509.ExtendedKeyUsage([usage]), critical=False)
-                .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]), critical=False)
+                .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address('127.0.0.1')), x509.DNSName('localhost')]), critical=False)
                 .sign(ca_key, hashes.SHA256()))
         (path / (name + '.pem')).write_bytes(cert.public_bytes(serialization.Encoding.PEM))
         keypath = path / (name + '.key')

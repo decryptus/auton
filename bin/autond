@@ -189,7 +189,9 @@ def main(options):
         DWHO_THREADS.append(httpdis_json.stop)
         start_endpoints()
         from auton.classes.retention import ResultRetention
-        retention = ResultRetention(MODULES['job'].service).start()
+        job_service = getattr(MODULES['job'], 'service', None)
+        if job_service is not None:
+            retention = ResultRetention(job_service).start()
         httpdis_json.run(options, http_req_handler=handler, **server_options)
     except (KeyboardInterrupt, SystemExit):
         pass

@@ -1,5 +1,4 @@
 """Real native mTLS: certificate trust and application permissions are independent."""
-import json
 import os
 import subprocess
 import sys

@@ -67,7 +67,9 @@ jobs:
         env:
           NODE_PATH: /tmp/auton-browser-tools/node_modules
           AUTON_BROWSER_EXECUTABLE: /usr/bin/google-chrome
-        run: node scripts/check_web_console.cjs
+        run: |
+          node scripts/check_web_console.cjs
+          node scripts/check_oidc_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

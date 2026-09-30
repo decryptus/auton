@@ -2,7 +2,6 @@
 import tempfile
 import time
 import unittest
-from types import SimpleNamespace
 from pathlib import Path
 from auton.classes.job import JobObject, STATUS_COMPLETE
 from auton.classes.jobs import JobService, JobUnavailable

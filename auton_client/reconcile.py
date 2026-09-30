@@ -124,7 +124,8 @@ class ReconciliationService:
                 attempts = row.get('attempts', [])
                 if (not isinstance(attempts, list) or len(attempts) > MAX_TARGETS
                         or any(not isinstance(attempt, dict) or not {'uri', 'status', 'reason'} <= set(attempt) or any(
-                            not isinstance(attempt.get(key, ''), str) for key in ('uri', 'status', 'reason'))
+                            not isinstance(attempt.get(key), str) for key in ('uri', 'status'))
+                            or (attempt.get('reason') is not None and not isinstance(attempt['reason'], str))
                             for attempt in attempts)):
                     raise ValueError('invalid saved failover attempts')
                 for field in ('stdout', 'stderr'):
