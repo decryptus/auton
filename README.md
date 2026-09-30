@@ -27,13 +27,13 @@ See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including th
 
 ## Quickstart
 
-This quickstart uses **Auton 1.0.0**, including SQLite authentication, durable
+This quickstart uses **Auton 1.0.1**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.0.0
+git checkout v1.0.1
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -899,7 +899,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.0.0`, or use the Docker image, which includes the authentication
+`autond[auth]==1.0.1`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
