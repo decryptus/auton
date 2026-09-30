@@ -532,18 +532,24 @@ Before a future major stable release:
 
 ## Current priorities
 
-Auton 1.0.2 client and daemon packages are published, with matching Docker images
-and the website pinned to that release. The 1.0 gate is complete; its reviews
-remain evidence for the release, not an outstanding publication checklist.
-The 1.0.2 patch preserves job references after uncertain submission outcomes.
+Auton 1.1.0 client and daemon packages and matching images are published, with the
+website pinned to that release. The release includes live TUI progress and explicit
+private JSON export. The 1.0 readiness review is historical release evidence.
 
-1. Release 1.1.0 adds live per-target/per-step TUI progress and explicit JSON
-   result export; publication remains gated by CI and installed-artifact acceptance.
-2. Keep installed-package, Python matrix, Docker/Compose, browser and documentation
-   checks as release gates, including regeneration of the website's pinned captures.
-3. Scope cancellation and durable scenario continuation separately; neither is
-   implied by stopping observation or exporting an operation result.
-4. Contact-form delivery remains optional follow-up; the contact link works already.
+The next release is under development; no pending item below is a release claim.
+See [the working checklist](docs/next-release-work.md) for the complete authorized
+scope and verification state:
 
-See [the 1.0 readiness review](docs/1.0-readiness.md) and
-[release/upgrade guide](docs/release-1.0.md) for evidence and boundaries.
+1. Read-only report reconciliation and replacement-origin monitoring.
+2. Guided endpoint parameters with server-side validation.
+3. Explicit owner-authorized cancellation, separate from stopping observation.
+4. Detached control-host workers with durable observation checkpoints and no replay.
+5. Explicit error continuation, optional DWho-backed Redis history, SSO/OIDC and mTLS.
+6. Python 3.13, reproducible wheels, retention and final interface/documentation review.
+
+Installed-package, Python matrix, Docker/Compose, real terminal, browser, Redis and
+documentation checks remain release gates. Website captures must be regenerated
+from the final pinned release. Development pauses after the authorized work is
+finished and accepted; a working branch is not delivery.
+
+The contact form remains outside this set, pending delivery configuration.

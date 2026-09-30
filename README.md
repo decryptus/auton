@@ -99,7 +99,7 @@ A successful greeting has `status: complete`, `return_code: 0` and
 successful execution. If submission times out, inspect the same job ID before
 considering another submission.
 
-For the CLI, install the client in a Python 3.10–3.12 virtual environment and run
+For the CLI, install the client in a Python 3.10–3.13 virtual environment and run
 another greeting using that same token:
 
 ```sh
@@ -116,9 +116,10 @@ HTTP, CLI and web access share the same identity and retained job history.
 
 ## Runtime and reliability notes
 
-Auton 1.0 targets Linux/Unix with Python **3.10–3.12**. Python 2 support is
-removed. Python 3.13+ is not supported yet because the daemon still imports
-`crypt`. Python 3.12 installs the `pyasyncore` compatibility dependency.
+Auton 1.0 targets Linux/Unix with Python **3.10–3.13**. Python 2 support is
+removed. Python 3.13 uses `legacycrypt` and HTTPdis's `legacy-cgi` compatibility
+dependency. Python 3.12+ installs `pyasyncore`. Newer Python versions remain outside
+the tested support range.
 
 The Docker image now installs **this checkout**, runs as the `auton` user, and
 Compose publishes port 8666 on **127.0.0.1 only**. The quickstart uses required
@@ -867,7 +868,7 @@ AUTON_PACKAGE=auton python -m pip wheel --no-deps . -w dist/client
 ```
 
 The test suite includes real subprocesses and an HTTP client/server integration
-with authentication. CI runs Python 3.10, 3.11 and 3.12 and builds the Docker image.
+with authentication. CI runs Python 3.10, 3.11, 3.12 and 3.13 and builds the Docker image.
 Docker builds track the checkout's code; dependencies and the base image are not
 fully locked, so builds are not yet bit-for-bit reproducible.
 
@@ -1836,3 +1837,53 @@ effects, and a job that wins the completion race retains its actual result.
 The web job detail offers a separate confirmation for cancellation. Stopping
 observation in CLI/TUI remains unrelated to cancellation. Existing installations
 must add the `POST /cancel/<endpoint>/<id>` route from the bundled module YAML.
+
+### Unattended scenarios on a control host
+
+```sh
+auton -c targets.yml -g production -s maintenance \
+  --operation-timeout 3600 --detach-dir /private/new-operation
+```
+
+`--detach-dir` starts an explicit detached Unix worker on the current control host.
+The foreground command returns after detachment; closing its terminal does not
+stop the sequence. The worker runs the same validated application service, with
+its existing credentials in memory. No permanent scheduler or central daemon is
+required. Keep the control host running: this mode does not migrate execution to
+another machine or restart the worker automatically after a host failure.
+
+The directory must be new; it is created with mode 0700. `observation.json` is
+atomically replaced with private 0600 checkpoints and, on completion, the final
+result. Checkpoints contain job references and states, not credentials or input
+payloads. A checkpoint is written before each submission; an interrupted or lost
+response remains uncertain. If checkpoint persistence fails, later submissions
+are stopped. A partial checkpoint omits command output until the final result;
+use `--reconcile` with the current trusted inventory to read retained daemon output.
+There is no automatic command replay or continuation after a worker crash.
+
+### Optional Redis job history through DWho
+
+Install `autond[redis]` and explicitly configure a Redis namespace per daemon:
+
+```yaml
+general:
+  job_storage:
+    backend: redis
+    url: redis://127.0.0.1:6379/0
+    namespace: autond-one
+    timeout: 3
+```
+
+Connections are provided by `dwho.adapters.redis.DWhoAdapterRedis`. Auton supplies
+only its job snapshot, retention and recovery policy. A renewable ownership lease
+and atomic fenced writes prevent simultaneous daemons from writing one namespace.
+Connection/read timeouts are bounded, automatic client retries are disabled, and
+loss of storage/lease blocks subsequent persistence and admission. Losing a lease
+cannot prove that an external command stopped: unfinished jobs recover as
+interrupted/uncertain and are never replayed.
+
+Use a private Redis service, a unique namespace, suitable Redis ACLs and `rediss://`
+for remote encrypted access. Redis persistence, backups and eviction policy remain
+operator responsibilities; do not use an evicting cache for durable history. Job
+history is optional; the default remains memory and SQLite remains supported.
+Authentication remains separately configured with its existing SQLite backend.

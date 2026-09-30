@@ -22,7 +22,7 @@ from auton.classes.config import DWHO_THREADS, load_conf, start_endpoints
 from auton.classes.http import AutonHttpReqHandler
 from auton.classes.auth_store import PersistentAuthentication
 from auton.classes.auth_audit import AuthenticationAudit
-from auton.classes.job_store import SQLiteJobStore
+from auton.classes.job_store import open_job_store
 from auton.classes.jobs import DEFAULT_MAX_OUTPUT_BYTES
 from auton.classes.plugins import ENDPOINTS
 from dwho.classes.modules import MODULES
@@ -168,7 +168,7 @@ def main(options):
                 MODULES['job'].browser_provider = options.auth_provider
         storage = options.configuration['general'].get('job_storage')
         if storage:
-            history = SQLiteJobStore(storage['path'], timeout=storage['timeout'],
+            history = open_job_store(storage,
                 max_output_bytes=options.configuration['general'].get('max_output_bytes', DEFAULT_MAX_OUTPUT_BYTES))
             MODULES['job'].history_store = history
         httpdis_json.init(options, False)

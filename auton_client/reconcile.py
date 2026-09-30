@@ -182,6 +182,8 @@ class ReconciliationService:
                     raise VisibilityError('invalid terminal return code')
                 if data.get('execution_uncertain'):
                     raise VisibilityError('daemon recovery: execution outcome is uncertain')
+                if data.get('outcome'):
+                    row['outcome'] = data['outcome']
                 state = data['status']
                 row.update(remote_status=state, error=None,
                            status=('completed' if data['return_code'] == 0 else 'failed') if state == 'complete'

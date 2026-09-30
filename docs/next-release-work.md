@@ -37,6 +37,8 @@ must remain independently configurable; Redis must not become mandatory.
 
 The working branch contains reconciliation, expanded origin monitoring, and
 explicit continuation after confirmed failure. Guided parameters and explicit
-owner-authorized subprocess cancellation are also implemented locally. They still require full interface
+owner-authorized subprocess cancellation, detached control-host workers and
+DWho-backed Redis job history are also implemented locally. Python 3.13 and wheel
+reproducibility have dedicated CI gates. SSO/OIDC and mTLS remain open. They still require full interface
 acceptance and review before being marked delivered. Remaining items are open.
 No new version has been published by this work.

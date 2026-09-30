@@ -302,7 +302,7 @@ class JobService(object):
                 raise AccessDenied('cancellation requires an authenticated job owner')
             with self.availability.condition:
                 with obj.output_lock:
-                    if obj.get_status() == STATUS_COMPLETE:
+                    if obj.get_status() == STATUS_COMPLETE or obj.cancel_requested:
                         return job_result(obj, 0)
                     if not getattr(self.endpoints[endpoint], 'SUPPORTS_CANCELLATION', False):
                         raise JobUnavailable('endpoint adapter does not support cancellation')
@@ -374,6 +374,8 @@ class JobService(object):
     def health(self):
         """Report local service availability without exposing job data."""
         with self._locked():
+            if self.store is not None and getattr(self.store, 'failed', False):
+                self.persistence_failed = True
             maintenance = self.availability.snapshot()
             result = {'status': 'degraded' if self.persistence_failed else 'ok', 'maintenance': maintenance,
                       'accepting_jobs': not maintenance['enabled'] and not self.persistence_failed}

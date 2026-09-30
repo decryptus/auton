@@ -1,6 +1,9 @@
 """Authentication policy and transport-independent credential verification."""
 import base64
-import crypt
+try:
+    import crypt
+except ImportError:
+    import legacycrypt as crypt
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import subprocess
@@ -46,7 +49,7 @@ class AuthenticationTests(unittest.TestCase):
                 apply_auth_policy({'general': {'auth_mode': mode}})
 
     def test_bcrypt_and_concurrent_identities(self):
-        secret = crypt.crypt('correct', crypt.mksalt(crypt.METHOD_BLOWFISH))
+        secret = crypt.crypt('correct', '$2b$12$abcdefghijklmnopqrstuu')
         self.assertTrue(secret.startswith('$2'), 'bcrypt is required on supported platforms')
         auth = PasswordAuthenticator({'alice': secret, 'bob': secret})
         attempts = [('alice', 'correct'), ('bob', 'correct'), ('alice', 'wrong'), ('unknown', 'correct')]

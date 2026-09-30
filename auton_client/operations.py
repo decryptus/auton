@@ -161,6 +161,10 @@ class OperationService:
                 error_offset = len(errors)
                 client.output_offset = data['next_offset']
                 result['remote_status'] = data['status']
+                if data.get('execution_uncertain'):
+                    raise ValueError('daemon recovery left execution outcome uncertain')
+                if data.get('outcome'):
+                    result['outcome'] = data['outcome']
                 if data['status'] == 'complete':
                     result['return_code'] = data['return_code']
                     result['status'] = 'completed' if data['return_code'] == 0 else 'failed'

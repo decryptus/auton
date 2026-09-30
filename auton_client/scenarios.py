@@ -137,7 +137,8 @@ class ScenarioService:
                 target['output_truncated'] |= result['output_truncated']
                 if result['status'] != 'completed':
                     definition = next(step for step in self.scenarios[scenario]['steps'] if step['name'] == step_name)
-                    continuing = result['status'] == 'failed' and definition.get('continue_on_error', False)
+                    continuing = (result['status'] == 'failed' and result.get('outcome') != 'job.cancelled'
+                                  and definition.get('continue_on_error', False))
                     result['continued_after_error'] = continuing
                     if continuing:
                         origin = result['uri']

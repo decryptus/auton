@@ -20,6 +20,18 @@ DEFAULT_REFRESH = 2.0
 STATUS_LABELS = {'new': 'queued', 'processing': 'running', 'complete': 'completed'}
 
 
+def status_label(job):
+    if job.get('execution_uncertain'):
+        return 'unknown'
+    if job.get('outcome') == 'job.cancelled':
+        return 'cancelled'
+    if job.get('cancel_requested') and job['status'] != 'complete':
+        return 'cancelling'
+    if job['status'] == 'complete' and job.get('return_code') not in (0, None):
+        return 'failed'
+    return STATUS_LABELS[job['status']]
+
+
 def safe_text(value):
     """Do not interpret terminal controls supplied by commands or remote metadata."""
     return ''.join(char if char.isprintable() else ' ' for char in str(value))
@@ -326,7 +338,7 @@ class OperatorView:
                             value += ' — ' + item['description']
                     else:
                         value = '%-11s %-5s %s' % (
-                            STATUS_LABELS[item['status']], item.get('return_code'), item['uid'])
+                            status_label(item), item.get('return_code'), item['uid'])
                     if self.daemon is None:
                         value = item['daemon'] + ' / ' + value
                 line(6 + i - start, value, curses.A_REVERSE if i == self.index else 0)
