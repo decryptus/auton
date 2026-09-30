@@ -111,7 +111,8 @@ class OperationService:
                                             or not isinstance(data.get('return_code'), int)):
             raise ValueError('missing final exit code')
 
-    def execute_target(self, name, job_id, deadline, stopped, output_limit=MAX_RETAINED_OUTPUT_BYTES, origin=None):
+    def execute_target(self, name, job_id, deadline, stopped, output_limit=MAX_RETAINED_OUTPUT_BYTES, origin=None,
+                       progress=None, progress_key=None):
         if type(output_limit) is not int or not 0 <= output_limit <= MAX_RETAINED_OUTPUT_BYTES:
             raise ValueError("invalid retained output limit")
         origins = self.origins[name] if origin is None else [origin]
@@ -131,6 +132,8 @@ class OperationService:
                     result.update(status='not_submitted', error='observation stopped before submission')
                     return result
                 result['uri'] = candidate
+                if progress is not None:
+                    progress.update(progress_key, dict(result, status='submitting'))
                 attempt = {'uri': candidate, 'status': 'unknown', 'reason': None}
                 result['attempts'].append(attempt)
                 client = self.client_factory([candidate], self.endpoint, job_id,
@@ -162,6 +165,10 @@ class OperationService:
                     result['return_code'] = data['return_code']
                     result['status'] = 'completed' if data['return_code'] == 0 else 'failed'
                     return result
+                if progress is not None:
+                    progress.update(progress_key, dict(result,
+                        status='queued' if data['status'] == 'new' else 'running',
+                        duration_ms=round(max(0, self.clock() - started) * 1000, 3)))
                 remaining = deadline - self.clock()
                 if remaining <= 0 or stopped.is_set():
                     result.update(status='unknown', error='observation stopped; remote job may still run')
@@ -185,19 +192,27 @@ class OperationService:
             result['duration_ms'] = round(max(0, self.clock() - started) * 1000, 3)
             result.pop('_output_bytes', None)
             result.pop('_output_limit', None)
+            if progress is not None:
+                progress.update(progress_key, result)
         return result
 
-    def run(self, operation_id=None, stopped=None):
+    def run(self, operation_id=None, stopped=None, progress=None):
         operation_id = operation_identity(operation_id)
         jobs = {name: str(uuid.uuid4()) for name in self.targets}
+        if progress is not None:
+            progress.begin(operation_id, [(name, {'target': name, 'endpoint': self.endpoint,
+                'scenario': '', 'step': '', 'uri': self.targets[name]}) for name in self.targets])
         deadline = self.clock() + self.timeout
         stopped = threading.Event() if stopped is None else stopped
         with ThreadPoolExecutor(max_workers=self.parallel) as pool:
-            futures = [pool.submit(self.execute_target, name, jobs[name], deadline, stopped) for name in self.targets]
+            futures = [pool.submit(self.execute_target, name, jobs[name], deadline, stopped,
+                                   progress=progress, progress_key=name) for name in self.targets]
             try:
                 results = [future.result() for future in futures]
             except KeyboardInterrupt:
                 stopped.set()
                 results = [future.result() for future in futures]
+        if progress is not None:
+            progress.finish(operation_status(results))
         return {'operation_id': operation_id, 'endpoint': self.endpoint,
                 'status': operation_status(results), 'targets': results}

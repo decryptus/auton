@@ -98,7 +98,8 @@ select scoped targets/groups and scenarios/groups or one endpoint, inspect the
 full preview, and confirm with `y`. Opening the TUI or applying startup filters
 never submits work. Background execution uses OperationService/ScenarioService;
 results show separate outputs and skipped/unknown outcomes. Stopping observation
-does not cancel remote jobs. Live step progress and result export remain planned.
+does not cancel remote jobs. Live step progress and explicit private JSON result export are implemented.
+Progress remains session-local; stopping observation does not stop remote jobs.
 Real terminal screenshots are included in the README.
 
 The TUI must remain a client interface. It must not move UI responsibilities into `autond`.
@@ -527,14 +528,17 @@ Before a future major stable release:
 
 ## Current priorities
 
-Visibility, the TUI, multi-daemon reads, explicit operations/scenarios, SQLite
-storage and the optional daemon web console are implemented on master. The 1.0.0 release candidate now aligns metadata and documentation with these features;
-publication remains gated by CI and installed-artifact acceptance.
+Auton 1.0.2 client and daemon packages are published, with matching Docker images
+and the website pinned to that release. The 1.0 gate is complete; its reviews
+remain evidence for the release, not an outstanding publication checklist.
+The 1.0.2 patch preserves job references after uncertain submission outcomes.
 
-1. Run the final candidate checks: Python matrix, Docker/Compose, browser, docs,
-   package parity and installed 0.3.2 compatibility.
-2. Publish matching 1.0.0 client/daemon artifacts and release notes after green checks.
-3. Pin auton.run documentation and freshly generated deployment examples to the release.
+1. Release 1.1.0 adds live per-target/per-step TUI progress and explicit JSON
+   result export; publication remains gated by CI and installed-artifact acceptance.
+2. Keep installed-package, Python matrix, Docker/Compose, browser and documentation
+   checks as release gates, including regeneration of the website's pinned captures.
+3. Scope cancellation and durable scenario continuation separately; neither is
+   implied by stopping observation or exporting an operation result.
 4. Contact-form delivery remains optional follow-up; the contact link works already.
 
 See [the 1.0 readiness review](docs/1.0-readiness.md) and
