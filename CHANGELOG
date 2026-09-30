@@ -1,3 +1,12 @@
+auton (1.0.2) stable; urgency=medium
+
+  * Preserve job references in CLI transport failures and Web uncertainty notices.
+  * Keep uncertain submissions visible when subsequent refreshes fail.
+  * Document HTTP/CLI onboarding and recovery without accidental resubmission.
+  * Exercise expired credentials, execution deadlines and lost responses.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Wed, 30 Sep 2026 15:30:00 +0200
+
 auton (1.0.1) stable; urgency=medium
 
   * Display accepted Web job submissions as blue informational notices.

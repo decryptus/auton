@@ -27,13 +27,13 @@ See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including th
 
 ## Quickstart
 
-This quickstart uses **Auton 1.0.1**, including SQLite authentication, durable
+This quickstart uses **Auton 1.0.2**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.0.1
+git checkout v1.0.2
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -105,7 +105,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.0.1
+python -m pip install auton==1.0.2
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -143,6 +143,31 @@ The handler keeps each authenticated identity local to its request.
 * Client arguments are literal, including braces and JSON. Only administrator
   configured arguments support variable interpolation. Uploaded names must be
   plain basenames; absolute paths and traversal are rejected.
+
+### Recovering after a failure
+
+| Situation | What to check before another submission |
+| --- | --- |
+| Connection refused before a connection is established | Check the daemon address and availability. Explicit failover may try another configured address only when the transport knows submission was not sent. |
+| Connection lost or response timeout after submission | The command may have run. Keep the original job ID and query its status on the original daemon with the same identity; do not assume a timeout cancelled it. |
+| Expired or revoked API token (401) | Obtain a new token for the same account. If an earlier request was accepted, inspect that job with the renewed credentials before running it again. Web session expiry requires signing in again. |
+| Command failed | Inspect retained stdout, stderr and return code. Nonzero completion can have partial side effects; it is not automatically retried. |
+| Command execution timeout (124) | The daemon stops the command process group. Inspect partial output and any external side effects before deciding whether to retry. |
+| Daemon restarted with SQLite history | Completed results remain until expiry. An unfinished job is marked interrupted and is never replayed automatically. A previously running job has an unknown execution outcome; check its effects. |
+| Job missing (404) | Verify the daemon, endpoint and ID. Expiry, eviction or memory-only storage can remove evidence; absence from history does not prove the command never ran. |
+
+Read an existing job without submitting another one:
+
+```sh
+auton --mode status --uri https://autond.example \
+  -k ./operator.token --endpoint diagnostic --uid ORIGINAL-JOB-ID
+```
+
+Use the exact ID of the original request, not a new UUID. Keep the same account:
+job ownership still applies when its token is renewed. For scripts or cron, record
+an explicit `--uid` before submission so recovery does not depend on terminal
+output. The web console labels interrupted running jobs **Unknown outcome**.
+Neither status reads nor refreshing the console resubmits a command.
 
 ### Results and resource limits
 
@@ -963,7 +988,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.0.1`, or use the Docker image, which includes the authentication
+`autond[auth]==1.0.2`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 

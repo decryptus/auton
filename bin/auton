@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """auton"""
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 import argparse
 import os
@@ -414,6 +414,11 @@ def main(options):
         rc = 2
     except Exception as e:
         LOG.error(e)
+        if auton is not None and isinstance(e, (requests.exceptions.RequestException, LookupError)):
+            print('Job reference: %s:%s. '
+                  'Check --mode status --endpoint %s --uid %s with the original '
+                  '--uri and credentials before submitting again.' %
+                  (options.endpoint, options.uid, options.endpoint, options.uid), file=sys.stderr)
         rc = 1
         raise
     finally:

@@ -5,10 +5,12 @@
   const REFRESH_MS = 5000;
   const MAX_DISPLAY_CHARS = 200000;
   let identity = null, csrf = '', jobs = [], endpoints = [], health = null;
+  let submissionWarning = '', submissionOwner = null;
   let selected = null, refreshing = false, refreshAgain = false, submitting = false, generation = 0;
   function savedCSRF() { try { return localStorage.getItem(CSRF_KEY) || csrf; } catch (_) { return csrf; } }
   function saveCSRF(value) { csrf = value; try { value ? localStorage.setItem(CSRF_KEY, value) : localStorage.removeItem(CSRF_KEY); } catch (_) {} }
   function notice(message, tone = 'error') {
+    if (submissionWarning) { message = submissionWarning + (message ? '\n' + message : ''); tone = 'warning'; }
     $('notice').dataset.tone = tone;
     $('notice').textContent = message; $('notice').hidden = !message;
   }
@@ -41,6 +43,7 @@
     } finally { clearTimeout(timer); }
   }
   function session(data) {
+    if (submissionOwner && submissionOwner !== data.principal) submissionWarning = '';
     identity = data; generation++; $('login-panel').hidden = true; $('console').hidden = false;
     $('logout').hidden = false; $('principal').textContent = data.principal;
     $('release').textContent = 'v' + data.version; $('release').hidden = false;
@@ -145,7 +148,7 @@
   });
   $('logout').addEventListener('click', async () => {
     $('logout').disabled = true;
-    try { await request('/ui/auth/logout', {method: 'POST', body: {}}); signedOut(); }
+    try { await request('/ui/auth/logout', {method: 'POST', body: {}}); submissionWarning = ''; signedOut(); }
     catch (error) { notice(error.message); }
     finally { $('logout').disabled = false; }
   });
@@ -164,6 +167,7 @@
     event.preventDefault(); if (submitting || !$('run-confirm').checked) return;
     const endpoint = $('run-endpoint').value, args = $('run-args').value ? $('run-args').value.split('\n') : [];
     if (args.length > 64) { $('run-preview').textContent = 'At most 64 arguments are allowed.'; return; }
+    submissionWarning = '';
     const id = crypto.randomUUID(); submitting = true; $('submit-run').disabled = true; $('cancel-run').disabled = true;
     try {
       await request('/run/' + encodeURIComponent(endpoint) + '/' + id, {method: 'POST', body: {args}});
@@ -171,7 +175,11 @@
     } catch (error) {
       $('run-dialog').close();
       const refused = [400, 401, 403, 404, 413].includes(error.status) || error.notAdmitted;
-      notice(refused ? error.message : 'Submission outcome unknown for ' + endpoint + ':' + id + '. It was not retried. Refresh the job list and verify before running again.', refused ? 'error' : 'warning');
+      if (!refused) {
+        submissionOwner = identity?.principal;
+        submissionWarning = 'Submission outcome unknown for ' + endpoint + ':' + id + '. It was not retried. Refresh the job list and verify before running again.';
+      }
+      notice(refused ? error.message : '', refused ? 'error' : 'warning');
       if (!refused && identity) { selected = null; await refresh(); }
     } finally { submitting = false; $('submit-run').disabled = false; $('cancel-run').disabled = false; if (identity && health) render(); }
   });
