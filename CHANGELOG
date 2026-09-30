@@ -1,3 +1,12 @@
+auton (1.0.1) stable; urgency=medium
+
+  * Display accepted Web job submissions as blue informational notices.
+  * Distinguish uncertain submission outcomes in amber from confirmed errors in red.
+  * Verify rendered notice severity in real browser acceptance tests.
+  * Require semantic review of interface feedback, screenshots and videos.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Wed, 30 Sep 2026 11:02:00 +0200
+
 auton (1.0.0) stable; urgency=medium
 
   * Deliver CLI/TUI visibility, authenticated discovery and the optional daemon Web console.
