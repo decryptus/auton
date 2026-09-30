@@ -12,7 +12,7 @@ from urllib3.exceptions import NewConnectionError
 from sonicprobe.libs import urisup
 
 SYSLOG_NAME = 'auton'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 DEFAULT_DELAY = 0.5
 DEFAULT_HTTP_TIMEOUT = 30
 
