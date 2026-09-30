@@ -171,7 +171,7 @@
     } catch (error) {
       $('run-dialog').close();
       const refused = [400, 401, 403, 404, 413].includes(error.status) || error.notAdmitted;
-      notice(refused ? error.message : 'Submission outcome unknown for ' + endpoint + ':' + id + '. It was not retried. Refresh the job list and verify before running again.');
+      notice(refused ? error.message : 'Submission outcome unknown for ' + endpoint + ':' + id + '. It was not retried. Refresh the job list and verify before running again.', refused ? 'error' : 'warning');
       if (!refused && identity) { selected = null; await refresh(); }
     } finally { submitting = false; $('submit-run').disabled = false; $('cancel-run').disabled = false; if (identity && health) render(); }
   });
