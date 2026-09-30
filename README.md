@@ -732,9 +732,20 @@ also stops client progression but cannot undo accepted work.
 
 The result screen shows per-target/per-step status, job IDs, exit codes,
 stdout/stderr and truncation. Use **j/k** or Page Up/Page Down to scroll, then
-Escape to return to monitoring. Results are session-local; use CLI JSON output
-when you need a saved operation report. A live per-step operation dashboard and
-result export remain future work.
+Escape to return to monitoring. During execution, the panel shows every selected
+target/scenario/step, its last observed state, origin and job ID. `pending` means
+not yet submitted; `submitting` does not prove acceptance; `queued` and `running`
+reflect daemon responses. Failed or unknown steps stop that target's sequence;
+remaining steps are marked `skipped`. Use **j/k** or Page Up/Page Down to scroll.
+Progress is session-local and sampled through existing status reads; it adds no
+requests, replay or durable scenario continuation.
+
+On the result screen, press **w**, enter a new file path and press Enter to export
+the full JSON result (including IDs, origins, outputs, exit codes, truncation and
+unknown/skipped outcomes). Escape cancels the path prompt. Exports use private
+file permissions and refuse existing files or symlinks. Outputs may contain
+sensitive data. Exporting saves the completed observation, even when the remote
+outcome is unknown; it does not submit, resume or cancel a job.
 
 The screenshots below show the site's published version. They are regenerated
 from its pinned source on every website build and shared by GitHub and the web

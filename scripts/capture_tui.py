@@ -4,6 +4,7 @@ Development dependencies: pyte, Pillow, requests, PyYAML and daemon requirements
 Run from the checkout with its Python environment. No production servers are used.
 """
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -120,7 +121,7 @@ def main():
             client_config = Path(directory) / 'client.yml'
             client_config.write_text(yaml.safe_dump({'targets': targets, 'groups': {'edges': list(targets)},
                 'scenarios': {'diagnostics': {'version': 1, 'steps': [
-                    {'name': 'check', 'endpoint': 'diagnostics', 'args': ['-c', 'print("System healthy")']},
+                    {'name': 'check', 'endpoint': 'diagnostics', 'args': ['-c', 'import time; time.sleep(3); print("System healthy")']},
                     {'name': 'verify', 'endpoint': 'diagnostics', 'args': ['-c', 'print("Verification passed")']}]}},
                 'scenario_groups': {'maintenance': ['diagnostics']}}))
             master, slave = pty.openpty()
@@ -165,9 +166,24 @@ def main():
             wait_for('CONFIRM EXECUTION')
             render(screen, 'tui-confirm.png')
             os.write(master, b'y')
+            wait_for('diagnostics/check | running')
+            render(screen, 'tui-progress.png')
             wait_for('OPERATION RESULT')
             wait_for('Verification passed')
             render(screen, 'tui-result.png')
+            exported = Path(directory) / 'operation.json'
+            os.write(master, b'w')
+            wait_for('EXPORT JSON')
+            os.write(master, str(exported).encode() + b'\n')
+            wait_for('Export saved:')
+            result = json.loads(exported.read_text())
+            assert result['status'] == 'completed' and len(result['targets']) == 2
+            assert all(len(t['scenarios'][0]['steps']) == 2 for t in result['targets'])
+            os.write(master, b'w')
+            wait_for('EXPORT JSON')
+            os.write(master, str(exported).encode() + b'\n')
+            wait_for('Export failed:')
+            assert json.loads(exported.read_text()) == result
             os.write(master, b'\x1b')
             wait_for('READ ONLY')
             os.write(master, b'q')

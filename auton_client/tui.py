@@ -252,7 +252,8 @@ class OperatorView:
                 for y, value in enumerate(values[5 + start:5 + start + available], 7):
                     line(y, value)
             else:
-                wrap_key = (id(panel.result), panel.mode, width, id(panel.service))
+                wrap_key = (id(panel.result), panel.mode, width, id(panel.service),
+                            panel.progress['revision'], panel.editing, panel.export_path)
                 if self.preparation_wrap_key != wrap_key:
                     self.preparation_wrapped = [part for value in values for part in
                         (textwrap.wrap(safe_text(value), width - 1, replace_whitespace=False) or [''])]

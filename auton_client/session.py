@@ -4,6 +4,8 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+from auton_client.progress import OperationProgress
+
 
 class ExecutionSession:
     def __init__(self):
@@ -11,6 +13,7 @@ class ExecutionSession:
         self.future = None
         self.stopped = threading.Event()
         self.closed = False
+        self.progress = OperationProgress()
 
     @property
     def running(self):
@@ -20,7 +23,8 @@ class ExecutionSession:
         if self.closed or self.running:
             raise ValueError('execution session is unavailable')
         self.stopped = threading.Event()
-        self.future = self.pool.submit(service.run, stopped=self.stopped)
+        self.progress = OperationProgress()
+        self.future = self.pool.submit(service.run, stopped=self.stopped, progress=self.progress)
 
     def poll(self):
         if self.future is None or not self.future.done():

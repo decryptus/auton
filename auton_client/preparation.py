@@ -5,6 +5,7 @@ import curses
 import json
 
 from auton_client.operations import OperationService
+from auton_client.export import export_result
 from auton_client.scenarios import ScenarioService, select_scenarios
 from auton_client.connections import select_connections, target_origins
 
@@ -34,10 +35,14 @@ class PreparationView:
         self.result = None
         self.result_lines = None
         self.endpoints = []
+        self.progress = {'revision': 0, 'rows': [], 'operation_id': None}
+        self.export_path = ''
 
     def update(self, snapshots):
         self.endpoints = sorted({item['name'] for data in snapshots.values()
                                  for item in data.get('endpoints', [])})
+        if self.mode == 'running':
+            self.progress = self.session.progress.snapshot()
         try:
             result = self.session.poll()
         except Exception:
@@ -103,7 +108,14 @@ class PreparationView:
     def handle(self, key):
         if self.editing is not None:
             if key in (10, 13, 27):
+                exporting = self.editing == 'export_path' and key != 27
                 self.editing = None
+                if exporting:
+                    try:
+                        export_result(self.result, self.export_path)
+                        self.error = 'Export saved: ' + self.export_path
+                    except (OSError, ValueError):
+                        self.error = 'Export failed: choose a new writable path; existing files are never overwritten.'
             elif key in (curses.KEY_BACKSPACE, 127, 8):
                 setattr(self, self.editing, getattr(self, self.editing)[:-1])
             elif 32 <= key <= 126 and len(getattr(self, self.editing)) < MAX_INPUT:
@@ -119,7 +131,11 @@ class PreparationView:
                 return True
             return False
         if self.mode == 'running':
-            if key == ord('x'):
+            if key in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
+                self.scroll += 10 if key == curses.KEY_NPAGE else 1
+            elif key in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
+                self.scroll = max(0, self.scroll - (10 if key == curses.KEY_PPAGE else 1))
+            elif key == ord('x'):
                 self.session.stop()
                 self.error = 'Stopping observation; waiting for in-flight requests. Remote jobs may continue.'
             return True
@@ -128,6 +144,7 @@ class PreparationView:
                 self.session.start(self.service)
                 self.result = self.result_lines = None
                 self.mode, self.error = 'running', ''
+                self.scroll = 0
             elif key == ord('n'):
                 self.mode = 'select'
                 self.service = None
@@ -137,7 +154,11 @@ class PreparationView:
                 self.scroll = max(0, self.scroll - 1)
             return True
         if self.mode == 'result':
-            if key in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
+            if key == ord('w') and self.result is not None:
+                self.editing = 'export_path'
+                self.export_path = ''
+                self.error = ''
+            elif key in (curses.KEY_DOWN, ord('j'), curses.KEY_NPAGE):
                 self.scroll += 10 if key == curses.KEY_NPAGE else 1
             elif key in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
                 self.scroll = max(0, self.scroll - (10 if key == curses.KEY_PPAGE else 1))
@@ -181,11 +202,23 @@ class PreparationView:
         if self.mode == 'confirm':
             return ['CONFIRM EXECUTION - y submits; n/Esc returns'] + self.preview
         if self.mode == 'running':
-            return ['EXECUTING - x stops observation, not remote jobs'] + self.preview
+            lines = ['EXECUTING - x stops observation, not remote jobs',
+                     'Operation: ' + str(self.progress['operation_id']),
+                     'Observed states; pending means not yet submitted.']
+            for row in self.progress['rows']:
+                label = (row['scenario'] + '/' + row['step']) if row['scenario'] else row['endpoint']
+                lines.append('%s | %s | %s | %sms' %
+                             (row['target'], label, row['status'], row['duration_ms']))
+                lines.append('  %s | job=%s' % (row['uri'], row['job_id'] or '-'))
+            return lines
         if self.mode == 'result':
+            if self.editing == 'export_path':
+                return ['EXPORT JSON - Enter writes; Esc cancels',
+                        'Contains job outputs; keep this file private.',
+                        'New file path: ' + self.export_path]
             if self.result_lines is not None:
                 return self.result_lines
-            lines = ['OPERATION RESULT - Esc returns to monitor']
+            lines = ['OPERATION RESULT - w exports JSON; Esc returns to monitor']
             if not self.result:
                 return lines
             lines.append('%s | %s' % (self.result['operation_id'], self.result['status']))

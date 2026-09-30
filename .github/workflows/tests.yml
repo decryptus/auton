@@ -23,6 +23,17 @@ jobs:
       - run: AUTON_PACKAGE=autond python -m pip wheel --no-deps . -w dist/server
       - run: AUTON_PACKAGE=auton python -m pip wheel --no-deps . -w dist/client
       - run: python .github/scripts/check-client-wheel.py
+      - name: Check real terminal progress and export
+        if: matrix.python == '3.12'
+        run: |
+          python -m pip install pyte Pillow
+          python scripts/capture_tui.py
+      - uses: actions/upload-artifact@v4
+        if: matrix.python == '3.12'
+        with:
+          name: tui-captures
+          path: docs/images/tui-*.png
+          if-no-files-found: error
   docker:
     runs-on: ubuntu-latest
     steps:

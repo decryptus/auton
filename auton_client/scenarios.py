@@ -106,7 +106,7 @@ class ScenarioService:
                 self.steps.append((scenario, step['name'], service))
         self.settings = self.steps[0][2]
 
-    def _target(self, name, deadline, stopped):
+    def _target(self, name, deadline, stopped, progress):
         started = self.settings.clock()
         target = {'target': name, 'uri': self.settings.targets[name], 'status': 'completed',
                   'scenarios': [], 'output_truncated': False}
@@ -125,7 +125,8 @@ class ScenarioService:
                           'output_truncated': False, 'duration_ms': 0}
             else:
                 result = service.execute_target(name, str(uuid.uuid4()), deadline, stopped,
-                                                output_limit=remaining_output, origin=origin)
+                                                output_limit=remaining_output, origin=origin,
+                                                progress=progress, progress_key=(name, scenario, step_name))
                 if result['status'] == 'completed':
                     origin = result['uri']
                 target['uri'] = result['uri']
@@ -135,21 +136,30 @@ class ScenarioService:
                 if result['status'] != 'completed':
                     blocked = scenario + '/' + step_name
                     current['status'] = target['status'] = result['status']
+            if blocked and result['status'] == 'skipped' and progress is not None:
+                progress.update((name, scenario, step_name), result)
             result.update(step=step_name, endpoint=service.endpoint)
             current['steps'].append(result)
         target['duration_ms'] = round(max(0, self.settings.clock() - started) * 1000, 3)
         return target
 
-    def run(self, operation_id=None, stopped=None):
+    def run(self, operation_id=None, stopped=None, progress=None):
         operation_id = operation_identity(operation_id)
+        if progress is not None:
+            progress.begin(operation_id, [((name, scenario, step),
+                {'target': name, 'scenario': scenario, 'step': step,
+                 'endpoint': service.endpoint, 'uri': self.settings.targets[name]})
+                for name in self.settings.targets for scenario, step, service in self.steps])
         deadline = self.settings.clock() + self.settings.timeout
         stopped = threading.Event() if stopped is None else stopped
         with ThreadPoolExecutor(max_workers=self.settings.parallel) as pool:
-            futures = [pool.submit(self._target, name, deadline, stopped) for name in self.settings.targets]
+            futures = [pool.submit(self._target, name, deadline, stopped, progress) for name in self.settings.targets]
             try:
                 results = [future.result() for future in futures]
             except KeyboardInterrupt:
                 stopped.set()
                 results = [future.result() for future in futures]
+        if progress is not None:
+            progress.finish(operation_status(results))
         return {'operation_id': operation_id, 'kind': 'scenario', 'scenarios': list(self.scenarios),
                 'status': operation_status(results), 'targets': results}

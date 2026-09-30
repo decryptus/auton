@@ -122,6 +122,37 @@ class PreparationTests(unittest.TestCase):
             release.set()
             session.close()
 
+    def test_export_prompt_cancel_and_save_do_not_submit_again(self):
+        import json
+        session = ExecutionSession()
+        calls = []
+        try:
+            panel = self.panel(session, calls)
+            panel.selected[0], panel.selected[2] = ['one'], ['check']
+            panel.handle(10)
+            panel.handle(ord('y'))
+            session.future.result(timeout=2)
+            panel.update({})
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'operation.json'
+                panel.handle(ord('w'))
+                panel.export_path = str(path)
+                panel.handle(27)
+                self.assertFalse(path.exists())
+                panel.handle(ord('w'))
+                panel.export_path = str(path)
+                self.assertIn('New file path: ' + str(path), panel.lines())
+                panel.handle(10)
+                self.assertEqual(json.loads(path.read_text()), panel.result)
+                panel.handle(ord('w'))
+                panel.export_path = str(path)
+                panel.handle(10)
+                self.assertIn('Export failed:', panel.error)
+                self.assertEqual(json.loads(path.read_text()), panel.result)
+                self.assertEqual(len(calls), 2)
+        finally:
+            session.close()
+
     def test_cli_catalogue_filters_do_not_preselect_execution(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True):
             path = Path(directory) / 'client.yml'
