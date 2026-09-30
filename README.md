@@ -55,6 +55,65 @@ For remote access, configure HTTPS, set `web_origin` to the external origin and
 keep the backend private (see [the web console](#autond-web-console)).
 The supplied browser origin deliberately accepts `127.0.0.1`, not `localhost`.
 
+### Run the same greeting over HTTP or from the CLI
+
+The SQLite quickstart uses your password for the **web login** and a scoped
+**bearer token for API/CLI access**. HTTP Basic password authentication belongs
+to the separate legacy Basic configuration; it does not log in to SQLite.
+
+After `docker compose up -d`, create a one-hour token for the same operator and
+copy it to your machine. Run these commands from the cloned `auton` directory:
+
+```sh
+docker compose exec auton autond-auth -c /etc/auton/auton.yml \
+  token create -u operator -s read -s run -t 3600 \
+  -o /var/lib/autond/auth/quickstart.token
+(umask 077; docker compose cp auton:/var/lib/autond/auth/quickstart.token ./quickstart.token)
+chmod 600 ./quickstart.token
+```
+
+The token file is a credential: keep it private and out of Git. Creation refuses
+to overwrite an existing file; choose a new filename in all commands when issuing
+another token. The token expires after one hour. Keep the credential ID printed
+by `token create` if you need to revoke it sooner.
+
+With `curl` installed, submit the fixed `hello` operation. This example uses Bash
+and supplies the authorization header over standard input, keeping the token out
+of the command arguments:
+
+```bash
+job_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+sed 's/^/Authorization: Bearer /' ./quickstart.token | \
+  curl --fail-with-body --silent --show-error --max-time 10 \
+    --header @- --header 'Content-Type: application/json' --data '{}' \
+    "http://127.0.0.1:8666/run/hello/$job_id"
+
+# Read this job again until status is complete; do not submit it again.
+sed 's/^/Authorization: Bearer /' ./quickstart.token | \
+  curl --fail-with-body --silent --show-error --max-time 10 \
+    --header @- "http://127.0.0.1:8666/jobs/hello/$job_id"
+```
+
+A successful greeting has `status: complete`, `return_code: 0` and
+`Hello from Auton!` in `stream`. An accepted submission alone is not proof of
+successful execution. If submission times out, inspect the same job ID before
+considering another submission.
+
+For the CLI, install the client in a Python 3.10–3.12 virtual environment and run
+another greeting using that same token:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install auton==1.0.1
+auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
+```
+
+The CLI prints `Hello from Auton!` and exits with code zero when the command
+succeeds. It does not open the TUI unless you explicitly request `--tui`.
+Refresh the web console while signed in as `operator` to see these jobs too:
+HTTP, CLI and web access share the same identity and retained job history.
+
 ## Runtime and reliability notes
 
 Auton 1.0 targets Linux/Unix with Python **3.10–3.12**. Python 2 support is

@@ -12,3 +12,7 @@ TODO
 # Manual images are generated and shared with the website.
 docs/images/*.png
 docs/screenshots/*.png
+
+# Local quickstart credentials and client environment.
+/quickstart.token
+/.venv/
