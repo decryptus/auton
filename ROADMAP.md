@@ -1,7 +1,7 @@
 # Auton Roadmap
 
 Status: active product roadmap  
-Updated: 2026-09-29
+Updated: 2026-09-30
 
 Auton is evolving from a remote command helper into a complete distributed remote-execution product while keeping a clear separation between the **auton client** and the **autond daemon**.
 
@@ -142,7 +142,7 @@ The implementation is client-side and stateless, with no central persistence.
 
 ## Milestone 4 — Explicit multi-target execution
 
-Implemented on master (not yet released): `OperationService` submits one independent
+Implemented for 1.0.0: `OperationService` submits one independent
 job per explicitly named target, with bounded parallelism and per-target results.
 The CLI emits a final JSON operation summary, including output, exit codes,
 observation duration, refusal and unknown outcomes. POST requests are not replayed.
@@ -459,7 +459,8 @@ as the HTTP API. No central service is required.
 
 ## Milestone 7 — Website
 
-Domain purchased: **auton.run**. DNS and website deployment remain to be configured.
+Website deployed: **https://auton.run/**, with HTTPS and GitHub deployment from
+the separate private `decryptus/auton-site` repository.
 
 Create a dedicated **Auton website**, following the same product/documentation approach used for monit-docker.
 
@@ -527,14 +528,14 @@ Before a future major stable release:
 ## Current priorities
 
 Visibility, the TUI, multi-daemon reads, explicit operations/scenarios, SQLite
-storage and the optional daemon web console are implemented on master. Published
-packages are still 0.3.2; implementation does not imply release readiness.
+storage and the optional daemon web console are implemented on master. The 1.0.0 release candidate now aligns metadata and documentation with these features;
+publication remains gated by CI and installed-artifact acceptance.
 
-1. Authentication gates implemented: origin-bound profiles and bounded JSONL
-   refusal auditing. Continue release review with these features enabled.
-2. Validate the authenticated Docker quickstart and reconcile migration docs.
-3. Build auton.run with release-aware documentation and existing local captures.
-4. Configure website hosting/DNS and contact delivery.
-5. Complete release review and publish matching client/daemon artifacts.
+1. Run the final candidate checks: Python matrix, Docker/Compose, browser, docs,
+   package parity and installed 0.3.2 compatibility.
+2. Publish matching 1.0.0 client/daemon artifacts and release notes after green checks.
+3. Pin auton.run documentation and freshly generated deployment examples to the release.
+4. Contact-form delivery remains optional follow-up; the contact link works already.
 
-See [the 1.0 readiness review](docs/1.0-readiness.md) for evidence and open gates.
+See [the 1.0 readiness review](docs/1.0-readiness.md) and
+[release/upgrade guide](docs/release-1.0.md) for evidence and boundaries.

@@ -27,11 +27,13 @@ See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including th
 
 ## Quickstart
 
-This quickstart uses the **development checkout**, including SQLite authentication,
-durable jobs and the web console. These features are not in the published 0.3.2
-packages yet. Run the following from the repository root with Docker Compose:
+This quickstart uses **Auton 1.0.0**, including SQLite authentication, durable
+jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
+git clone https://github.com/decryptus/auton.git
+cd auton
+git checkout v1.0.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -55,7 +57,7 @@ The supplied browser origin deliberately accepts `127.0.0.1`, not `localhost`.
 
 ## Runtime and reliability notes
 
-This branch targets Linux/Unix with Python **3.10–3.12**. Python 2 support is
+Auton 1.0 targets Linux/Unix with Python **3.10–3.12**. Python 2 support is
 removed. Python 3.13+ is not supported yet because the daemon still imports
 `crypt`. Python 3.12 installs the `pyasyncore` compatibility dependency.
 
@@ -175,7 +177,7 @@ credentials before starting it. Current endpoint ACLs and job ownership still
 apply. Use HTTPS for remote access. Keep the existing `run` route's
 `safe_init: true` setting when migrating route configuration.
 
-### Explicit multi-target execution (development branch)
+### Explicit multi-target execution
 
 Run one command on each explicitly named daemon:
 
@@ -849,7 +851,7 @@ endpoints:
 
 ### Import endpoint catalogues
 
-Available on the development branch; not included in the published 0.3.2 release.
+Available since Auton 1.0.0.
 The main daemon configuration can keep inline endpoints and import additional ones:
 
 ```yaml
@@ -896,10 +898,9 @@ All endpoint components are prepared before endpoint instances are initialized.
 
 ### Authentication
 
-New installations can use persistent SQLite authentication. Install the development
-build with its authentication extra (`AUTON_PACKAGE=autond pip install '.[auth]'`),
-or use the Docker image, which includes it. Published Auton 0.3.2 does not include
-this integration yet. HTTPdis >= 0.6.30 and Sonicprobe >= 0.3.55 provide the shared
+New installations can use persistent SQLite authentication. Install
+`autond[auth]==1.0.0`, or use the Docker image, which includes the authentication
+extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
 ```yaml
@@ -1123,9 +1124,10 @@ requirements (maintenance remains protected), but otherwise local callers share
 anonymous identity and job visibility. Loopback is not protection against other
 local users or a reverse proxy: do not publish this mode through a proxy.
 
-#### Authentication migration before 1.0
+#### Authentication migration from 0.3.2 to 1.0
 
-These policy options are development features, not part of published 0.3.2.
+Version 1.0 adds explicit authentication policies. See the
+[1.0 upgrade guide](docs/release-1.0.md) before replacing a running installation.
 Existing configurations without `auth_mode` retain historical per-route behavior
 and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
 `auth_basic_file` alone does not protect routes in legacy mode. Set `auth: true`
