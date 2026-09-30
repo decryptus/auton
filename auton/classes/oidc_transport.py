@@ -34,4 +34,3 @@ class OIDCTokenExchange:
                 return body['id_token']
         except (requests.RequestException, ValueError, KeyError, TypeError):
             raise AuthenticationUnavailable() from None
-

@@ -298,6 +298,8 @@ class PreparationView:
             lines = ['OPERATION RESULT - w exports JSON; Esc returns to monitor']
             if not self.result:
                 return lines
+            if self.result.get('reconciled'):
+                lines.append('READ-ONLY RECONCILIATION - durations are from the saved observation')
             lines.append('%s | %s' % (self.result['operation_id'], self.result['status']))
             for target in self.result['targets']:
                 lines.append('%s | %s | %sms' % (target['target'], target['status'], target.get('duration_ms', '?')))

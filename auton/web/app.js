@@ -93,7 +93,8 @@
       $('jobs').append(row);
     }
     $('empty').hidden = rows.length > 0;
-    $('empty').textContent = jobs.length ? 'No jobs match your filters.' : 'No jobs yet. Run an allowed endpoint to get started.';
+    $('empty').textContent = jobs.length ? 'No jobs match your filters.' : identity.scopes.includes('run')
+      ? 'No jobs yet. Run an allowed endpoint to get started.' : 'No retained jobs are visible for this account.';
   }
   function render() {
     const maintenance = health.maintenance.enabled, available = health.status === 'ok';

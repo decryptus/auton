@@ -537,9 +537,10 @@ Auton 1.1.0 client and daemon packages and matching images are published, with t
 website pinned to that release. The release includes live TUI progress and explicit
 private JSON export. The 1.0 readiness review is historical release evidence.
 
-The next release is under development; no pending item below is a release claim.
+The next-release candidate is implemented and accepted in PR #36; publication
+and the final website source-pin update remain separate release steps.
 See [the working checklist](docs/next-release-work.md) for the complete authorized
-scope and verification state:
+scope, verification evidence and publication handoff:
 
 1. Read-only report reconciliation and replacement-origin monitoring.
 2. Guided endpoint parameters with server-side validation.

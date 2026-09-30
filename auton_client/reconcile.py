@@ -14,6 +14,8 @@ from auton_client.operations import (MAX_TARGETS, MAX_RETAINED_OUTPUT_BYTES,
                                      operation_identity, validate_endpoint)
 from auton_client.visibility import DaemonClient, VisibilityError
 
+ATTEMPT_FIELDS = frozenset(('uri', 'status', 'reason'))
+ATTEMPT_TEXT_FIELDS = ('uri', 'status')
 MAX_REPORT_BYTES = 16 * 1024 * 1024
 MAX_REPORT_JOBS = 16384
 MAX_RECONCILED_OUTPUT_BYTES = 8 * 1024 * 1024
@@ -123,8 +125,8 @@ class ReconciliationService:
                     raise ValueError('invalid saved diagnostics')
                 attempts = row.get('attempts', [])
                 if (not isinstance(attempts, list) or len(attempts) > MAX_TARGETS
-                        or any(not isinstance(attempt, dict) or not {'uri', 'status', 'reason'} <= set(attempt) or any(
-                            not isinstance(attempt.get(key), str) for key in ('uri', 'status'))
+                        or any(not isinstance(attempt, dict) or not ATTEMPT_FIELDS <= set(attempt) or any(
+                            not isinstance(attempt.get(key), str) for key in ATTEMPT_TEXT_FIELDS)
                             or (attempt.get('reason') is not None and not isinstance(attempt['reason'], str))
                             for attempt in attempts)):
                     raise ValueError('invalid saved failover attempts')

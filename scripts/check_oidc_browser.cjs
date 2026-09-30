@@ -27,6 +27,7 @@ const {chromium} = require('playwright');
     await page.locator('#console').waitFor({state: 'visible'});
     assert.equal(await page.locator('#principal').textContent(), 'reader');
     assert.equal(await page.locator('#new-job').isDisabled(), true);
+    assert.equal(await page.locator('#empty').textContent(), 'No retained jobs are visible for this account.');
     assert.equal(new URL(page.url()).search, '');
     assert.equal(await page.evaluate(() => document.cookie), '');
     const cookies = await context.cookies();

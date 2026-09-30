@@ -1758,7 +1758,8 @@ reconciliation; this limit is checked before network access.
 This performs one bounded, read-only snapshot. A missing, expired or inaccessible
 job remains **unknown**; it is never considered safe to replay. Already skipped,
 rejected or unsubmitted steps remain unchanged. Outputs are refreshed from the
-same daemon and job identity; the original report is not modified. Do not redirect
+same daemon and job identity; saved observation durations are retained and labeled
+as such in the TUI. The original report is not modified. Do not redirect
 to the input report. Exit status is zero only when all observed work is completed
 successfully. `--operation-timeout` bounds the overall observation budget between
 requests, and `--http-timeout` bounds each HTTP request.
