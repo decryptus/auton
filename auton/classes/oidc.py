@@ -13,9 +13,8 @@ from pathlib import Path
 import secrets
 import threading
 import time
-from urllib.parse import urlencode, urlsplit, quote
+from urllib.parse import urlencode, urlsplit
 
-import requests
 from httpdis.authentication import AuthenticationDenied, AuthenticationUnavailable, Identity
 from httpdis.auth_backend import SessionGrant
 from auton.classes.exceptions import AutonConfigurationError
@@ -30,7 +29,6 @@ MAX_SESSIONS = 1024
 FLOW_TTL = 300
 SESSION_TTL = 3600
 IDLE_TTL = 900
-OIDC_TIMEOUT = 5
 REQUIRED_CLAIMS = ('iss', 'aud', 'sub', 'exp', 'iat', 'nonce')
 
 
@@ -129,7 +127,10 @@ class OIDCService:
         self.settings = settings
         self.redirect_uri = origin + '/oidc/callback'
         self.local, self.account_lookup, self.clock = local, account_lookup, clock
-        self.exchange = exchange or self._exchange
+        if exchange is None:
+            from auton.classes.oidc_transport import OIDCTokenExchange
+            exchange = OIDCTokenExchange(settings['token_endpoint'], settings['client_id'], self.secret, self.redirect_uri)
+        self.exchange = exchange
         self.session_ttl = local.session_ttl
         self.exchange_slots = threading.BoundedSemaphore(4)
         self.lock = threading.RLock()
@@ -154,27 +155,6 @@ class OIDCService:
         params = dict(response_type='code', client_id=self.settings['client_id'], redirect_uri=self.redirect_uri,
                       scope='openid', state=state, nonce=nonce, code_challenge=challenge, code_challenge_method='S256')
         return self.settings['authorization_endpoint'] + '?' + urlencode(params), binding
-
-    def _exchange(self, code, verifier):
-        payload = dict(grant_type='authorization_code', code=code, redirect_uri=self.redirect_uri,
-                       client_id=self.settings['client_id'], code_verifier=verifier)
-        auth = (quote(self.settings['client_id'], safe=''), quote(self.secret, safe='')) if self.secret is not None else None
-        try:
-            # No redirects/retries; a code exchange is not safely replayable.
-            with requests.post(self.settings['token_endpoint'], data=payload, auth=auth,
-                               timeout=OIDC_TIMEOUT, allow_redirects=False, stream=True) as response:
-                if response.status_code != 200:
-                    raise AuthenticationDenied()
-                data = bytearray()
-                deadline = time.monotonic() + OIDC_TIMEOUT
-                for chunk in response.iter_content(4096):
-                    data.extend(chunk)
-                    if len(data) > MAX_DOCUMENT_BYTES or time.monotonic() > deadline:
-                        raise AuthenticationUnavailable()
-                body = json.loads(data)
-                return body['id_token']
-        except (requests.RequestException, ValueError, KeyError, TypeError):
-            raise AuthenticationUnavailable() from None
 
     def finish(self, state, binding, code):
         if not all(_text(value, limit) for value, limit in ((state, 43), (binding, 43), (code, 2048))):

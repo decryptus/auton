@@ -13,6 +13,10 @@ from auton.classes.exceptions import AutonConfigurationError
 MAX_LOGIN_BYTES = 8192
 LOGIN_FIELDS = frozenset(('principal', 'password'))
 OIDC_COOKIE = '__Host-autond-oidc'
+OIDC_CALLBACK_HTML = ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                      '<meta http-equiv="refresh" content="0;url=/ui/">'
+                      '<title>Auton sign-in complete</title></head><body>'
+                      '<p>Signed in. <a href="/ui/">Continue to Auton</a>.</p></body></html>')
 CALLBACK_FIELDS = frozenset(('code', 'state', 'iss', 'session_state'))
 WEB_ROUTES = {
     'web_auth_options': ('^ui/auth/options$', 'web_auth_options', 'GET', False),
@@ -173,5 +177,7 @@ class WebConsole:
             raise HttpReqErrJson(401, 'SSO callback rejected') from None
         grant = auth_call(self.provider.service.finish, params['state'], bindings[0], params['code'])
         # No token or CSRF value in the URL. Session GET supplies CSRF same-origin.
-        return HttpResponse(303, '', headers={'Location': '/ui/',
+        # Commit a same-origin document before navigation: a cross-site redirect
+        # chain must not weaken the console's Sec-Fetch-Site policy.
+        return HttpResponse(200, OIDC_CALLBACK_HTML, headers={'Content-Type': 'text/html; charset=utf-8',
             'Set-Cookie': self.provider.cookie(grant.secret, max(0, int(grant.expires_at - time.time())))})

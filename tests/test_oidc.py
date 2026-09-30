@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 import time
 import unittest
 from urllib.parse import parse_qs, urlsplit
@@ -98,6 +100,58 @@ class OIDCTests(unittest.TestCase):
         self.service.logout(grant.secret)
         self.assertEqual(self.service.sessions, {})
         self.local.logout.assert_called_once_with(grant.secret)
+
+    def test_service_runs_without_http_cli_or_outbound_adapter_imports(self):
+        code = r'''
+import importlib.abc, sys, json, tempfile, time
+class Block(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in ('httpdis.httpdis', 'auton.classes.http', 'auton.classes.config', 'auton.classes.oidc_transport') or fullname.split('.')[0] in ('dwho', 'curses', 'requests', 'argparse'):
+            raise AssertionError(fullname)
+sys.meta_path.insert(0, Block())
+from types import SimpleNamespace
+from pathlib import Path
+from urllib.parse import urlsplit, parse_qs
+from cryptography.hazmat.primitives.asymmetric import rsa
+import jwt
+from auton.classes.oidc import OIDCService
+with tempfile.TemporaryDirectory() as directory:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key()))
+    jwk['kid'] = 'key'
+    path = Path(directory) / 'keys.json'
+    path.write_text(json.dumps({'keys': [jwk]}))
+    settings = dict(issuer='https://idp.example', client_id='client', subjects={'subject': 'alice'},
+                    authorization_endpoint='https://idp.example/authorize', jwks_file=str(path))
+    tokens = []
+    service = OIDCService(settings, 'https://auton.example', SimpleNamespace(session_ttl=3600),
+                          lambda principal: (1, ['read']), exchange=lambda *args: tokens[0])
+    url, binding = service.begin()
+    query = parse_qs(urlsplit(url).query)
+    tokens.append(jwt.encode(dict(iss=settings['issuer'], aud='client', sub='subject', iat=int(time.time()),
+                                  exp=int(time.time())+60, nonce=query['nonce'][0]), key, algorithm='RS256', headers={'kid': 'key'}))
+    grant = service.finish(query['state'][0], binding, 'code')
+    assert service.authenticate_session(grant.secret, grant.csrf, True).principal == 'alice'
+    service.close()
+'''
+        result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_expired_flow_and_idle_session_cannot_authenticate(self):
+        query, binding = self.flow()
+        now = time.time()
+        self.service.clock = lambda: now + 301
+        with self.assertRaises(AuthenticationDenied):
+            self.service.finish(query['state'], binding, 'code')
+        self.exchange.assert_not_called()
+        self.service.clock = time.time
+        query, binding = self.flow(exp=int(time.time()) + 2000)
+        grant = self.service.finish(query['state'], binding, 'code')
+        self.local.authenticate_session.side_effect = AuthenticationDenied()
+        self.service.clock = lambda: now + 901
+        with self.assertRaises(AuthenticationDenied):
+            self.service.authenticate_session(grant.secret)
+        self.assertEqual(self.service.sessions, {})
 
     def test_configuration_rejects_insecure_or_unbounded_options(self):
         general = dict(web_enabled=True, web_origin='https://auton.example', auth_mode='required',

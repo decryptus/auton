@@ -251,8 +251,9 @@
   });
   setInterval(() => { if (!document.hidden && $('auto-refresh').checked) refresh(); }, REFRESH_MS);
   (async () => {
-    if (!savedCSRF()) return;
-    try { $('sso-login').hidden = !(await request('/ui/auth/options', {login: true})).oidc; } catch (_) {}
+    let ssoEnabled = false;
+    try { ssoEnabled = (await request('/ui/auth/options', {login: true})).oidc; $('sso-login').hidden = !ssoEnabled; } catch (_) {}
+    if (!savedCSRF() && !ssoEnabled) return;
     try { session(await request('/ui/auth/session')); await refresh(); }
     catch (error) { signedOut(error.status === 401 ? '' : error.message); }
   })();
