@@ -533,8 +533,8 @@ and the website pinned to that release. The 1.0 gate is complete; its reviews
 remain evidence for the release, not an outstanding publication checklist.
 The 1.0.2 patch preserves job references after uncertain submission outcomes.
 
-1. Deliver live per-target/per-step TUI progress and explicit JSON result export
-   in the next release; implementation and terminal acceptance accompany this change.
+1. Release 1.1.0 adds live per-target/per-step TUI progress and explicit JSON
+   result export; publication remains gated by CI and installed-artifact acceptance.
 2. Keep installed-package, Python matrix, Docker/Compose, browser and documentation
    checks as release gates, including regeneration of the website's pinned captures.
 3. Scope cancellation and durable scenario continuation separately; neither is
