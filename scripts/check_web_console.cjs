@@ -64,6 +64,10 @@ const {chromium} = require('playwright');
     await page.locator('#refresh').click();
     await page.waitForFunction(() => document.querySelector('#stdout').textContent.includes('browser execution verified'));
     assert.equal(posts, 1);
+    assert.match(await page.locator('#notice').textContent(), /^Job submitted:/);
+    assert.equal(await page.locator('#notice').getAttribute('data-tone'), 'info');
+    assert.equal(await page.locator('#notice').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(234, 242, 255)');
+    await page.screenshot({path: 'docs/screenshots/web-submitted.png', fullPage: true});
     await page.locator('#auto-refresh').uncheck();
     // A mutation overlapping an older refresh must schedule a fresh read even
     // with automatic refresh off; otherwise stale "Ready" can hide maintenance.
@@ -102,6 +106,8 @@ const {chromium} = require('playwright');
     await page.locator('#submit-run').click();
     await page.waitForFunction(() => document.querySelector('#notice').textContent.includes('Submission outcome unknown'));
     assert.equal(posts, 2);
+    assert.equal(await page.locator('#notice').getAttribute('data-tone'), 'error');
+    assert.equal(await page.locator('#notice').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(255, 241, 242)');
     await page.locator('#refresh').click();
     assert.equal(posts, 2);
     await page.unroute('**/run/**');

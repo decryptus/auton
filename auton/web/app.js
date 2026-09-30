@@ -8,7 +8,10 @@
   let selected = null, refreshing = false, refreshAgain = false, submitting = false, generation = 0;
   function savedCSRF() { try { return localStorage.getItem(CSRF_KEY) || csrf; } catch (_) { return csrf; } }
   function saveCSRF(value) { csrf = value; try { value ? localStorage.setItem(CSRF_KEY, value) : localStorage.removeItem(CSRF_KEY); } catch (_) {} }
-  function notice(message) { $('notice').textContent = message; $('notice').hidden = !message; }
+  function notice(message, tone = 'error') {
+    $('notice').dataset.tone = tone;
+    $('notice').textContent = message; $('notice').hidden = !message;
+  }
   function signedOut(message = '') {
     generation++; identity = null; selected = null; jobs = []; endpoints = []; health = null;
     $('console').hidden = true; $('login-panel').hidden = false; $('logout').hidden = true;
@@ -164,7 +167,7 @@
     const id = crypto.randomUUID(); submitting = true; $('submit-run').disabled = true; $('cancel-run').disabled = true;
     try {
       await request('/run/' + encodeURIComponent(endpoint) + '/' + id, {method: 'POST', body: {args}});
-      selected = {endpoint, uid: endpoint + ':' + id}; $('run-dialog').close(); notice('Job submitted: ' + id); await refresh();
+      selected = {endpoint, uid: endpoint + ':' + id}; $('run-dialog').close(); notice('Job submitted: ' + id, 'info'); await refresh();
     } catch (error) {
       $('run-dialog').close();
       const refused = [400, 401, 403, 404, 413].includes(error.status) || error.notAdmitted;
