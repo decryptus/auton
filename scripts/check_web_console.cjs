@@ -64,6 +64,10 @@ const {chromium} = require('playwright');
     await page.locator('#refresh').click();
     await page.waitForFunction(() => document.querySelector('#stdout').textContent.includes('browser execution verified'));
     assert.equal(posts, 1);
+    assert.match(await page.locator('#notice').textContent(), /^Job submitted:/);
+    assert.equal(await page.locator('#notice').getAttribute('data-tone'), 'info');
+    assert.equal(await page.locator('#notice').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(234, 242, 255)');
+    await page.screenshot({path: 'docs/screenshots/web-submitted.png', fullPage: true});
     await page.locator('#auto-refresh').uncheck();
     // A mutation overlapping an older refresh must schedule a fresh read even
     // with automatic refresh off; otherwise stale "Ready" can hide maintenance.
@@ -102,13 +106,25 @@ const {chromium} = require('playwright');
     await page.locator('#submit-run').click();
     await page.waitForFunction(() => document.querySelector('#notice').textContent.includes('Submission outcome unknown'));
     assert.equal(posts, 2);
+    assert.equal(await page.locator('#notice').getAttribute('data-tone'), 'warning');
+    assert.equal(await page.locator('#notice').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(255, 243, 205)');
     await page.locator('#refresh').click();
     assert.equal(posts, 2);
     await page.unroute('**/run/**');
     await page.locator('#logout').click();
     await page.locator('#login-panel').waitFor({state: 'visible'});
     assert.equal((await context.cookies()).filter(cookie => cookie.name === 'autond-session').length, 0);
+    await page.locator('#username').fill('operator');
+    await page.locator('#password').fill('wrong-fixture-password');
+    await page.locator('#login-button').click();
+    await page.locator('#notice').waitFor({state: 'visible'});
+    assert.equal(await page.locator('#notice').getAttribute('data-tone'), 'error');
+    assert.equal(await page.locator('#notice').evaluate(node => getComputedStyle(node).backgroundColor), 'rgb(255, 241, 242)');
     await login('reader');
+    // Login reveals the panel before its asynchronous refresh finishes.
+    // Wait for the reader's rendered controls, not the previous Ready label.
+    await page.waitForFunction(() => document.querySelector('#new-job').disabled &&
+      document.querySelector('#jobs').children.length === 0);
     assert.equal(await page.locator('#new-job').isDisabled(), true);
     assert.equal(await page.locator('#maintenance-controls').isVisible(), false);
     assert.equal(await page.locator('#jobs tr').count(), 0);
