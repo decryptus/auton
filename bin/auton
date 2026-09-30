@@ -124,8 +124,8 @@ def argv_parse_check():
     parser.add_argument("--mode",
                         dest      = 'mode',
                         default   = 'autorun',
-                        choices   = ('autorun', 'run', 'status'),
-                        help      = "Auton mode: autorun, run, status, instead of %(default)s")
+                        choices   = ('autorun', 'run', 'status', 'cancel'),
+                        help      = "Auton mode: autorun, run, status, cancel, instead of %(default)s")
     parser.add_argument("-e",
                         action    = 'append',
                         dest      = 'envvars',
@@ -190,6 +190,11 @@ def argv_parse_check():
             parser.error('--no-return-code cannot hide multi-target failures')
     if (options.tui or not (options.target or options.target_group)) and (options.operation_id or options.parallel != 4 or options.operation_timeout != 300):
         parser.error('operation options require execution with --target or --target-group')
+    if options.mode == 'cancel':
+        if (options.uid is None or len(options.uri) != 1 or not options.endpoint
+                or options.args or options.argfiles or options.margs or options.margsfiles
+                or options.envvars or options.envfiles or options.imp_envvars or options.load_envfiles):
+            parser.error('cancel requires one explicit --uri, --endpoint and --uid, without execution inputs')
     if options.uid is None:
         options.uid = str(uuid.uuid4())
 
@@ -406,6 +411,10 @@ def main(options):
                 timeout=options.operation_timeout).run()
             print(json.dumps(result))
             rc = int(result['status'] != 'completed')
+        elif options.mode == 'cancel':
+            from auton_client.execution import cancel_job
+            rc = cancel_job(options.uri[0], options.endpoint, options.uid,
+                            credentials_from_options(options), options.http_timeout)
         elif options.target or options.target_group:
             from auton_client.operations import OperationService
             auth = credentials_from_options(options)

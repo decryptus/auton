@@ -69,6 +69,27 @@ class PreparationTests(unittest.TestCase):
         finally:
             session.close()
 
+    def test_guided_parameters_prepare_literal_args_without_submission(self):
+        import json
+        panel = self.panel()
+        panel.selected[4] = ['echo']
+        panel.update({'one': {'endpoints': [{'name': 'echo', 'parameters': {'version': 1,
+            'args': [{'name': 'mode', 'choices': ['safe', 'full']} ]}}]}})
+        original = panel.input
+        panel.handle(ord('p'))
+        self.assertIn('GUIDED ARGUMENTS', panel.lines()[0])
+        panel.handle(ord('x'))
+        panel.handle(10)
+        self.assertEqual(panel.editing, 'parameter_input')
+        panel.handle(27)
+        self.assertEqual(panel.input, original)
+        panel.handle(ord('p'))
+        for char in 'safe':
+            panel.handle(ord(char))
+        panel.handle(10)
+        self.assertEqual(json.loads(panel.input), {'args': ['safe'], 'env': {}})
+        panel.session.start.assert_not_called()
+
     def test_invalid_inputs_block_preview_and_endpoint_switch_clears_scenarios(self):
         panel = self.panel()
         panel.selected[0] = ['one']

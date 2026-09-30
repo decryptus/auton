@@ -185,6 +185,8 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                     if user is None or not self.users.get(user):
                         raise AutonTargetUnauthorized("unauthorized user: %r" % user)
 
+                from auton.classes.parameters import validate_arguments
+                validate_arguments(self.discovery.get('parameters'), obj.get_payload())
                 func = "do_%s" % obj.get_method()
                 if not hasattr(self, func):
                     LOG.warning("unknown method %r for endpoint %r", func, self.name)
@@ -199,7 +201,11 @@ class AutonPlugBase(threading.Thread, DWhoPluginBase):
                 getattr(self, func)(obj)
                 obj.set_return_code(0)
             except Exception as e:
-                if isinstance(e, AutonTargetTimeout):
+                from auton.classes.exceptions import AutonTargetCancelled
+                if isinstance(e, AutonTargetCancelled):
+                    obj.outcome = 'job.cancelled'
+                    obj.outcome_reason = 'owner_request'
+                elif isinstance(e, AutonTargetTimeout):
                     obj.outcome = 'job.timeout'
                 elif isinstance(e, AutonTargetUnauthorized):
                     obj.outcome = 'job.rejected'

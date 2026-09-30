@@ -245,16 +245,17 @@ class OperatorView:
             line(0, 'AUTON %s | %s' % (__version__, panel.mode.upper()), curses.A_BOLD)
             line(1, panel.error, curses.A_BOLD)
             values = panel.lines()
-            if panel.mode == 'select':
-                for y, value in enumerate(values[:5], 2):
+            if panel.mode == 'select' and panel.editing not in ('import_path', 'parameter_input'):
+                for y, value in enumerate(values[:6], 2):
                     line(y, value)
-                available = height - 8
+                available = height - 9
                 start = max(0, panel.index - available + 1)
-                for y, value in enumerate(values[5 + start:5 + start + available], 7):
+                for y, value in enumerate(values[6 + start:6 + start + available], 8):
                     line(y, value)
             else:
                 wrap_key = (id(panel.result), panel.mode, width, id(panel.service),
-                            panel.progress['revision'], panel.editing, panel.export_path, panel.import_path)
+                            panel.progress['revision'], panel.editing, panel.export_path, panel.import_path,
+                            panel.parameter_index, panel.parameter_input)
                 if self.preparation_wrap_key != wrap_key:
                     self.preparation_wrapped = [part for value in values for part in
                         (textwrap.wrap(safe_text(value), width - 1, replace_whitespace=False) or [''])]
@@ -287,7 +288,7 @@ class OperatorView:
             coverage = 'Jobs coverage %s/%s | ' % (stats.get('responding', 0), len(self.monitor.clients))
         line(4, coverage + (' | '.join('%s: %s' % item for item in errors.items()) if errors else
              ('Refreshing...' if self.monitor.worker is not None else 'Last refresh completed')))
-        available = height - 8
+        available = height - 9
         if self.view == 2:
             job = self.selected_job()
             detail = self.data.get('detail', {})

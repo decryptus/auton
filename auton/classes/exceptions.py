@@ -25,3 +25,7 @@ class AutonTargetTimeout(AutonTargetFailed):
 
 class AutonTargetUnauthorized(AutonTargetFailed):
     pass
+
+
+class AutonTargetCancelled(AutonTargetFailed):
+    pass

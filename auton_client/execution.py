@@ -3,12 +3,15 @@
 """Pinned execution transport with safe, presentation-independent diagnostics."""
 from urllib.parse import quote
 import time
+import re
 
 from requests import exceptions
 
 from auton_client import RemoteClient
 
 EXECUTION_ROUTE = '/%s/%s/%s'
+CANCEL_ROUTE = '/cancel/%s/%s'
+CANCEL_JOB_ID_PATTERN = re.compile(r'[a-z0-9][a-z0-9\-]{7,63}')
 REJECTED_HTTP_CODES = frozenset((400, 401, 403, 404, 405, 415, 422))
 JOB_RESPONSE_CODES = frozenset((200, 400))
 
@@ -102,3 +105,33 @@ class ExecutionClient(RemoteClient):
 
     def do_status(self):
         return self._request('status')
+
+
+def cancel_job(origin, endpoint, job_id, auth=None, http_timeout=30, session=None):
+    """One explicit cancellation request to a pinned daemon; never retry or fail over."""
+    from urllib.parse import quote
+    from auton_client.visibility import DaemonClient
+    from auton_client.operations import validate_endpoint
+    validate_endpoint(endpoint)
+    if not isinstance(job_id, str) or CANCEL_JOB_ID_PATTERN.fullmatch(job_id) is None:
+        raise ValueError('invalid job ID')
+    client = DaemonClient(origin, auth=auth, http_timeout=http_timeout, session=session)
+    response = None
+    try:
+        response = client.session.post(client.uri + CANCEL_ROUTE % (quote(endpoint, safe=''), job_id),
+            json={}, headers=RemoteClient._build_headers(), auth=client.auth,
+            timeout=client.http_timeout, allow_redirects=False)
+        if response.status_code != 200:
+            raise ExecutionError('cancellation request returned HTTP %s; inspect job state' % response.status_code)
+        data = response.json()
+        if (not isinstance(data, dict) or data.get('uid') != endpoint + ':' + job_id
+                or data.get('code') != 200 or data.get('status') not in ('new', 'processing', 'complete')):
+            raise ExecutionError('invalid cancellation response; inspect job state')
+        return data
+    except exceptions.RequestException:
+        raise ExecutionError('cancellation outcome unknown; inspect job state; request was not retried') from None
+    except ValueError:
+        raise ExecutionError('unreadable cancellation response; inspect job state') from None
+    finally:
+        if response is not None:
+            response.close()

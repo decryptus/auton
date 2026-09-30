@@ -6,7 +6,7 @@ from pathlib import Path
 from auton.classes.exceptions import AutonConfigurationError
 
 AUTH_FIELDS = frozenset(('backend', 'path', 'timeout'))
-AUTH_SCOPES = frozenset(('read', 'run', 'maintenance'))
+AUTH_SCOPES = frozenset(('read', 'run', 'maintenance', 'cancel'))
 DEFAULT_AUTH_TIMEOUT = 5
 
 
@@ -40,7 +40,7 @@ def validate_scopes(scopes):
         raise ValueError('scopes must be a collection')
     scopes = frozenset(scopes)
     if not scopes or not scopes <= AUTH_SCOPES:
-        raise ValueError('scopes must contain only read, run or maintenance')
+        raise ValueError('scopes must contain only read, run, maintenance or cancel')
     return scopes
 
 

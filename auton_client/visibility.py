@@ -81,6 +81,19 @@ class DaemonClient:
                 or not isinstance(item.get('name'), str)
                 or ('description' in item and not isinstance(item['description'], str)) for item in data):
             raise VisibilityError('invalid endpoints response')
+        for item in data:
+            schema = item.get('parameters')
+            if schema is None:
+                continue
+            if (not isinstance(schema, dict) or schema.get('version') != 1
+                    or not isinstance(schema.get('args'), list) or len(schema['args']) > 64):
+                raise VisibilityError('invalid endpoint parameter schema')
+            for field in schema['args']:
+                if (not isinstance(field, dict) or not isinstance(field.get('name'), str)
+                        or not isinstance(field.get('description', ''), str)
+                        or not isinstance(field.get('choices', []), list)
+                        or any(not isinstance(value, str) for value in field.get('choices', []))):
+                    raise VisibilityError('invalid endpoint parameter fields')
         return data
 
     def stats(self):

@@ -1779,3 +1779,60 @@ Continuation applies only to a confirmed terminal failure, preserves that failur
 in the final result and pins later steps to the same daemon. Unknown outcomes,
 refusals and observation timeouts always stop the target's sequence. This option
 never retries a job, rolls back work or converts failure into success.
+
+### Published positional parameters
+
+An endpoint can explicitly publish a bounded argument contract. Only this public
+metadata is returned by `/endpoints`, after endpoint authorization. No private
+plugin configuration is published.
+
+```yaml
+discovery:
+  description: Check one service
+  parameters:
+    version: 1
+    args:
+      - name: service
+        choices: [web, database]
+      - name: attempts
+        type: integer
+        required: false
+```
+
+Each field is one literal positional argument. Supported types are `string`
+(default), `integer` and `boolean` (`true`/`false` text). Fields may declare
+`description`, `choices`, `max_length` (1–4096) and `required` (default true).
+Optional fields must be trailing; at most 64 fields are allowed. The daemon rejects
+missing, extra or invalid arguments before admission, and validates again in the
+worker. Endpoints without a schema retain their existing input behavior. This
+schema describes positional arguments only, not environment variables or uploads.
+
+The web console builds a form. In TUI preparation, select an endpoint and press
+`p` for guided input; Escape leaves the previous input unchanged. The guided TUI
+form replaces arguments and clears the environment. Conflicting published schemas
+cannot be combined into a guided form. Execution still requires the normal preview
+and confirmation. Raw CLI arguments remain available and receive the same server
+validation.
+
+### Explicit job cancellation
+
+An authenticated job owner can request cancellation with the new `cancel` scope;
+existing tokens are not silently granted that permission. With Basic authentication,
+the authenticated owner and endpoint ACL are checked. The bundled `subproc` adapter
+supports cancellation; other adapters must explicitly support it.
+
+```sh
+auton --mode cancel --uri https://node.example.com --endpoint backup \
+  --uid 00000000-0000-0000-0000-000000000001 -k operator.token
+```
+
+The request is pinned to one daemon and is never retried automatically. A queued
+job is prevented from launching, including during maintenance. A running subprocess
+and its process group are terminated before terminal state is reported. The response
+may show `cancel_requested: true` while cleanup is still underway; inspect the job
+to confirm `outcome: job.cancelled`. Cancellation cannot undo already completed
+effects, and a job that wins the completion race retains its actual result.
+
+The web job detail offers a separate confirmation for cancellation. Stopping
+observation in CLI/TUI remains unrelated to cancellation. Existing installations
+must add the `POST /cancel/<endpoint>/<id>` route from the bundled module YAML.

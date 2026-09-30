@@ -36,6 +36,7 @@ must remain independently configurable; Redis must not become mandatory.
 ## Working status
 
 The working branch contains reconciliation, expanded origin monitoring, and
-explicit continuation after confirmed failure. They still require full interface
+explicit continuation after confirmed failure. Guided parameters and explicit
+owner-authorized subprocess cancellation are also implemented locally. They still require full interface
 acceptance and review before being marked delivered. Remaining items are open.
 No new version has been published by this work.

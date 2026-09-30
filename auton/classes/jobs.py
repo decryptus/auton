@@ -3,6 +3,7 @@
 """Job admission, access and retention, independent of transport interfaces."""
 
 import math
+import copy
 import logging
 import threading
 import time
@@ -10,6 +11,7 @@ from contextlib import contextmanager
 
 from auton.classes.job import JobObject, STATUS_NEW, STATUS_PROCESSING, STATUS_COMPLETE
 from auton.classes.job_schema import validate_input
+from auton.classes.parameters import validate_arguments
 from auton.classes.journal import record_event
 from auton.classes.availability import Availability, MaintenanceActive
 from auton.classes.job_store import JobStoreUnavailable, snapshot, restore
@@ -73,8 +75,9 @@ def job_result(obj, offset=None):
                   'started_at': obj.get_started_at(),
                   'stream': obj.get_last_result(offset),
                   'next_offset': len(obj.result),
-                  'ended_at': obj.get_ended_at()}
-        if obj.outcome == 'job.interrupted':
+                  'ended_at': obj.get_ended_at(),
+                  'cancel_requested': obj.cancel_requested}
+        if obj.outcome in ('job.interrupted', 'job.cancelled'):
             result.update(outcome=obj.outcome, outcome_reason=obj.outcome_reason,
                           execution_uncertain=obj.execution_uncertain)
         if obj.has_error():
@@ -99,6 +102,7 @@ def job_summary(obj):
             'outcome_reason': obj.outcome_reason,
             'execution_uncertain': obj.execution_uncertain,
             'storage_error': obj.persistence_error,
+            'cancel_requested': obj.cancel_requested,
         }
 
 
@@ -264,6 +268,7 @@ class JobService(object):
         with self._locked():
             try:
                 self.authorize(endpoint, principal)
+                validate_arguments(getattr(self.endpoints[endpoint], 'discovery', {}).get('parameters'), payload)
                 if self.persistence_failed:
                     raise JobUnavailable('job storage unavailable; new admissions disabled until restart')
                 with self.availability.admission():
@@ -286,6 +291,27 @@ class JobService(object):
             obj = self.get_object(endpoint, xid)
             self.authorize(endpoint, principal, obj)
             return job_result(obj, offset)
+
+    def cancel(self, endpoint, xid, principal):
+        """Request cooperative adapter cancellation; completion follows process cleanup."""
+        validate_input({'endpoint': endpoint, 'id': xid})
+        with self._locked():
+            obj = self.get_object(endpoint, xid)
+            self.authorize(endpoint, principal, obj)
+            if principal is None:
+                raise AccessDenied('cancellation requires an authenticated job owner')
+            with self.availability.condition:
+                with obj.output_lock:
+                    if obj.get_status() == STATUS_COMPLETE:
+                        return job_result(obj, 0)
+                    if not getattr(self.endpoints[endpoint], 'SUPPORTS_CANCELLATION', False):
+                        raise JobUnavailable('endpoint adapter does not support cancellation')
+                    obj.cancel_requested = True
+                    obj.launch_cancelled = True
+                    self.availability.condition.notify_all()
+                    record_event(self.journal, 'job.cancel_requested', uid=obj.uid,
+                                 endpoint=endpoint, principal=principal, execution_id=obj.execution_id)
+                    return job_result(obj, 0)
 
     def list_jobs(self, principal, endpoint=None, status=None):
         """Return visible jobs without consuming output cursors."""
@@ -324,6 +350,9 @@ class JobService(object):
             description = getattr(self.endpoints[name], 'discovery', {}).get('description')
             if description:
                 item['description'] = description
+            parameters = getattr(self.endpoints[name], 'discovery', {}).get('parameters')
+            if parameters is not None:
+                item['parameters'] = copy.deepcopy(parameters)
             result.append(item)
         return result
 

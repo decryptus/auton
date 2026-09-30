@@ -5,12 +5,18 @@ from pathlib import Path
 import sys
 import time
 import requests
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tests'))
 from web_fixture import WebDaemon
 
 daemon = WebDaemon()
 try:
+    config_path = daemon.path / 'auton.yml'
+    config = yaml.safe_load(config_path.read_text())
+    config['endpoints']['health-check']['discovery'] = {'parameters': {'version': 1, 'args': [
+        {'name': 'python-mode', 'choices': ['-c']}, {'name': 'script', 'type': 'string'}]}}
+    config_path.write_text(yaml.safe_dump(config))
     daemon.start()
     headers = {'Authorization': 'Bearer ' + daemon.token}
     for endpoint, uid, code in (

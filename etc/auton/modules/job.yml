@@ -41,3 +41,8 @@ job:
       regexp:    '^status/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
       auth:      false
       op:        'GET'
+    cancel:
+      handler:   'job_cancel'
+      regexp:    '^cancel/(?P<endpoint>[^\/]+)/(?P<id>[a-z0-9][a-z0-9\-]{7,63})$'
+      auth:      true
+      op:        'POST'

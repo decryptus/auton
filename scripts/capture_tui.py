@@ -90,7 +90,8 @@ def main():
                                          max_life_time=0, max_requests=0, auth_mode='anonymous')
                 config.pop('import_modules', None)
                 config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
-                config['endpoints'] = {'diagnostics': {'plugin': 'subproc', 'config': {
+                config['endpoints'] = {'diagnostics': {'plugin': 'subproc', 'discovery': {'parameters':
+                    {'version': 1, 'args': [{'name': 'mode', 'choices': ['-c']}, {'name': 'script'}]}}, 'config': {
                     'prog': sys.executable, 'timeout': 15}}}
                 path = Path(directory) / (name + '.yml')
                 path.write_text(yaml.safe_dump(config))
@@ -197,6 +198,17 @@ def main():
             assert [[job['uid'] for job in jobs] for jobs in after] == [[job['uid'] for job in jobs] for jobs in before]
             assert json.loads(exported.read_text()) == result
             os.write(master, b'\x1b')
+            wait_for('READ ONLY')
+            os.write(master, b'e\t p')
+            wait_for('GUIDED ARGUMENTS')
+            os.write(master, b'-c\n')
+            wait_for('2/2: script')
+            render(screen, 'tui-parameters.png')
+            os.write(master, b'print("guided")\n')
+            wait_for('PREPARE')
+            os.write(master, b'\n')
+            wait_for('CONFIRM EXECUTION')
+            os.write(master, b'n\x1b')
             wait_for('READ ONLY')
             os.write(master, b'q')
             if tui.wait(timeout=3) != 0:

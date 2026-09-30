@@ -22,13 +22,14 @@ from auton.classes.jobs import (JobService, job_result, UnknownEndpoint, Unknown
 
 from auton.classes.availability import Availability, MaintenanceActive
 from auton.classes.auth_store import authorized_principal
+from auton.classes.parameters import InvalidParameters
 
 MAINTENANCE_FIELDS = frozenset(('enabled', 'reason'))
 
 LOG = logging.getLogger('auton.modules.job')
 OUTPUT_OFFSET_PATTERN = re.compile(r'[0-9]{1,12}')
 JOB_FILTER_FIELDS = frozenset(('endpoint', 'status'))
-HTTP_ERROR_CODES = {UnknownEndpoint: 404, UnknownJob: 404, AccessDenied: 403,
+HTTP_ERROR_CODES = {InvalidParameters: 400, UnknownEndpoint: 404, UnknownJob: 404, AccessDenied: 403,
                     DuplicateJob: 415, JobUnavailable: 503, InvalidOffset: 400, InvalidFilter: 400,
                     InvalidArgumentsType: 400, InvalidArguments: 415}
 HTTP_ERRORS = tuple(HTTP_ERROR_CODES)
@@ -216,6 +217,16 @@ class JobModule(DWhoModuleBase):
         except ValueError as error:
             raise HttpReqErrJson(400, str(error))
         return {'code': 200, 'maintenance': result}
+
+    def job_cancel(self, request):
+        params = request.query_params()
+        _http_call(validate_input, params)
+        if request.payload_params() != {}:
+            raise HttpReqErrJson(400, 'cancellation requires an empty JSON object')
+        result = _http_call(self.service.cancel, params['endpoint'], params['id'],
+                            self._principal(request, 'cancel'))
+        result['code'] = 200
+        return result
 
     def job_status(self, request):
         return self._handle(request)

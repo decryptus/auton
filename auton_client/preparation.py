@@ -39,10 +39,21 @@ class PreparationView:
         self.progress = {'revision': 0, 'rows': [], 'operation_id': None}
         self.export_path = ''
         self.import_path = ''
+        self.parameter_catalogue = {}
+        self.parameter_fields = []
+        self.parameter_values = []
+        self.parameter_index = 0
+        self.parameter_input = ''
 
     def update(self, snapshots):
         self.endpoints = sorted({item['name'] for data in snapshots.values()
                                  for item in data.get('endpoints', [])})
+        catalogues = {}
+        for data in snapshots.values():
+            for item in data.get('endpoints', []):
+                catalogues.setdefault(item['name'], set()).add(json.dumps(item.get('parameters'), sort_keys=True))
+        self.parameter_catalogue = {name: json.loads(next(iter(values)))
+                                    for name, values in catalogues.items() if len(values) == 1}
         if self.mode == 'running':
             self.progress = self.session.progress.snapshot()
         try:
@@ -108,6 +119,32 @@ class PreparationView:
         self.mode, self.scroll = 'confirm', 0
 
     def handle(self, key):
+        if self.editing == 'parameter_input':
+            if key == 27:
+                self.editing = None
+            elif key in (10, 13):
+                field = self.parameter_fields[self.parameter_index]
+                value = self.parameter_input
+                if field.get('required', True) and not value:
+                    self.error = 'This parameter is required.'
+                    return True
+                if value and field.get('choices') and value not in field['choices']:
+                    self.error = 'Choose one of the published values.'
+                    return True
+                self.parameter_values.append(value)
+                self.parameter_index += 1
+                self.parameter_input, self.error = '', ''
+                if self.parameter_index == len(self.parameter_fields):
+                    while (self.parameter_values and not self.parameter_values[-1]
+                           and not self.parameter_fields[len(self.parameter_values) - 1].get('required', True)):
+                        self.parameter_values.pop()
+                    self.input = json.dumps({'args': self.parameter_values, 'env': {}})
+                    self.editing = None
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                self.parameter_input = self.parameter_input[:-1]
+            elif 32 <= key <= 126 and len(self.parameter_input) < MAX_INPUT:
+                self.parameter_input += chr(key)
+            return True
         if self.editing is not None:
             if key in (10, 13, 27):
                 importing = self.editing == 'import_path' and key != 27
@@ -177,7 +214,16 @@ class PreparationView:
             elif key in (curses.KEY_UP, ord('k'), curses.KEY_PPAGE):
                 self.scroll = max(0, self.scroll - (10 if key == curses.KEY_PPAGE else 1))
             return True
-        if key == ord('r'):
+        if key == ord('p'):
+            schema = self.parameter_catalogue.get(self.selected[4][0]) if len(self.selected[4]) == 1 else None
+            if not schema or not schema.get('args'):
+                self.error = 'Select one endpoint with a consistent published parameter schema.'
+            else:
+                self.parameter_fields = schema['args']
+                self.parameter_values, self.parameter_index = [], 0
+                self.parameter_input, self.error = '', ''
+                self.editing = 'parameter_input'
+        elif key == ord('r'):
             self.editing = 'import_path'
             self.import_path = ''
             self.error = ''
@@ -217,6 +263,14 @@ class PreparationView:
         return True
 
     def lines(self):
+        if self.editing == 'parameter_input':
+            field = self.parameter_fields[self.parameter_index]
+            return ['GUIDED ARGUMENTS - Enter next; Esc cancels without changing inputs',
+                    'This form replaces args and clears env; server validation remains authoritative.',
+                    '%s/%s: %s (%s, %s)' % (self.parameter_index + 1, len(self.parameter_fields),
+                        field['name'], field.get('type', 'string'), 'required' if field.get('required', True) else 'optional'),
+                    field.get('description', ''), 'Choices: ' + ', '.join(field.get('choices', [])),
+                    'Value: ' + self.parameter_input]
         if self.editing == 'import_path':
             return ['RECONCILE REPORT - Enter reads; Esc cancels',
                     'Select trusted targets first. No submission or scenario continuation.',
@@ -272,6 +326,6 @@ class PreparationView:
                 ' | '.join('[' + name + ']' if i == self.section else name for i, name in enumerate(SECTIONS)),
                 'Selected targets/groups: %s/%s; scenarios/groups: %s/%s; endpoints: %s' %
                 tuple(len(selected) for selected in self.selected),
-                'Search (/): ' + self.search, 'Inputs (i, JSON): ' + self.input, 'r opens a saved report for read-only reconciliation'] + [
+                'Search (/): ' + self.search, 'Inputs (i, JSON): ' + self.input, 'p guided arguments | r reconcile a saved report'] + [
                 ('> ' if i == self.index else '  ') + ('[x] ' if name in self.selected[self.section] else '[ ] ') + name
                 for i, name in enumerate(rows)]

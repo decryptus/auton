@@ -54,6 +54,8 @@
     if (job.storage_error) return ['Storage error', 'unknown'];
     if (job.execution_uncertain) return ['Unknown outcome', 'unknown'];
     if (job.outcome === 'job.interrupted') return ['Interrupted', 'failed'];
+    if (job.outcome === 'job.cancelled') return ['Cancelled', 'unknown'];
+    if (job.cancel_requested && job.status !== 'complete') return ['Cancellation requested', 'unknown'];
     if (job.status === 'processing') return ['Running', 'running'];
     if (job.status === 'new') return ['Queued', 'queued'];
     return job.return_code === 0 ? ['Completed', 'completed'] : ['Failed', 'failed'];
@@ -93,18 +95,53 @@
     $('maintenance-banner').textContent = 'Maintenance is enabled. ' + (health.maintenance.reason || 'New jobs are refused; queued jobs wait.');
     $('maintenance').textContent = maintenance ? 'Disable maintenance' : 'Enable maintenance';
     $('new-job').disabled = !identity.scopes.includes('run') || !health.accepting_jobs || endpoints.length === 0 || submitting;
-    $('endpoints').replaceChildren(); $('run-endpoint').replaceChildren();
+    $('endpoints').replaceChildren();
+    const editingRun = $('run-dialog').open;
+    if (!editingRun) $('run-endpoint').replaceChildren();
     const oldEndpoint = selectedRunEndpoint;
     for (const endpoint of endpoints) {
       const item = document.createElement('li'); item.textContent = endpoint.name + (endpoint.description ? ' — ' + endpoint.description : ''); $('endpoints').append(item);
-      const option = document.createElement('option'); option.value = endpoint.name; option.textContent = item.textContent; $('run-endpoint').append(option);
+      if (!editingRun) { const option = document.createElement('option'); option.value = endpoint.name; option.textContent = item.textContent; $('run-endpoint').append(option); }
     }
-    if (endpoints.some(e => e.name === oldEndpoint)) $('run-endpoint').value = oldEndpoint;
+    if (!editingRun && endpoints.some(e => e.name === oldEndpoint)) $('run-endpoint').value = oldEndpoint;
     $('endpoint-count').textContent = String(endpoints.length);
     if (!endpoints.length) { const item = document.createElement('li'); item.textContent = 'No permitted endpoints'; $('endpoints').append(item); }
     renderJobs();
   }
-  let selectedRunEndpoint = '';
+  let selectedRunEndpoint = '', activeParameters = null;
+  function parameterForm() {
+    const fields = endpoints.find(item => item.name === $('run-endpoint').value)?.parameters?.args;
+    activeParameters = fields;
+    $('run-parameters').replaceChildren();
+    $('run-args').hidden = $('run-args-label').hidden = !!fields;
+    if (!fields) return;
+    for (const [index, field] of fields.entries()) {
+      const label = document.createElement('label');
+      label.textContent = field.name + (field.required === false ? ' (optional, trailing)' : '');
+      const choices = field.choices || (field.type === 'boolean' ? ['true', 'false'] : null);
+      const input = document.createElement(choices ? 'select' : 'input');
+      input.id = 'parameter-' + index; label.htmlFor = input.id;
+      input.dataset.argumentIndex = String(index);
+      input.required = field.required !== false;
+      if (choices) {
+        const empty = document.createElement('option'); empty.value = ''; empty.textContent = 'Choose…'; input.append(empty);
+        for (const value of choices) { const option = document.createElement('option'); option.value = option.textContent = value; input.append(option); }
+      } else {
+        input.type = 'text'; input.maxLength = field.max_length || 4096;
+        if (field.type === 'integer') { input.inputMode = 'numeric'; input.pattern = '-?(0|[1-9][0-9]*)'; }
+      }
+      input.addEventListener('input', () => { $('run-confirm').checked = false; });
+      $('run-parameters').append(label, input);
+      if (field.description) { const help = document.createElement('p'); help.className = 'small muted'; help.textContent = field.description; $('run-parameters').append(help); }
+    }
+  }
+  function preparedArgs() {
+    const fields = activeParameters;
+    if (!fields) return $('run-args').value ? $('run-args').value.split('\n') : [];
+    const args = fields.map((_, index) => $('parameter-' + index).value);
+    while (args.length && fields[args.length - 1].required === false && args[args.length - 1] === '') args.pop();
+    return args;
+  }
   async function refresh() {
     if (!identity) return;
     if (refreshing) { refreshAgain = true; return; }
@@ -132,6 +169,8 @@
     const job = selected, current = generation;
     const data = await request('/jobs/' + encodeURIComponent(job.endpoint) + '/' + encodeURIComponent(job.uid.slice(job.endpoint.length + 1)));
     if (current !== generation || selected?.uid !== job.uid) return;
+    $('cancel-job').hidden = !identity.scopes.includes('cancel') || data.status === 'complete';
+    $('cancel-job').disabled = !!data.cancel_requested;
     $('detail').hidden = false; $('detail-title').textContent = data.uid;
     $('detail-meta').textContent = state(data)[0] + ' · ' + duration(data) + ' · Return code ' + (data.return_code ?? 'pending');
     $('stdout').textContent = output(data.stream); $('stderr').textContent = output(data.errors);
@@ -157,15 +196,15 @@
   $('close-detail').addEventListener('click', () => { selected = null; $('detail').hidden = true; $('stdout').textContent = ''; $('stderr').textContent = ''; });
   $('new-job').addEventListener('click', () => {
     $('run-confirm').checked = false; $('run-args').value = ''; $('run-preview').textContent = 'Daemon: ' + location.origin;
-    $('run-dialog').showModal();
+    parameterForm(); $('run-dialog').showModal();
   });
-  $('run-endpoint').addEventListener('change', () => { selectedRunEndpoint = $('run-endpoint').value; $('run-confirm').checked = false; });
+  $('run-endpoint').addEventListener('change', () => { selectedRunEndpoint = $('run-endpoint').value; $('run-confirm').checked = false; parameterForm(); });
   $('run-args').addEventListener('input', () => { $('run-confirm').checked = false; });
   $('cancel-run').addEventListener('click', () => $('run-dialog').close());
   $('run-dialog').addEventListener('cancel', event => { if (submitting) event.preventDefault(); });
   $('run-form').addEventListener('submit', async event => {
     event.preventDefault(); if (submitting || !$('run-confirm').checked) return;
-    const endpoint = $('run-endpoint').value, args = $('run-args').value ? $('run-args').value.split('\n') : [];
+    const endpoint = $('run-endpoint').value, args = preparedArgs();
     if (args.length > 64) { $('run-preview').textContent = 'At most 64 arguments are allowed.'; return; }
     submissionWarning = '';
     const id = crypto.randomUUID(); submitting = true; $('submit-run').disabled = true; $('cancel-run').disabled = true;
@@ -182,6 +221,15 @@
       notice(refused ? error.message : '', refused ? 'error' : 'warning');
       if (!refused && identity) { selected = null; await refresh(); }
     } finally { submitting = false; $('submit-run').disabled = false; $('cancel-run').disabled = false; if (identity && health) render(); }
+  });
+  $('cancel-job').addEventListener('click', async () => {
+    if (!selected || !confirm('Request cancellation of ' + selected.uid + ' on ' + location.origin + '? Completed effects are not rolled back.')) return;
+    const job = selected; $('cancel-job').disabled = true;
+    try {
+      await request('/cancel/' + encodeURIComponent(job.endpoint) + '/' + encodeURIComponent(job.uid.slice(job.endpoint.length + 1)), {method: 'POST', body: {}});
+      notice('Cancellation requested. Refresh to confirm the final job state.', 'warning'); await refresh();
+    } catch (error) { notice('Cancellation could not be confirmed. Inspect the job state; the request was not retried.', 'warning'); }
+    finally { if (selected) await inspect().catch(error => notice(error.message)); }
   });
   $('maintenance').addEventListener('click', async () => {
     const enabled = !health?.maintenance.enabled;
