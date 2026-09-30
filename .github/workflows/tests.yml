@@ -67,15 +67,23 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install 'Sphinx>=8,<10' -r docs/requirements.txt
       - run: python -m sphinx -W -b html docs /tmp/auton-docs
-      - name: Check full-size screenshot links
+      - name: Check shared manual screenshot links
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
+          import re, json, hashlib, urllib.request
           root = Path('/tmp/auton-docs')
           html = (root / 'index.html').read_text()
-          links = re.findall(r'href="((?:images|screenshots)/[^"<>]+\.png)"', html)
-          assert len(set(links)) >= 9, links
-          for link in links:
-              assert (root / link).is_file(), link
+          links = set(re.findall(r'https://auton\.run/manual-captures/([\w-]+\.png)', html))
+          assert len(links) == 9, links
+          base = 'https://auton.run/manual-captures/'
+          with urllib.request.urlopen(base + 'manifest.json', timeout=20) as response:
+              manifest = json.load(response)
+          for name in links:
+              with urllib.request.urlopen(base + name, timeout=20) as response:
+                  data = response.read(1048577)
+              assert len(data) <= 1048576 and data.startswith(b'\x89PNG\r\n\x1a\n'), name
+              assert hashlib.sha256(data).hexdigest() == manifest['files'][name], name
+          readme = Path('README.md').read_text()
+          assert not re.search(r'\]\(docs/(?:images|screenshots)/', readme)
           PY
