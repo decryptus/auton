@@ -18,6 +18,8 @@ jobs:
   release:
     outputs:
       publish: ${{ steps.release.outputs.publish }}
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -130,3 +132,30 @@ jobs:
         with:
           packages-dir: dist/${{ matrix.package }}/
           skip-existing: true
+
+  github-release:
+    needs: [release, pypi]
+    if: needs.release.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: auton-github-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+      - name: Publish release notes after image and both packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          # Existing published releases remain immutable on a workflow retry.
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Auton ${RELEASE_TAG#v}" --notes-file "docs/release-${RELEASE_TAG#v}.md"

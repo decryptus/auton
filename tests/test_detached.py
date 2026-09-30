@@ -38,6 +38,12 @@ class DetachedTests(unittest.TestCase):
                 ObservationWriter(path)
 
     def test_real_scenario_finishes_after_cli_launcher_exits(self):
+        self._check_detached_scenario(False)
+
+    def test_real_scenario_with_closed_standard_input(self):
+        self._check_detached_scenario(True)
+
+    def _check_detached_scenario(self, close_stdin):
         daemon = WebDaemon()
         self.addCleanup(daemon.close)
         daemon.start()
@@ -54,6 +60,7 @@ class DetachedTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(root / 'bin/auton'), '-c', str(config),
             '-t', 'node', '-s', 'checks', '-k', str(token), '--detach-dir', str(directory),
             '--operation-timeout', '5'], capture_output=True, text=True, timeout=3,
+            preexec_fn=(lambda: os.close(0)) if close_stdin else None,
             env={**{k: v for k, v in os.environ.items() if not k.startswith('AUTON_')}, 'PYTHONPATH': str(root)})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)['status'], 'detached')

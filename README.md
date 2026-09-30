@@ -27,13 +27,13 @@ See [ROADMAP.md](ROADMAP.md) for the current Auton product roadmap, including th
 
 ## Quickstart
 
-This quickstart uses **Auton 1.1.0**, including SQLite authentication, durable
+This quickstart uses **Auton 1.2.0**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.1.0
+git checkout v1.2.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -105,7 +105,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.1.0
+python -m pip install auton==1.2.0
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -229,7 +229,7 @@ The TUI displays and searches descriptions; the web console displays them as tex
 including in its endpoint selector. Execution still requires `run` and endpoint
 permission at admission and execution time. Legacy/anonymous configurations retain
 their existing authentication policy; discovery does not silently strengthen it.
-The development branch also supports explicit parameter schemas and generated
+Auton 1.2.0 also supports explicit parameter schemas and generated
 forms (see below). No arguments, constraints or defaults are inferred from the
 executable's private configuration.
 
@@ -682,7 +682,7 @@ silently retried against another daemon.
 explicit `--uri`. One `--uri` (or one `AUTON_URI` value) is accepted as a shortcut.
 Multiple execution `--uri` values remain **failover**, not daemon selection or
 broadcast. Opening the TUI never submits commands. Execution requires the
-separate preparation screen and an explicit confirmation; remote cancellation is a separate CLI/web action in the development branch,
+separate preparation screen and an explicit confirmation; remote cancellation is a separate CLI/web action in 1.2.0,
 not a side effect of leaving the TUI.
 
 | Key | Action |
@@ -1002,7 +1002,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.1.0`, or use the Docker image, which includes the authentication
+`autond[auth]==1.2.0`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
@@ -1180,7 +1180,7 @@ Keep the local database and backups private; this is hashed credentials, not an
 encrypted database. The parent must be owned by the daemon and not writable by
 other users, and the database must be a private regular file. Incompatible schemas,
 unsafe permissions and backend errors fail closed. Never replace the file beneath
-a running daemon. Stop all writers before copying a backup. Redis job history is available on the development branch; authentication remains SQLite.
+a running daemon. Stop all writers before copying a backup. Redis job history is available in 1.2.0; authentication remains SQLite.
 An optional browser console is available with SQLite authentication; see below.
 Bearer-only configurations and explicit legacy Basic authentication remain usable
 without enabling the console. TOTP and SSO are not supplied in this release.
@@ -1597,7 +1597,7 @@ with suitable ownership if history must survive container replacement.
 The SQLite adapter reuses Sonicprobe AnySQL with automatic reconnection/replay
 disabled. Authentication and job history require **separate database files**;
 Basic authentication also works with SQLite jobs. With no `job_storage` section,
-the historical in-memory behavior is unchanged. The development branch also accepts Redis job history through DWho (see below),
+the historical in-memory behavior is unchanged. Auton 1.2.0 also accepts Redis job history through DWho (see below),
 independently of SQLite authentication.
 
 Jobs are committed at admission, before execution, and at completion. Terminal
@@ -1896,7 +1896,7 @@ history is optional; the default remains memory and SQLite remains supported.
 Authentication remains separately configured with its existing SQLite backend.
 
 
-### Mutual TLS (development branch)
+### Mutual TLS (since 1.2.0)
 
 Native HTTPS can require a client certificate in addition to the existing
 application identity. Enable required authentication and provide certificate files:
@@ -1922,9 +1922,9 @@ reconciliation and cancellation. Every selected origin must use HTTPS. Server
 certificate verification cannot be disabled. For browser access, install the
 client certificate in the browser or use a separately secured TLS ingress.
 
-### Browser SSO with OIDC (development branch)
+### Browser SSO with OIDC (since 1.2.0)
 
-Install `autond[oidc]` (the candidate Docker image includes it). Configure the
+Install `autond[oidc]` (the Docker image includes it). Configure the
 existing SQLite accounts and HTTPS web console first, then add an explicit OIDC
 provider. Example values below are placeholders, not a working provider:
 
@@ -1977,7 +1977,7 @@ at most 16 deletions and a one-second budget checked between storage operations.
 A large backlog can therefore take several sweeps. Retention does not securely
 erase database backups or provide a forensic deletion guarantee.
 
-The candidate supports Python 3.10–3.13. CI compares wheel bytes from two separate
+Auton 1.2.0 supports Python 3.10–3.13. CI compares wheel bytes from two separate
 build directories with the same source, tool versions and `SOURCE_DATE_EPOCH`.
 This checks reproducibility within that environment; it does not claim identical
 artifacts across arbitrary operating systems or dependency versions.

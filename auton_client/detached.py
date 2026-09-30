@@ -6,6 +6,7 @@ The worker owns the already validated service. It never starts the CLI, stores
 credentials in reports, or replays work after a host/worker crash.
 """
 import json
+import fcntl
 import os
 import resource
 import signal
@@ -30,6 +31,14 @@ class ObservationWriter:
         if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
             raise ValueError('observation directory must be private and owned by this user')
         self.directory_fd = os.open(self.directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        # Launchers may have closed stdin/stdout/stderr. Keep the directory out
+        # of that range before the worker redirects its standard descriptors.
+        if self.directory_fd < 3:
+            original = self.directory_fd
+            try:
+                self.directory_fd = fcntl.fcntl(original, fcntl.F_DUPFD_CLOEXEC, 3)
+            finally:
+                os.close(original)
         self.lock = threading.Lock()
 
     def write(self, result):

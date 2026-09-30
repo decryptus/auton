@@ -1,7 +1,7 @@
-# Next release work — candidate acceptance
+# Auton 1.2.0 — acceptance and delivery
 
 Reviewed on 2026-09-30. Implementation and candidate acceptance for
-[PR #36](https://github.com/decryptus/auton/pull/36); this is **not a published release**.
+[PR #36](https://github.com/decryptus/auton/pull/36); release preparation evidence.
 The authorized scope is complete below. Publication is a separate final step;
 development pauses after delivery, without silently adding another workstream.
 
@@ -29,8 +29,8 @@ and [Docker/package run 36750744423](https://github.com/decryptus/auton/actions/
 The PR's latest-head checks remain required after the final documentation and
 presentation refinements; an earlier green commit does not validate later edits.
 
-- `unittest`: 226 declarations and 226 collected cases. Local execution passed
-  224 and deliberately skipped two integration cases without a Redis server.
+- `unittest`: 227 declarations and 227 collected cases. Local execution passed
+  225 and deliberately skipped two integration cases without a Redis server.
   The dedicated CI Redis job executes those cases against real Redis.
 - Python 3.10, 3.11, 3.12 and 3.13: suite and installed client-isolation checks.
 - Docker build, unprivileged image tests, authenticated Compose quickstart and
@@ -77,6 +77,9 @@ Acceptance found and corrected:
 - The first-visit browser path hid the SSO button behind a saved-CSRF check.
   Discovery now runs before that condition, and the callback establishes a
   same-origin document without weakening the console's cross-site protections.
+- A detached launcher with closed stdin could lose its observation directory descriptor
+  during standard-stream redirection. The directory descriptor is now kept above
+  stderr, with real detached-scenario regression coverage.
 - Read-only empty-state wording and reconciled-duration labeling were corrected
   during visual review.
 
@@ -110,7 +113,9 @@ long-duration leak-free claim is made by these acceptance tests.
 
 ## Publication handoff
 
-- [ ] Choose/bump the release version and regenerate captures from that exact source.
+Version 1.2.0 is selected for these backward-compatible, opt-in capabilities.
+
+- [x] Select and bump version 1.2.0; captures are regenerated from the final site pin.
 - [ ] Merge and publish packages/images through the existing release gates.
 - [ ] Update the private website's source pin and verify its generated version,
   documentation and shared screenshot manifest after deployment.

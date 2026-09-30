@@ -69,7 +69,7 @@ Endpoint discovery is implemented through the existing authenticated `/endpoints
 catalogue and current endpoint ACLs. Optional explicitly published descriptions
 appear in TUI and web selection; private plugin configuration is never serialized.
 Endpoints without metadata keep their previous response shape. Parameter schemas
-and generated forms are implemented in the next-release candidate, with execution-time validation.
+and generated forms are implemented in the 1.2.0 release, with execution-time validation.
 
 Exact routes remain implementation details and must respect existing HTTP conventions.
 
@@ -458,9 +458,9 @@ as the HTTP API. No central service is required.
   ownership and maintenance operator checks remain in force. Basic stays available
   as an explicit compatibility mode.
 - Authentication state and optional local job history survive restart in separate
-  SQLite files. Interrupted jobs are never replayed. The next-release candidate adds optional DWho-backed Redis job history;
+  SQLite files. Interrupted jobs are never replayed. The 1.2.0 release adds optional DWho-backed Redis job history;
   authentication remains a separate SQLite store.
-- The next-release candidate implements opt-in OIDC browser SSO and native mTLS,
+- The 1.2.0 release implements opt-in OIDC browser SSO and native mTLS,
   with explicit local account authorization; see the working acceptance checklist.
 
 ## Milestone 7 — Website
@@ -533,12 +533,11 @@ Before a future major stable release:
 
 ## Current priorities
 
-Auton 1.1.0 client and daemon packages and matching images are published, with the
-website pinned to that release. The release includes live TUI progress and explicit
-private JSON export. The 1.0 readiness review is historical release evidence.
+Auton 1.2.0 completes the authorized work below. Live TUI progress and private
+JSON export were introduced in 1.1.0. The 1.0 readiness review is historical evidence.
 
-The next-release candidate is implemented and accepted in PR #36; publication
-and the final website source-pin update remain separate release steps.
+The 1.2.0 release is prepared in PR #36. Package/image publication and the final
+website source-pin update are verified separately after merge.
 See [the working checklist](docs/next-release-work.md) for the complete authorized
 scope, verification evidence and publication handoff:
 
