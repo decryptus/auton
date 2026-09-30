@@ -652,11 +652,16 @@ Escape to return to monitoring. Results are session-local; use CLI JSON output
 when you need a saved operation report. A live per-step operation dashboard and
 result export remain future work.
 
+The screenshots below show the site's published version. They are regenerated
+from its pinned source on every website build and shared by GitHub and the web
+manual. [Capture provenance](https://auton.run/manual-captures/manifest.json)
+records the source commit, version and image checksums.
+
 Captures below come from real terminal sessions against disposable local daemons:
 
-[![Prepare targets and scenario groups](docs/images/tui-prepare.png)](docs/images/tui-prepare.png)
-[![Review the execution plan](docs/images/tui-confirm.png)](docs/images/tui-confirm.png)
-[![Inspect operation results](docs/images/tui-result.png)](docs/images/tui-result.png)
+[![Prepare targets and scenario groups](https://auton.run/manual-captures/tui-prepare.png)](https://auton.run/manual-captures/tui-prepare.png)
+[![Review the execution plan](https://auton.run/manual-captures/tui-confirm.png)](https://auton.run/manual-captures/tui-confirm.png)
+[![Inspect operation results](https://auton.run/manual-captures/tui-result.png)](https://auton.run/manual-captures/tui-result.png)
 
 Counts and lists retain server-side ownership and endpoint ACL restrictions.
 Completion is separate from success: inspect the exit code and stderr. Output
@@ -689,15 +694,15 @@ open the full-size image; the PNG files are stored in this repository.
 
 **Aggregated jobs**, including successful and failed commands:
 
-[![Auton TUI: jobs from two daemons](docs/images/tui-jobs.png)](docs/images/tui-jobs.png)
+[![Auton TUI: jobs from two daemons](https://auton.run/manual-captures/tui-jobs.png)](https://auton.run/manual-captures/tui-jobs.png)
 
 **Daemon status** and visible job counts:
 
-[![Auton TUI: daemon status table](docs/images/tui-daemons.png)](docs/images/tui-daemons.png)
+[![Auton TUI: daemon status table](https://auton.run/manual-captures/tui-daemons.png)](https://auton.run/manual-captures/tui-daemons.png)
 
 **Job output**, pinned to its originating daemon:
 
-[![Auton TUI: retained stdout](docs/images/tui-output.png)](docs/images/tui-output.png)
+[![Auton TUI: retained stdout](https://auton.run/manual-captures/tui-output.png)](https://auton.run/manual-captures/tui-output.png)
 
 Regenerate with `python scripts/capture_tui.py` from a development checkout with
 daemon dependencies, `pyte`, `Pillow`, and the DejaVu Sans Mono font installed.
@@ -1630,8 +1635,8 @@ checkout with `PYTHON` pointing at your configured daemon Python environment.
 Set `AUTON_BROWSER_EXECUTABLE` to Chromium/Chrome if using a system installation.
 The script creates the documentation captures; this is not a public execution demo.
 
-![Autond sign-in](docs/screenshots/web-login.png)
+![Autond sign-in](https://auton.run/manual-captures/web-login.png)
 
-![Autond jobs and output](docs/screenshots/web-console.png)
+![Autond jobs and output](https://auton.run/manual-captures/web-console.png)
 
-![Autond mobile maintenance view](docs/screenshots/web-mobile.png)
+![Autond mobile maintenance view](https://auton.run/manual-captures/web-mobile.png)

@@ -86,3 +86,14 @@ Current project runner: `unittest` for `tests`. CI helper tests use
   to hide a product defect. Regenerate affected media after the source correction.
 - Add a focused regression check for a discovered severity mismatch. A passing
   build/link check or screenshots alone do not prove correct user feedback.
+
+## Shared documentation screenshots
+
+- GitHub README screenshots use https://auton.run/manual-captures/ and the same
+  generated assets as the website manual. Do not commit frozen PNG copies or
+  replace documentation scenarios with unrelated marketing recordings.
+- Keep capture scripts runnable from a clean checkout. The website regenerates
+  all captures from its pinned source on every deployment and scheduled build.
+  Its manifest records source revision, version and SHA-256 checksums.
+- Review generated artifacts for scenario/legend agreement. A green browser test
+  alone does not update the images displayed by GitHub; verify the shared URLs.
