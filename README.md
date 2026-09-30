@@ -144,6 +144,31 @@ The handler keeps each authenticated identity local to its request.
   configured arguments support variable interpolation. Uploaded names must be
   plain basenames; absolute paths and traversal are rejected.
 
+### Recovering after a failure
+
+| Situation | What to check before another submission |
+| --- | --- |
+| Connection refused before a connection is established | Check the daemon address and availability. Explicit failover may try another configured address only when the transport knows submission was not sent. |
+| Connection lost or response timeout after submission | The command may have run. Keep the original job ID and query its status on the original daemon with the same identity; do not assume a timeout cancelled it. |
+| Expired or revoked API token (401) | Obtain a new token for the same account. If an earlier request was accepted, inspect that job with the renewed credentials before running it again. Web session expiry requires signing in again. |
+| Command failed | Inspect retained stdout, stderr and return code. Nonzero completion can have partial side effects; it is not automatically retried. |
+| Command execution timeout (124) | The daemon stops the command process group. Inspect partial output and any external side effects before deciding whether to retry. |
+| Daemon restarted with SQLite history | Completed results remain until expiry. An unfinished job is marked interrupted and is never replayed automatically. A previously running job has an unknown execution outcome; check its effects. |
+| Job missing (404) | Verify the daemon, endpoint and ID. Expiry, eviction or memory-only storage can remove evidence; absence from history does not prove the command never ran. |
+
+Read an existing job without submitting another one:
+
+```sh
+auton --mode status --uri https://autond.example \
+  -k ./operator.token --endpoint diagnostic --uid ORIGINAL-JOB-ID
+```
+
+Use the exact ID of the original request, not a new UUID. Keep the same account:
+job ownership still applies when its token is renewed. For scripts or cron, record
+an explicit `--uid` before submission so recovery does not depend on terminal
+output. The web console labels interrupted running jobs **Unknown outcome**.
+Neither status reads nor refreshing the console resubmits a command.
+
 ### Results and resource limits
 
 New clients send `X-Auton-Output-Offset` on status requests and consume the
