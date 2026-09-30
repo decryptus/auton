@@ -68,3 +68,21 @@ See [the architecture review](docs/architecture-review-2026-09-27.md).
 
 Current project runner: `unittest` for `tests`. CI helper tests use
 `unittest` in `.github/tests`.
+
+## Interface feedback and visual acceptance
+
+- Apply this convention to every project and delivery surface (Web, CLI/TUI,
+  documentation, screenshots and videos): blue/informational for accepted or
+  queued requests, a distinct labeled in-progress state, green for confirmed
+  success, amber for warnings/uncertain outcomes, and red for failures/refusals.
+- Submission/HTTP acceptance is not execution success. Never label it completed
+  or reuse an error banner for a normal confirmation. Keep explicit text/icons;
+  color alone must not carry meaning. Preserve readable contrast.
+- Review normal, in-progress, success, warning and failure states before delivery,
+  including mobile. Check wording, severity and computed visual styles together.
+  Exercise the affected real interface flow when changing status presentation.
+- Review generated screenshots/videos for semantic mistakes as well as layout.
+  Generate them from the pinned, accurately labeled source; do not retouch images
+  to hide a product defect. Regenerate affected media after the source correction.
+- Add a focused regression check for a discovered severity mismatch. A passing
+  build/link check or screenshots alone do not prove correct user feedback.
