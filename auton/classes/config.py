@@ -86,7 +86,15 @@ def load_conf(xfile, options = None, envvar = None):
     conf = import_conf_files('modules', conf)
 
     apply_auth_policy(conf)
+    from auton.classes.tls import tls_config
+    tls = tls_config(conf['general'], conf.get('_config_directory'))
+    if tls is not None:
+        conf['general']['tls'] = tls
     configure_web(conf)
+    from auton.classes.oidc import oidc_config
+    oidc = oidc_config(conf['general'], conf.get('_config_directory'))
+    if oidc is not None:
+        conf['general']['oidc'] = oidc
     storage = history_config(conf['general'], conf.get('_config_directory'))
     if storage is not None:
         conf['general']['job_storage'] = storage

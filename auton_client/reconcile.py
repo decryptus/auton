@@ -62,7 +62,7 @@ def summary_status(rows):
 class ReconciliationService:
     """One bounded snapshot; never submits, fails over or resumes scenario steps."""
     def __init__(self, report, targets, auth=None, http_timeout=30, timeout=300,
-                 client_factory=DaemonClient, clock=time.monotonic):
+                 client_factory=DaemonClient, clock=time.monotonic, transport=None):
         if not isinstance(report, dict) or not report.get('operation_id'):
             raise ValueError('report requires an operation_id')
         operation_identity(report['operation_id'])
@@ -121,6 +121,12 @@ class ReconciliationService:
                 if (row.get('error') is not None and not isinstance(row['error'], str)
                         or type(row.get('output_truncated', False)) is not bool):
                     raise ValueError('invalid saved diagnostics')
+                attempts = row.get('attempts', [])
+                if (not isinstance(attempts, list) or len(attempts) > MAX_TARGETS
+                        or any(not isinstance(attempt, dict) or not {'uri', 'status', 'reason'} <= set(attempt) or any(
+                            not isinstance(attempt.get(key, ''), str) for key in ('uri', 'status', 'reason'))
+                            for attempt in attempts)):
+                    raise ValueError('invalid saved failover attempts')
                 for field in ('stdout', 'stderr'):
                     if (not isinstance(row.get(field, []), list)
                             or any(not isinstance(chunk, str) for chunk in row.get(field, []))):
@@ -149,6 +155,8 @@ class ReconciliationService:
                 self.jobs.append((row, endpoint, allowed[key]))
         self.auth = bind_credentials(auth, [origin for _, _, origin in self.jobs])
         self.http_timeout = http_timeout
+        from auton_client.transport import validate_transport
+        self.transport = validate_transport(transport, [origin for _, _, origin in self.jobs])
         self.client_factory = client_factory
         self.timeout, self.clock = timeout, clock
 
@@ -176,7 +184,8 @@ class ReconciliationService:
                 if remaining_time <= 0 or stopped.is_set():
                     raise VisibilityError('reconciliation deadline reached')
                 client = self.client_factory(origin, auth=self.auth,
-                                             http_timeout=min(self.http_timeout, remaining_time))
+                                             http_timeout=min(self.http_timeout, remaining_time),
+                                             **({'transport': self.transport} if self.transport else {}))
                 data = client.detail(endpoint, row['uid'])
                 if data.get('status') == 'complete' and type(data.get('return_code')) is not int:
                     raise VisibilityError('invalid terminal return code')

@@ -72,7 +72,7 @@ if requirements_autond and package in (None, 'autond'):
         packages                      = find_packages(exclude=('auton_client',)),
         package_data                  = {'auton': ['web/*.html', 'web/*.css', 'web/*.js', 'web/*.svg']},
         install_requires              = requirements_autond,
-        extras_require                = {'auth': ['httpdis[auth]>=0.6.31'], 'redis': ['redis>=5,<9']},
+        extras_require                = {'auth': ['httpdis[auth]>=0.6.31'], 'redis': ['redis>=5,<9'], 'oidc': ['PyJWT[crypto]>=2.10,<3', 'httpdis[auth]>=0.6.31']},
         python_requires               = ', '.join(setup_cfg['python_requires']),
         classifiers                   = setup_cfg['common']['classifiers'] + setup_cfg['autond'].get('classifiers', []),
         long_description              = long_desc,

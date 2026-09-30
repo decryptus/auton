@@ -42,6 +42,9 @@ def argv_parse_check():
     parser        = argparse.ArgumentParser()
 
     parser.add_argument('-c', '--config', help='Client YAML inventory; targets must still be selected explicitly')
+    parser.add_argument('--ca-file', help='CA bundle for HTTPS server verification')
+    parser.add_argument('--client-cert', help='Client certificate chain for mutual TLS')
+    parser.add_argument('--client-key', help='Private key matching --client-cert')
     parser.add_argument('--detach-dir', metavar='NEW_DIRECTORY',
                         help='Start an unattended worker on this host and save private observations')
     parser.add_argument('--reconcile', metavar='REPORT.json',
@@ -269,6 +272,11 @@ def argv_parse_check():
         except ValueError as error:
             parser.error(str(error))
 
+    from auton_client.transport import transport_from_options
+    try:
+        options.transport = transport_from_options(options)
+    except ValueError as error:
+        parser.error(str(error))
     return options
 
 
@@ -349,7 +357,8 @@ class AutonClient(RemoteClient, PayloadBuilder):
         PayloadBuilder.__init__(self, options)
         auth = credentials_from_options(options)
         RemoteClient.__init__(self, options.uri, options.endpoint, options.uid,
-                              payload=self.payload, auth=auth, http_timeout=options.http_timeout)
+                              payload=self.payload, auth=auth, http_timeout=options.http_timeout,
+                              transport=options.transport)
 
     @staticmethod
     def _show_results(data):
@@ -379,7 +388,7 @@ def main(options):
                               configured=options.configured_targets, selected=options.selected_targets,
                               groups=options.configured_groups,
                               scenarios=options.selected_scenarios if options.selected_scenarios is not None else options.configured_scenarios,
-                              scenario_groups=options.configured_scenario_groups)
+                              scenario_groups=options.configured_scenario_groups, transport=options.transport)
         except ImportError:
             print('Auton TUI requires Python curses support.', file=sys.stderr)
             return_code = 1
@@ -412,18 +421,18 @@ def main(options):
             from auton_client.reconcile import ReconciliationService, load_report
             result = ReconciliationService(load_report(options.reconcile), options.selected_targets,
                 auth=credentials_from_options(options), http_timeout=options.http_timeout,
-                timeout=options.operation_timeout).run()
+                timeout=options.operation_timeout, transport=options.transport).run()
             print(json.dumps(result))
             rc = int(result['status'] != 'completed')
         elif options.mode == 'cancel':
             from auton_client.execution import cancel_job
             rc = cancel_job(options.uri[0], options.endpoint, options.uid,
-                            credentials_from_options(options), options.http_timeout)
+                            credentials_from_options(options), options.http_timeout, transport=options.transport)
         elif options.target or options.target_group:
             from auton_client.operations import OperationService
             auth = credentials_from_options(options)
             settings = dict(auth=auth, http_timeout=options.http_timeout, parallel=options.parallel,
-                            timeout=options.operation_timeout, delay=options.delay)
+                            timeout=options.operation_timeout, delay=options.delay, transport=options.transport)
             if options.selected_scenarios:
                 from auton_client.scenarios import ScenarioService
                 operation = ScenarioService(options.selected_targets, options.selected_scenarios, **settings)

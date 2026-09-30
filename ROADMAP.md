@@ -69,7 +69,7 @@ Endpoint discovery is implemented through the existing authenticated `/endpoints
 catalogue and current endpoint ACLs. Optional explicitly published descriptions
 appear in TUI and web selection; private plugin configuration is never serialized.
 Endpoints without metadata keep their previous response shape. Parameter schemas
-and generated forms remain planned, with execution-time validation required.
+and generated forms are implemented in the next-release candidate, with execution-time validation.
 
 Exact routes remain implementation details and must respect existing HTTP conventions.
 
@@ -458,9 +458,10 @@ as the HTTP API. No central service is required.
   ownership and maintenance operator checks remain in force. Basic stays available
   as an explicit compatibility mode.
 - Authentication state and optional local job history survive restart in separate
-  SQLite files. Interrupted jobs are never replayed. Redis is deferred; configure
-  the two stores independently and allow mixed backends once both are supported.
-- SSO/OIDC and mTLS remain separately scoped extensions.
+  SQLite files. Interrupted jobs are never replayed. The next-release candidate adds optional DWho-backed Redis job history;
+  authentication remains a separate SQLite store.
+- The next-release candidate implements opt-in OIDC browser SSO and native mTLS,
+  with explicit local account authorization; see the working acceptance checklist.
 
 ## Milestone 7 — Website
 

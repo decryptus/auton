@@ -104,6 +104,15 @@ class JobModule(DWhoModuleBase):
         from auton.classes.web import WebConsole
         return WebConsole(self.browser_provider, self.service)
 
+    def web_auth_options(self, request):
+        return self._web().auth_options(request)
+
+    def web_oidc_start(self, request):
+        return self._web().oidc_start(request)
+
+    def web_oidc_callback(self, request):
+        return self._web().oidc_callback(request)
+
     def web_console(self, request):
         return self._web().asset('index.html', 'text/html')
 

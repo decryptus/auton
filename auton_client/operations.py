@@ -26,7 +26,8 @@ MAX_OPERATION_ID = 128
 
 def validate_endpoint(endpoint):
     if (not isinstance(endpoint, str) or not endpoint or
-            any(char in endpoint for char in '/?#\r\n')):
+            endpoint in ('.', '..') or len(endpoint) > 256 or
+            any(char in endpoint for char in '/?%#\\') or any(not char.isprintable() for char in endpoint)):
         raise ValueError('endpoint must be a nonempty URL path segment')
     return endpoint
 
@@ -49,7 +50,7 @@ class OperationService:
     def __init__(self, targets, endpoint, payload=None, auth=None,
                  http_timeout=DEFAULT_HTTP_TIMEOUT, parallel=DEFAULT_PARALLEL,
                  timeout=DEFAULT_OPERATION_TIMEOUT, delay=DEFAULT_DELAY,
-                 client_factory=ExecutionClient, clock=time.monotonic, sleep=time.sleep):
+                 client_factory=ExecutionClient, clock=time.monotonic, sleep=time.sleep, transport=None):
         if not isinstance(targets, dict) or not 1 <= len(targets) <= MAX_TARGETS:
             raise ValueError('provide between 1 and %s explicit targets' % MAX_TARGETS)
         validate_endpoint(endpoint)
@@ -68,7 +69,7 @@ class OperationService:
             validate_connection_name(name)
             origins = target_origins(uri)
             for origin in origins:
-                DaemonClient(origin, http_timeout=http_timeout)
+                DaemonClient(origin, http_timeout=http_timeout, transport=transport)
                 key = origin_key(origin)
                 if key in seen:
                     raise ValueError('duplicate target origin across selected targets')
@@ -78,6 +79,7 @@ class OperationService:
         from auton_client.credentials import bind_credentials
         self.endpoint, self.payload = endpoint, copy.deepcopy(payload or {})
         self.auth = bind_credentials(auth, [uri for origins in self.origins.values() for uri in origins])
+        self.transport = transport or {}
         self.http_timeout, self.parallel = http_timeout, parallel
         self.timeout, self.delay = timeout, delay
         self.client_factory, self.clock, self.sleep = client_factory, clock, sleep
@@ -138,7 +140,8 @@ class OperationService:
                 result['attempts'].append(attempt)
                 client = self.client_factory([candidate], self.endpoint, job_id,
                     payload=copy.deepcopy(self.payload), auth=self.auth,
-                    http_timeout=min(self.http_timeout, remaining))
+                    http_timeout=min(self.http_timeout, remaining),
+                    **({'transport': self.transport} if self.transport else {}))
                 try:
                     data = client.do_run()
                 except ExecutionError as error:

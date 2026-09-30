@@ -68,6 +68,14 @@ class PersistentAuthentication:
             self.store.close()
             raise
 
+    def account_identity(self, principal):
+        from httpdis.authentication import AuthenticationDenied
+        with self.store.transaction() as tx:
+            account = tx.get('accounts', principal)
+            if not account or not account['enabled']:
+                raise AuthenticationDenied()
+            return account['revision'], frozenset(account['scopes'])
+
     def close(self):
         self.store.close()
 

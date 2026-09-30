@@ -2,6 +2,8 @@
 from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 import re
+import time
+from urllib.parse import parse_qsl, urlsplit
 
 from httpdis.auth_browser import BrowserAuthProvider, browser_origin
 from httpdis.authentication import AuthenticationRequest, AuthenticationDenied, AUTH_HEADER_NAMES
@@ -10,7 +12,12 @@ from auton.classes.exceptions import AutonConfigurationError
 
 MAX_LOGIN_BYTES = 8192
 LOGIN_FIELDS = frozenset(('principal', 'password'))
+OIDC_COOKIE = '__Host-autond-oidc'
+CALLBACK_FIELDS = frozenset(('code', 'state', 'iss', 'session_state'))
 WEB_ROUTES = {
+    'web_auth_options': ('^ui/auth/options$', 'web_auth_options', 'GET', False),
+    'web_oidc_start': ('^ui/auth/oidc$', 'web_oidc_start', 'POST', False),
+    'web_oidc_callback': ('^oidc/callback$', 'web_oidc_callback', 'GET', False),
     'web_console': ('^ui/?$', 'web_console', 'GET', False),
     'web_script': ('^ui/app\\.js$', 'web_script', 'GET', False),
     'web_style': ('^ui/style\\.css$', 'web_style', 'GET', False),
@@ -20,7 +27,8 @@ WEB_ROUTES = {
     'web_logout': ('^ui/auth/logout$', 'web_logout', 'POST', True),
 }
 WEB_PATHS = ('ui', 'ui/', 'ui/app.js', 'ui/style.css', 'ui/logo.svg',
-             'ui/auth/login', 'ui/auth/session', 'ui/auth/logout')
+             'ui/auth/login', 'ui/auth/session', 'ui/auth/logout',
+             'ui/auth/options', 'ui/auth/oidc', 'oidc/callback')
 SECURITY_HEADERS = {
     'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
     'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',
@@ -107,8 +115,60 @@ class WebConsole:
         identity = request.get_server_vars().get('HTTP_AUTH_IDENTITY')
         if identity is None or identity.method != 'session':
             raise HttpReqErrJson(401, 'Browser session required')
-        return self.identity(identity)
+        result = self.identity(identity)
+        if hasattr(self.provider.service, 'csrf_for'):
+            secret = self.provider.session_secret(authentication_request(request))
+            csrf = self.provider.service.csrf_for(secret)
+            if csrf:
+                result['csrf'] = csrf
+        return result
 
     def logout(self, request):
         auth_call(self.provider.logout, authentication_request(request))
         return HttpResponseJson(200, {'logged_out': True}, headers={'Set-Cookie': self.provider.expired_cookie()})
+
+    def auth_options(self, request):
+        return {'oidc': hasattr(self.provider.service, 'begin')}
+
+    def oidc_start(self, request):
+        if not hasattr(self.provider.service, 'begin'):
+            raise HttpReqErrJson(404, 'SSO is not configured')
+        auth_call(self.provider.require_browser, authentication_request(request), True)
+        if request.payload_params() != {} or request.headers.get('Authorization') is not None:
+            raise HttpReqErrJson(400, 'SSO requires an empty browser request')
+        url, binding = auth_call(self.provider.service.begin)
+        return HttpResponseJson(200, {'authorization_url': url}, headers={
+            'Set-Cookie': OIDC_COOKIE + '=' + binding + '; Path=/; Max-Age=300; HttpOnly; Secure; SameSite=Lax'})
+
+    def oidc_callback(self, request):
+        if not hasattr(self.provider.service, 'finish'):
+            raise HttpReqErrJson(404, 'SSO is not configured')
+        # This is an intentional cross-site top-level GET from the trusted IdP.
+        # Do not apply same-origin fetch policy; bind it to a one-use state cookie.
+        values = authentication_request(request)
+        for name in AUTH_HEADER_NAMES:
+            values.header(name)
+        if values.header('host', '').lower() != self.provider.authority or values.header('authorization') is not None:
+            raise HttpReqErrJson(401, 'SSO callback rejected')
+        try:
+            if len(request.path) > 8192:
+                raise ValueError()
+            pairs = parse_qsl(urlsplit(request.path).query, keep_blank_values=True, max_num_fields=8)
+            params = dict(pairs)
+            if len(params) != len(pairs) or not {'code', 'state'} <= set(params) or set(params) - CALLBACK_FIELDS:
+                raise ValueError()
+            if params.get('iss', self.provider.service.settings['issuer']) != self.provider.service.settings['issuer']:
+                raise ValueError()
+            cookie = values.header('cookie', '')
+            if len(cookie) > 8192:
+                raise ValueError()
+            bindings = [part.strip().partition('=')[2] for part in cookie.split(';')
+                        if part.strip().partition('=')[0] == OIDC_COOKIE]
+            if len(bindings) != 1:
+                raise ValueError()
+        except ValueError:
+            raise HttpReqErrJson(401, 'SSO callback rejected') from None
+        grant = auth_call(self.provider.service.finish, params['state'], bindings[0], params['code'])
+        # No token or CSRF value in the URL. Session GET supplies CSRF same-origin.
+        return HttpResponse(303, '', headers={'Location': '/ui/',
+            'Set-Cookie': self.provider.cookie(grant.secret, max(0, int(grant.expires_at - time.time())))})

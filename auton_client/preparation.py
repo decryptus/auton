@@ -153,7 +153,7 @@ class PreparationView:
                 if importing:
                     try:
                         targets = select_connections(self.selected[0], self.selected[1], self.connections, self.groups)
-                        settings = {key: self.settings[key] for key in ('auth', 'http_timeout', 'timeout')
+                        settings = {key: self.settings[key] for key in ('auth', 'http_timeout', 'timeout', 'transport')
                                     if key in self.settings}
                         self.service = ReconciliationService(load_report(self.import_path), targets, **settings)
                         self.session.start(self.service)

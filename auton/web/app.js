@@ -1,6 +1,15 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id);
+  $('sso-login').addEventListener('click', async () => {
+    $('sso-login').disabled = true;
+    try {
+      const data = await request('/ui/auth/oidc', {method: 'POST', body: {}, login: true});
+      const url = new URL(data.authorization_url);
+      if (url.protocol !== 'https:') throw new Error('Invalid SSO provider URL.');
+      location.assign(url.href);
+    } catch (error) { notice(error.message); $('sso-login').disabled = false; }
+  });
   const CSRF_KEY = 'auton.csrf';
   const REFRESH_MS = 5000;
   const MAX_DISPLAY_CHARS = 200000;
@@ -43,6 +52,7 @@
     } finally { clearTimeout(timer); }
   }
   function session(data) {
+    if (data.csrf) saveCSRF(data.csrf);
     if (submissionOwner && submissionOwner !== data.principal) submissionWarning = '';
     identity = data; generation++; $('login-panel').hidden = true; $('console').hidden = false;
     $('logout').hidden = false; $('principal').textContent = data.principal;
@@ -242,6 +252,7 @@
   setInterval(() => { if (!document.hidden && $('auto-refresh').checked) refresh(); }, REFRESH_MS);
   (async () => {
     if (!savedCSRF()) return;
+    try { $('sso-login').hidden = !(await request('/ui/auth/options', {login: true})).oidc; } catch (_) {}
     try { session(await request('/ui/auth/session')); await refresh(); }
     catch (error) { signedOut(error.status === 401 ? '' : error.message); }
   })();

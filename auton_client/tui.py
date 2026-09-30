@@ -349,7 +349,7 @@ class OperatorView:
 
 
 def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None, selected=None,
-        groups=None, scenarios=None, scenario_groups=None):
+        groups=None, scenarios=None, scenario_groups=None, transport=None):
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError('TUI requires an interactive terminal')
     if not math.isfinite(refresh) or refresh < 0.2:
@@ -361,13 +361,13 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     from auton_client.credentials import bind_credentials
     auth = bind_credentials(auth, [uri for target in connections.values() for uri in target_origins(target)])
     origins = monitoring_origins(connections)
-    clients = {name: DaemonClient(uri, auth, http_timeout) for name, uri in origins.items()}
+    clients = {name: DaemonClient(uri, auth, http_timeout, transport=transport) for name, uri in origins.items()}
     monitor = FleetMonitor(clients)
     from auton_client.preparation import PreparationView
     from auton_client.session import ExecutionSession
     session = ExecutionSession()
     preparation = PreparationView(connections, groups or {}, scenarios or {}, scenario_groups or {},
-                                  session, dict(auth=auth, http_timeout=http_timeout))
+                                  session, dict(auth=auth, http_timeout=http_timeout, transport=transport))
     view = OperatorView(monitor, refresh, preparation=preparation)
     view.origin_aware = any(len(target_origins(value)) > 1 for value in connections.values())
     def display(screen):

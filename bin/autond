@@ -132,6 +132,11 @@ def main(options):
 
     # Basic files may be readable only before dropping privileges. SQLite is
     # opened later, under the daemon account and after daemonization.
+    tls_settings = options.configuration['general'].get('tls')
+    server_options = {}
+    if tls_settings:
+        from auton.classes.tls import tls_server_class
+        server_options['http_server_class'] = tls_server_class(tls_settings)
     settings = options.configuration['general'].get('authentication')
     if not settings:
         AutonHttpReqHandler.configure_auth(getattr(options, 'auth_basic_file', None),
@@ -147,6 +152,8 @@ def main(options):
 
     authentication = None
     history = None
+    oidc = None
+    retention = None
     try:
         LOG.info("pidfile ok")
         root_logger.setLevel(options.loglevel)
@@ -163,7 +170,14 @@ def main(options):
             options.auth_provider = authentication.provider
             if options.configuration['general'].get('web_enabled'):
                 from httpdis.auth_browser import BrowserAuthProvider
-                options.auth_provider = BrowserAuthProvider(authentication.service,
+                browser_service = authentication.service
+                oidc_settings = options.configuration['general'].get('oidc')
+                if oidc_settings:
+                    from auton.classes.oidc import OIDCService
+                    oidc = OIDCService(oidc_settings, options.configuration['general']['web_origin'],
+                                       authentication.service, authentication.account_identity)
+                    browser_service = oidc
+                options.auth_provider = BrowserAuthProvider(browser_service,
                     options.configuration['general']['web_origin'], cookie_prefix='autond')
                 MODULES['job'].browser_provider = options.auth_provider
         storage = options.configuration['general'].get('job_storage')
@@ -174,7 +188,9 @@ def main(options):
         httpdis_json.init(options, False)
         DWHO_THREADS.append(httpdis_json.stop)
         start_endpoints()
-        httpdis_json.run(options, http_req_handler=handler)
+        from auton.classes.retention import ResultRetention
+        retention = ResultRetention(MODULES['job'].service).start()
+        httpdis_json.run(options, http_req_handler=handler, **server_options)
     except (KeyboardInterrupt, SystemExit):
         pass
     except Exception:
@@ -184,6 +200,8 @@ def main(options):
             httpdis_json.stop()
         finally:
             try:
+                if retention is not None:
+                    retention.close()
                 for endpoint in ENDPOINTS.values():
                     try:
                         endpoint.at_stop()
@@ -193,6 +211,8 @@ def main(options):
                     if history is not None:
                         history.close()
                 finally:
+                    if oidc is not None:
+                        oidc.close()
                     if authentication is not None:
                         authentication.close()
             finally:
