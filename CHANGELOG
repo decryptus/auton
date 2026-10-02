@@ -1,7 +1,8 @@
-Unreleased
+auton (1.2.1) unstable; urgency=medium
 
   * Hide unexpected job-service exception details in HTTP responses and logs.
   * Preserve uncertain admission semantics and explicit maintenance refusals.
+ -- Adrien Delle Cave <pypi@doowan.net>  Fri, 02 Oct 2026 06:28:27 +0200
 
 auton (1.1.0) stable; urgency=medium
 
