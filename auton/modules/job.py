@@ -206,8 +206,10 @@ class JobModule(DWhoModuleBase):
         except HttpReqErrJson:
             raise
         except Exception as error:
-            LOG.exception(error)
-            raise HttpReqErrJson(503, repr(error))
+            # The exception may contain credentials or storage/endpoint details.
+            # Admission may already have happened: never advertise safe replay.
+            LOG.error('Job service failed (%s)', type(error).__name__)
+            raise HttpReqErrJson(503, 'job_service_unavailable') from None
 
     def job_run(self, request):
         try:
