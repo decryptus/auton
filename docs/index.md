@@ -11,3 +11,4 @@
    pypi
    next-release-work
    release-1.2.0
+   release-1.2.1
