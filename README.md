@@ -1981,3 +1981,8 @@ Auton 1.2.0 supports Python 3.10–3.13. CI compares wheel bytes from two separa
 build directories with the same source, tool versions and `SOURCE_DATE_EPOCH`.
 This checks reproducibility within that environment; it does not claim identical
 artifacts across arbitrary operating systems or dependency versions.
+
+
+Unexpected job submission or status failures return HTTP 503 with
+`job_service_unavailable`, without internal exception details. This response does
+not prove that submission was rejected: reconcile the job ID before retrying.

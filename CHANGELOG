@@ -1,3 +1,8 @@
+Unreleased
+
+  * Hide unexpected job-service exception details in HTTP responses and logs.
+  * Preserve uncertain admission semantics and explicit maintenance refusals.
+
 auton (1.1.0) stable; urgency=medium
 
   * Show live per-target and per-step scenario progress in the TUI.
@@ -537,3 +542,4 @@ auton (0.1.0) unstable; urgency=medium
   * First version package
 
  -- Adrien DELLE CAVE <adrien.delle.cave@commandersact.com>  Thu, 06 Dec 2018 07:29:34 +0100
+
