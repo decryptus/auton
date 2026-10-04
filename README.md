@@ -1986,3 +1986,6 @@ artifacts across arbitrary operating systems or dependency versions.
 Unexpected job submission or status failures return HTTP 503 with
 `job_service_unavailable`, without internal exception details. This response does
 not prove that submission was rejected: reconcile the job ID before retrying.
+
+See [configuration validation](docs/configuration-validation.md) for YAML schema
+coverage and compatibility.
