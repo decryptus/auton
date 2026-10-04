@@ -22,6 +22,7 @@ from mako.template import Template
 from sonicprobe.helpers import load_yaml
 
 from auton.classes.exceptions import AutonConfigurationError
+from auton.classes.configuration_schema import validate_configuration, validate_mapping
 from auton.classes.authentication import apply_auth_policy, PasswordAuthenticator
 from auton.classes.job_store import history_config
 from auton.classes.auth_audit import audit_config
@@ -62,8 +63,8 @@ def import_file(filepath, config_dir = None, xvars = None):
         filepath = os.path.join(config_dir, filepath)
 
     with open(filepath, 'r') as f:
-        return load_yaml(Template(f.read(),
-                                  imports = _TPL_IMPORTS).render(**xvars))
+        return validate_mapping(load_yaml(Template(f.read(),
+                                  imports = _TPL_IMPORTS).render(**xvars)))
 
 def load_conf(xfile, options = None, envvar = None):
     signal.signal(signal.SIGTERM, stop)
@@ -73,17 +74,18 @@ def load_conf(xfile, options = None, envvar = None):
 
     if os.path.exists(xfile):
         with open(xfile, 'r') as f:
-            conf = parse_conf(load_yaml(f))
+            conf = parse_conf(validate_configuration(load_yaml(f)))
 
         conf['_config_directory'] = os.path.dirname(os.path.abspath(xfile))
     elif envvar and os.environ.get(envvar):
         c = StringIO(os.environ[envvar])
-        conf = parse_conf(load_yaml(c.getvalue()))
+        conf = parse_conf(validate_configuration(load_yaml(c.getvalue())))
         c.close()
         conf['_config_directory'] = None
 
     conf['endpoints'], endpoint_sources = load_endpoint_imports(conf)
     conf = import_conf_files('modules', conf)
+    validate_configuration(conf)
 
     apply_auth_policy(conf)
     from auton.classes.tls import tls_config
