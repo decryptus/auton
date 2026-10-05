@@ -4,9 +4,11 @@
 
 import curses
 import math
-import sys
 import textwrap
 import time
+
+from dwho.cli import require_terminal
+from dwho.tui import put
 
 from auton_client import __version__
 from auton_client.monitor import FleetMonitor
@@ -243,11 +245,7 @@ class OperatorView:
         screen.erase()
         height, width = screen.getmaxyx()
         def line(y, value, attr=0):
-            if 0 <= y < height:
-                try:
-                    screen.addnstr(y, 0, safe_text(value), max(0, width - 1), attr)
-                except curses.error:
-                    pass  # Resize races and terminal wide-character boundaries.
+            put(screen, y, safe_text(value), attr)
         if height < MIN_ROWS or width < MIN_COLS:
             line(0, 'Auton: enlarge terminal to 64x12; q quits')
             screen.refresh()
@@ -350,8 +348,7 @@ class OperatorView:
 
 def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, configured=None, selected=None,
         groups=None, scenarios=None, scenario_groups=None, transport=None):
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        raise ValueError('TUI requires an interactive terminal')
+    require_terminal('TUI requires an interactive terminal')
     if not math.isfinite(refresh) or refresh < 0.2:
         raise ValueError('refresh must be at least 0.2 seconds')
     connections = daemon_specs(specs, uris, configured) if selected is None else selected
