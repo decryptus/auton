@@ -1,13 +1,26 @@
-.. mdinclude:: ../README.md
+User documentation
+==================
 
+Installation, configuration, public APIs and troubleshooting.
+
+.. mdinclude:: ../README.md
 
 .. toctree::
    :maxdepth: 1
-   :caption: Project maintenance
+   :caption: User guide and reference
 
-   release-1.0
-   1.0-readiness
-   architecture-review-2026-09-27
-   next-release-work
    release-1.2.0
    release-1.2.1
+   release-1.0
+
+
+Contributor documentation
+-------------------------
+
+Changing the project? Use the separate :doc:`contributors` guide.
+
+.. toctree::
+   :maxdepth: 1
+   :caption: For contributors
+
+   contributors
