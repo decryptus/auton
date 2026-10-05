@@ -1480,27 +1480,6 @@ Get file contents from stdin with `-`:
 
 `cat foo.txt | auton --endpoint curl --uri http://localhost:8666 --multi-args '-vvv -u foo:bar sftp://example.com' --multi-argsfiles '--key=private_key.pem --pubkey=public_key.pem -T=-'`
 
-### Automatic releases and Docker Hub
-
-To release, update `VERSION` and `RELEASE` together (`X.Y.Z`), along with
-`setup.yml`, the versions in `bin/auton` and `bin/autond`, and `CHANGELOG.md`.
-Merge into `master`: the Docker Hub workflow builds and tests the image, creates
-`vX.Y.Z` if absent, and publishes that same image as `decryptus/auton:X.Y.Z`
-and `decryptus/auton:vX.Y.Z`. Tag creation and publication happen in the same
-workflow, so they do not depend on another workflow being triggered by a bot tag.
-
-Ordinary commits with an already tagged version do not replace that release.
-Pull requests build and test only. Existing tags are never moved.
-To retry a failed upload or publish an existing release such as `v0.3.0`, select
-**Actions → Docker Hub → Run workflow**, use branch `master`, and enter the tag.
-The workflow builds the tagged commit, verifies it belongs to master's history,
-and tests it before uploading. Published tags are versioned; `latest` is not changed.
-
-## Publishing to PyPI
-
-See [PyPI publishing](docs/pypi.md) for Trusted Publisher setup and automated releases.
-
-
 ### Application services and remote client
 
 `auton.classes.jobs.JobService` owns admission, endpoint ACLs, job ownership,
