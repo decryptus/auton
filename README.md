@@ -1482,9 +1482,6 @@ Get file contents from stdin with `-`:
 
 ### Automatic releases and Docker Hub
 
-Set `DOCKERHUB_TOKEN` in repository Actions secrets to a Docker Hub token with
-write access to `decryptus/auton`. The login is `decryptus`.
-
 To release, update `VERSION` and `RELEASE` together (`X.Y.Z`), along with
 `setup.yml`, the versions in `bin/auton` and `bin/autond`, and `CHANGELOG.md`.
 Merge into `master`: the Docker Hub workflow builds and tests the image, creates
