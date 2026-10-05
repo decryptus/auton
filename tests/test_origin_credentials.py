@@ -59,8 +59,8 @@ class OriginCredentialTests(unittest.TestCase):
     def test_tui_preflights_backup_credentials_before_starting_monitor(self):
         from auton_client import tui
         auth = bind_credentials(BearerCredentials('a' * 43), ['https://one'])
-        with patch.object(tui.sys.stdin, 'isatty', return_value=True), \
-             patch.object(tui.sys.stdout, 'isatty', return_value=True), \
+        with patch.object(sys.stdin, 'isatty', return_value=True), \
+             patch.object(sys.stdout, 'isatty', return_value=True), \
              patch.object(tui, 'FleetMonitor') as monitor:
             with self.assertRaises(ValueError):
                 tui.run([], [], auth=auth, selected={'one': {'uris': ['https://one', 'https://two']}})

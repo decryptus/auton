@@ -218,6 +218,57 @@ class OperatorViewTests(unittest.TestCase):
             with self.subTest(specs=specs), self.assertRaises(ValueError):
                 daemon_specs(specs, uris)
 
+    def test_draw_survives_resize_and_preserves_selection_style(self):
+        screen = Mock()
+        screen.getmaxyx.return_value = (24, 80)
+        self.view.draw(screen)
+        selected = [call.args for call in screen.addnstr.call_args_list
+                    if JOB['uid'] in call.args[2]]
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0][4], curses.A_REVERSE)
+        screen.addnstr.side_effect = curses.error('resized')
+        self.view.draw(screen)
+        for size in ((0, 0), (1, 1)):
+            screen.reset_mock()
+            screen.getmaxyx.return_value = size
+            self.view.draw(screen)
+            screen.addnstr.assert_not_called()
+
+    def test_cli_and_nonterminal_rejection_do_not_load_interactive_or_server_modules(self):
+        script = '''
+import importlib.abc, runpy, sys
+from types import SimpleNamespace
+class Block(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if (fullname.split('.')[0] in ('curses', '_curses', 'auton', 'httpdis')
+                or fullname in ('auton_client.tui', 'auton_client.preparation')
+                or (fullname.startswith('dwho.') and fullname != 'dwho.cli')):
+            raise AssertionError(fullname)
+sys.meta_path.insert(0, Block())
+module = runpy.run_path('bin/auton', run_name='auton_test')
+module['main'](SimpleNamespace(tui=True))
+'''
+        result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout, '')
+        self.assertEqual(result.stderr, 'TUI requires an interactive terminal\n')
+
+    def test_direct_tui_entry_rejects_either_redirected_stream_before_clients(self):
+        from auton_client import tui
+        for stdin_tty, stdout_tty in ((False, True), (True, False), (False, False)):
+            with self.subTest(stdin=stdin_tty, stdout=stdout_tty), \
+                    patch.object(sys.stdin, 'isatty', return_value=stdin_tty), \
+                    patch.object(sys.stdout, 'isatty', return_value=stdout_tty), \
+                    patch.object(tui, 'DaemonClient') as client, \
+                    patch.object(tui, 'FleetMonitor') as monitor, \
+                    patch.object(curses, 'wrapper') as wrapper:
+                with self.assertRaisesRegex(ValueError, 'interactive terminal'):
+                    tui.run([], ['http://localhost'])
+                client.assert_not_called()
+                monitor.assert_not_called()
+                wrapper.assert_not_called()
+
     def test_tui_cli_rejects_execution_and_non_terminal(self):
         for args in (['--daemon', 'a=http://one'], ['--tui', '-a', 'dangerous'],
                      ['--tui', '--refresh', 'nan']):

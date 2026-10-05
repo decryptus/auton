@@ -14,9 +14,9 @@ import uuid
 
 import logging
 import math
-import json
 from logging.handlers import WatchedFileHandler
 
+from dwho.cli import require_terminal, write_json
 from dotenv.main import dotenv_values
 from sonicprobe import helpers
 
@@ -382,6 +382,7 @@ def main(options):
     """
     if options.tui:
         try:
+            require_terminal('TUI requires an interactive terminal')
             from auton_client.tui import run
             auth = credentials_from_options(options)
             return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh,
@@ -422,7 +423,7 @@ def main(options):
             result = ReconciliationService(load_report(options.reconcile), options.selected_targets,
                 auth=credentials_from_options(options), http_timeout=options.http_timeout,
                 timeout=options.operation_timeout, transport=options.transport).run()
-            print(json.dumps(result))
+            write_json(result)
             rc = int(result['status'] != 'completed')
         elif options.mode == 'cancel':
             from auton_client.execution import cancel_job
@@ -446,12 +447,12 @@ def main(options):
             else:
                 result = operation.run(options.operation_id)
                 rc = int(result['status'] != 'completed')
-            print(json.dumps(result))
+            write_json(result)
         else:
             auton = AutonClient(options)
             rc = getattr(auton, "do_%s" % options.mode)()
         if isinstance(rc, dict):
-            print(json.dumps(rc))
+            write_json(rc)
             rc = int(rc['code'] != 200)
     except (KeyboardInterrupt, SystemExit):
         rc = 2

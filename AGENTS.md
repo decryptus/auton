@@ -31,6 +31,10 @@ See [the architecture review](docs/architecture-review-2026-09-27.md).
 
 ## Auton boundaries
 
+- Reuse `dwho.cli` for terminal checks/JSON output and `dwho.tui` for shared
+  drawing primitives. Keep Auton-specific navigation, sanitization and job
+  interaction in Auton. Import curses only through explicit TUI entry; reject
+  redirected input/output before importing the interactive interface.
 - Job admission, ownership, capacity, expiry, status and output retention belong
   to a job service, independent of JobModule and HttpReqErrJson.
 - Workers receive job inputs and an authenticated principal, never a retained HTTP
