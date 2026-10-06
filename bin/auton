@@ -49,7 +49,9 @@ def argv_parse_check():
                         help='Start an unattended worker on this host and save private observations')
     parser.add_argument('--reconcile', metavar='REPORT.json',
                         help='Read current states from a saved report; never submit or resume jobs')
-    parser.add_argument('--tui', action='store_true', help='Read-only ncurses operator interface')
+    parser.add_argument('--tui', action='store_true', help='Terminal operator interface')
+    parser.add_argument('--tui-ui', choices=('curses', 'textual'), default='curses',
+                        help='TUI renderer; Textual is currently read-only')
     parser.add_argument('--daemon', action='append', default=[], metavar='SELECTOR[=URI]',
                         help='TUI target name/glob/~regex from --config or NAME=URI')
     parser.add_argument('-t', '--target', action='append', default=[], metavar='SELECTOR[=URI]',
@@ -203,6 +205,8 @@ def argv_parse_check():
     if options.uid is None:
         options.uid = str(uuid.uuid4())
 
+    if options.tui_ui != 'curses' and not options.tui:
+        parser.error('--tui-ui requires --tui')
     if options.daemon and not options.tui:
         parser.error('--daemon requires --tui; it is not a broadcast execution option')
     if options.tui:
@@ -382,7 +386,10 @@ def main(options):
     """
     if options.tui:
         try:
-            from auton_client.tui import run
+            if options.tui_ui == 'textual':
+                from auton_client.textual_tui import run
+            else:
+                from auton_client.tui import run
             auth = credentials_from_options(options)
             return_code = run(options.daemon, options.uri, auth, options.http_timeout, options.refresh,
                               configured=options.configured_targets, selected=options.selected_targets,
@@ -390,7 +397,7 @@ def main(options):
                               scenarios=options.selected_scenarios if options.selected_scenarios is not None else options.configured_scenarios,
                               scenario_groups=options.configured_scenario_groups, transport=options.transport)
         except ImportError:
-            print('Auton TUI requires Python curses support.', file=sys.stderr)
+            print('TUI renderer unavailable; see the terminal installation guide for its dependencies.', file=sys.stderr)
             return_code = 1
         except KeyboardInterrupt:
             return_code = 2

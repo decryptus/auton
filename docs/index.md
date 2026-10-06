@@ -10,6 +10,7 @@ Installation, configuration, public APIs and troubleshooting.
    :caption: User guide and reference
 
    configuration-validation
+   textual
    release-1.2.0
    release-1.2.1
    release-1.0
