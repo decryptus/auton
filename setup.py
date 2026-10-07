@@ -52,7 +52,7 @@ if requirements_auton and package in (None, 'auton'):
         packages                      = ['auton_client'],
         options                       = {'build': {'build_base': 'build/auton'}},
         install_requires              = requirements_auton,
-        extras_require                = {'textual': ['dwho>=0.3.63', "textual>=8.2.8,<9; python_version >= '3.9'"]},
+        extras_require                = {'textual': ['dwho[textual]>=0.3.65', "textual>=8.2.8,<9; python_version >= '3.9'"]},
         python_requires               = ', '.join(setup_cfg['python_requires']),
         classifiers                   = setup_cfg['common']['classifiers'] + setup_cfg['auton'].get('classifiers', []),
         long_description              = long_desc,
