@@ -82,3 +82,12 @@ class TextualTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(client.call_args.kwargs['transport'], {'verify': True})
             app.return_value.run.assert_called_once()
             monitor.return_value.close.assert_called_once()
+
+    async def test_refresh_does_not_access_monitor_after_app_shutdown(self):
+        app = demo_app()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+        with patch.object(app.monitor, 'poll') as poll, patch.object(app.monitor, 'refresh') as refresh:
+            app.tick()
+            poll.assert_not_called()
+            refresh.assert_not_called()

@@ -51,6 +51,8 @@ class OperatorApp(DashboardApp):
         return self.output_job if self.daemon is None else self.output_job[1:]
 
     def tick(self):
+        if not self.is_running:
+            return
         result = self.monitor.poll()
         if result is not None:
             daemon, job, data = result
