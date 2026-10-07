@@ -3,7 +3,7 @@
 ## Optional Textual interface
 
 This version adds an optional terminal dashboard using the shared
-DWho 0.3.65 presentation components. Python 3.9+ is required for this extra.
+DWho 0.3.65 presentation components. Auton supports Python 3.10–3.13.
 The existing curses interface remains the default.
 
 View jobs, endpoints, daemon status and stdout/stderr with search, filtering
