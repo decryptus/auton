@@ -15,17 +15,17 @@ SECTIONS = ('Targets', 'Target groups', 'Scenarios', 'Scenario groups', 'Endpoin
 
 class OperationsScreen(Screen):
     CSS = '''
-    OperationsScreen { background: #0a1220; }
-    #op-title { height: 3; padding: 1 2; background: #101f34; color: #83cfff; text-style: bold; }
+    OperationsScreen { background: $background; }
+    #op-title { height: 3; padding: 1 2; background: $surface; color: $primary; text-style: bold; }
     #op-selection { height: 13; margin-top: 1; }
-    .op-section Static { color: #b7dcff; text-style: bold; }
-    .op-section SelectionList { background: #102137; border: round #305778; }
-    .op-section SelectionList:focus { border: round #83cfff; }
+    .op-section Static { color: $secondary; text-style: bold; }
+    .op-section SelectionList { background: $panel; border: round $panel-lighten-2; }
+    .op-section SelectionList:focus { border: round $primary; }
     #op-actions { padding: 0 2; }
-    #op-actions Button { background: #173e62; color: #b7e2ff; border: none; height: 3; }
-    #op-actions Button:focus { background: #245d86; color: #ffffff; }
-    #op-actions Button:disabled { background: #102137; color: #66819e; }
-    #op-preview { background: #245d86; }
+    #op-actions Button { background: $primary-muted; color: $foreground; border: none; height: 3; }
+    #op-actions Button:focus { background: $primary-muted; color: $foreground; }
+    #op-actions Button:disabled { background: $panel; color: $foreground-disabled; }
+    #op-preview { background: $primary-muted; }
 
     .op-section { width: 1fr; padding: 0 1; }
     .op-section SelectionList { height: 10; }
