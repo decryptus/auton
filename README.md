@@ -654,7 +654,7 @@ Existing single-command and legacy failover invocations remain available.
 
 ### Operator TUI (client)
 
-The Unix client includes a ncurses interface with read-only monitoring and an
+The Unix client includes Textual and curses interfaces. See the [Textual guide](docs/textual.md) for the modern interface. The following keyboard reference describes curses, with read-only monitoring and an
 explicit execution preparation screen. It requires an interactive
 terminal with Python curses support and a daemon with the visibility API above.
 
@@ -750,7 +750,7 @@ from its pinned source on every website build and shared by GitHub and the web
 manual. [Capture provenance](https://auton.run/manual-captures/manifest.json)
 records the source commit, version and image checksums.
 
-Captures below come from real terminal sessions against disposable local daemons:
+Captures below show the real Textual interface with synthetic offline fixtures; no remote command is executed:
 
 [![Prepare targets and scenario groups](https://auton.run/manual-captures/tui-prepare.png)](https://auton.run/manual-captures/tui-prepare.png)
 [![Review the execution plan](https://auton.run/manual-captures/tui-confirm.png)](https://auton.run/manual-captures/tui-confirm.png)
@@ -781,9 +781,9 @@ without persistent central history or any change to execution failover.
 
 ### TUI screenshots
 
-These captures come from the real curses UI connected to two disposable local
-daemons. All job names and output are demonstration data. Click a capture to
-open the full-size image; the PNG files are stored in this repository.
+These captures show the Textual interface with labelled synthetic fixtures.
+All job names and output are demonstration data. Click a capture to open its
+full-size image; the website regenerates the shared PNG files from pinned sources.
 
 **Aggregated jobs**, including successful and failed commands:
 
@@ -1916,3 +1916,16 @@ coverage and compatibility.
 
 - **Users:** installation, configuration, operation and API usage in this README and the user guide.
 - **Contributors:** [architecture, tests and development](https://github.com/decryptus/auton/blob/master/CONTRIBUTING.md).
+
+
+## Textual terminal interface
+
+Install the optional extra and select the modern interface explicitly:
+
+```sh
+python -m pip install 'auton[textual]'
+auton --tui --tui-ui textual -c inventory.yml
+```
+
+See the [Textual guide](docs/textual.md) for navigation and supported operations.
+The existing curses interface remains available. Screenshots use synthetic data.
