@@ -42,9 +42,34 @@ class DemoMonitor:
         self.closed = True
 
 
-def demo_app():
-    return OperatorApp(DemoMonitor(), demo=True)
+class DemoExecutionClient:
+    """Synthetic adapter: never opens a socket or executes a command."""
+    def __init__(self, uris, endpoint, uid, **kwargs):
+        self.uri, self.endpoint, self.uid = uris[0], endpoint, uid
+        self.output_offset = 0
+
+    def do_run(self):
+        failed = 'worker-02' in self.uri and self.endpoint == 'install'
+        return dict(uid=self.endpoint + ':' + self.uid, status='complete', return_code=7 if failed else 0,
+                    stream=['Synthetic ' + self.endpoint + (' failed: invalid archive.' if failed else ' completed.') + '\n'],
+                    errors=[], next_offset=1)
+
+
+def demo_app(operations=False):
+    preparation = None
+    if operations:
+        from .preparation_model import PreparationModel
+        from .session import ExecutionSession
+        preparation = PreparationModel({'edge-01': 'http://edge-01.invalid', 'worker-02': 'http://worker-02.invalid'},
+            {'staging': ['edge-01', 'worker-02']}, {'deploy-app': {'version': 1, 'steps': [
+                {'name': name, 'endpoint': name} for name in ('install', 'restart', 'verify')]}}, {},
+            ExecutionSession(), {'client_factory': DemoExecutionClient, 'delay': 0})
+    return OperatorApp(DemoMonitor(), demo=True, preparation=preparation)
 
 
 if __name__ == '__main__':
-    demo_app().run()
+    app = demo_app(operations=True)
+    try:
+        app.run()
+    finally:
+        app.preparation.session.close()

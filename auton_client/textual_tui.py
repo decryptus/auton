@@ -1,4 +1,4 @@
-"""Read-only Textual adapter over FleetMonitor; no execution service or CLI import."""
+"""Textual adapter over observation and explicit operation services."""
 import hashlib
 import json
 import math
@@ -23,16 +23,17 @@ def identity(parts):
 
 class OperatorApp(DashboardApp):
     BINDINGS = DashboardApp.BINDINGS + [
-        ('r', 'refresh', 'Refresh'), ('p', 'pause', 'Pause'),
+        ('e', 'prepare', 'Operations'), ('r', 'refresh', 'Refresh'), ('p', 'pause', 'Pause'),
         ('s', 'state', 'State'), ('c', 'clear_filters', 'Clear filters'),
         ('v', 'stream', 'Stdout/stderr'), ('left_square_bracket', 'previous_daemon', 'Previous daemon'),
         ('right_square_bracket', 'next_daemon', 'Next daemon'), ('a', 'all_daemons', 'All daemons')]
 
-    def __init__(self, monitor, refresh=DEFAULT_REFRESH, clock=time.monotonic, demo=False):
+    def __init__(self, monitor, refresh=DEFAULT_REFRESH, clock=time.monotonic, demo=False, preparation=None):
         super().__init__(product='Auton', heading='Operations overview', columns=COLUMNS,
-                         navigation=NAVIGATION, mode='read_only',
+                         navigation=NAVIGATION, mode='interactive' if preparation is not None else 'read_only',
                          subtitle='SYNTHETIC DEMO' if demo else 'DAEMON OBSERVATION')
-        self.monitor, self.refresh, self.clock, self.demo = monitor, refresh, clock, demo
+        self.monitor, self.refresh_seconds, self.clock, self.demo = monitor, refresh, clock, demo
+        self.preparation = preparation
         self.names = list(monitor.clients)
         self.daemon = self.names[0]
         self.view, self.state, self.endpoint, self.output_job = 'jobs', None, None, None
@@ -53,13 +54,15 @@ class OperatorApp(DashboardApp):
     def tick(self):
         if not self.is_running:
             return
+        if len(self.screen_stack) > 1:
+            return
         result = self.monitor.poll()
         if result is not None:
             daemon, job, data = result
             if daemon == self.daemon and job == self.requested_job():
                 self.data = data
                 self.render_snapshot()
-                self.next_refresh = self.clock() + self.refresh
+                self.next_refresh = self.clock() + self.refresh_seconds
             else:
                 self.next_refresh = 0
         if (not self.paused or self.next_refresh == 0) and self.clock() >= self.next_refresh:
@@ -129,7 +132,7 @@ class OperatorApp(DashboardApp):
         self.display_rows(rows)
         if self.view == 'output':
             self.show_output()
-        self.set_activity('READ ONLY | %s entries\nExecution preparation remains available in the curses interface.' % len(rows))
+        self.set_activity('%s entries | e prepares an operation with explicit confirmation.' % len(rows) if self.preparation is not None else 'READ ONLY | %s entries' % len(rows))
 
     def _show_row(self, key):
         if self.view == 'output':
@@ -221,6 +224,26 @@ class OperatorApp(DashboardApp):
         self.action_clear_search()
         self.render_snapshot()
 
+    def check_action(self, action, parameters):
+        if len(self.screen_stack) > 1:
+            return False
+        return True
+
+    def action_prepare(self):
+        if self.preparation is None:
+            self.notify('Execution is not configured in this observation session.')
+            return
+        from auton_client.textual_operations import OperationsScreen
+        snapshots = getattr(self.monitor, 'snapshots', {}) or {self.daemon: self.data}
+        self.preparation.update(snapshots)
+        self.push_screen(OperationsScreen(self.preparation, demo=self.demo))
+
+    def action_quit(self):
+        if self.preparation is not None and self.preparation.session.running:
+            self.notify('Stop observation first. Remote jobs are not cancelled.', severity='warning')
+            return
+        self.exit()
+
     def action_stream(self):
         self.stderr = not self.stderr
         if self.view == 'output':
@@ -241,9 +264,15 @@ def run(specs, uris, auth=None, http_timeout=30, refresh=DEFAULT_REFRESH, config
     auth = bind_credentials(auth, [uri for target in connections.values() for uri in target_origins(target)])
     clients = {name: DaemonClient(uri, auth, http_timeout, transport=transport)
                for name, uri in monitoring_origins(connections).items()}
+    from auton_client.preparation_model import PreparationModel
+    from auton_client.session import ExecutionSession
     monitor = FleetMonitor(clients)
+    session = ExecutionSession()
+    preparation = PreparationModel(connections, groups or {}, scenarios or {}, scenario_groups or {},
+                                   session, {'auth': auth, 'http_timeout': http_timeout, 'transport': transport})
     try:
-        OperatorApp(monitor, refresh).run()
+        OperatorApp(monitor, refresh, preparation=preparation).run()
     finally:
         monitor.close()
+        session.close()
     return 0
