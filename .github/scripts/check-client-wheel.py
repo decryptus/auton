@@ -16,10 +16,15 @@ with tempfile.TemporaryDirectory() as directory:
 import importlib.abc
 import sys
 class BlockDaemon(importlib.abc.MetaPathFinder):
+    presentation = False
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.split('.')[0] in ('auton', 'dwho', 'httpdis'):
+        if fullname.split('.')[0] in ('auton', 'httpdis'):
             raise AssertionError(fullname)
-sys.meta_path.insert(0, BlockDaemon())
+        if fullname.split('.')[0] == 'dwho' and not (
+                self.presentation and fullname in ('dwho', 'dwho.cli', 'dwho.tui')):
+            raise AssertionError(fullname)
+boundary = BlockDaemon()
+sys.meta_path.insert(0, boundary)
 from auton_client import RemoteClient
 from auton_client.credentials import BearerCredentials
 assert 'a' * 43 not in repr(BearerCredentials('a' * 43))
@@ -45,6 +50,10 @@ targets = resolve_targets({"one": "http://one", "deployment": {"uris": [{"target
 assert OperationService({"deployment": targets["deployment"]}, "example").origins["deployment"] == ["http://one", "http://two"]
 from auton_client.visibility import DaemonClient
 from auton_client.monitor import FleetMonitor
+boundary.presentation = True
+from dwho.cli import require_terminal, write_json
+from dwho.tui import put
+assert 'curses' not in sys.modules
 from auton_client.tui import OperatorView, daemon_specs
 from auton_client.preparation import PreparationView
 from auton_client.session import ExecutionSession

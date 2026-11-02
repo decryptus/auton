@@ -3,6 +3,7 @@
 All daemons, credentials, environments and jobs are disposable and loopback-only.
 No application imports are resolved from the source checkout.
 """
+import ast
 import base64
 import hashlib
 import json
@@ -64,6 +65,15 @@ assert installed != source and installed.read_bytes() == source.read_bytes()
             work, env=clean_env)
         for executable, flag in [('auton', '--help'), ('autond', '-d'), ('autond-auth', '--help')]:
             run([str(candidate / 'bin' / executable), flag], work, env=clean_env, stdout=subprocess.DEVNULL)
+        # Inspect the installed entry points, not the checkout: a matching wheel
+        # metadata version must not hide a stale CLI/HTTP server identity.
+        for executable in ('auton', 'autond'):
+            tree = ast.parse((candidate / 'bin' / executable).read_text())
+            versions = [ast.literal_eval(node.value) for node in tree.body
+                        if isinstance(node, ast.Assign) and any(
+                            isinstance(target, ast.Name) and target.id == '__version__'
+                            for target in node.targets)]
+            assert versions == [expected], executable
         password_file = work / 'passwd'
         # Explicit legacy SHA entry exercises migration compatibility, not a new-account recommendation.
         password_file.write_text('operator:{SHA}' + base64.b64encode(hashlib.sha1(PASSWORD.encode()).digest()).decode() + '\n')

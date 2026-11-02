@@ -1,3 +1,12 @@
+auton (1.3.3) stable; urgency=medium
+
+  * Reuse shared DWho terminal drawing, interactive preflight and JSON output.
+  * Reject redirected terminal interfaces before loading UI modules or credentials.
+  * Preserve optional Textual, client isolation and command execution semantics.
+  * Align executable version identities and refresh the delivered roadmap.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Mon, 02 Nov 2026 08:00:00 +0100
+
 auton (1.3.2) stable; urgency=medium
 
   * Bound the complete OIDC token exchange to the existing five-second budget.

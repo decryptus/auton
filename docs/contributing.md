@@ -61,7 +61,7 @@ rejecting a trailing newline.
 
 ## Build verification
 
-Auton 1.2.0 supports Python 3.10–3.13. CI compares wheel bytes from two separate
+Auton 1.3.x supports Python 3.10–3.13. CI compares wheel bytes from two separate
 build directories with the same source, tool versions and `SOURCE_DATE_EPOCH`.
 This checks reproducibility within that environment; it does not claim identical
 artifacts across arbitrary operating systems or dependency versions.
@@ -69,3 +69,12 @@ artifacts across arbitrary operating systems or dependency versions.
 ## Documentation rules
 
 Keep user instructions and contributor material separate. The repository [engineering requirements](https://github.com/decryptus/auton/blob/master/AGENTS.md) define the review and validation rules. Preserve user-facing compatibility, security and recovery guidance when moving internal explanations.
+
+## Shared terminal primitives
+
+The curses client uses `dwho.tui.put` for bounded drawing and `dwho.cli` for
+terminal preflight and JSON output. Auton retains remote-text sanitization,
+navigation and execution preparation. Both optional renderers are checked for an
+interactive terminal before importing their implementation or loading credentials.
+Client services remain independent of DWho presentation and daemon modules;
+the installed-wheel check exercises this boundary outside the checkout.

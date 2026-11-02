@@ -1,9 +1,10 @@
-# Auton 1.2.0 — acceptance and delivery
+# Auton 1.2.0 — historical acceptance and delivery
 
-Reviewed on 2026-09-30. Implementation and candidate acceptance for
-[PR #36](https://github.com/decryptus/auton/pull/36); release preparation evidence.
-The authorized scope is complete below. Publication is a separate final step;
-development pauses after delivery, without silently adding another workstream.
+Candidate reviewed on 2026-09-30; delivery status reconciled on 2026-11-02.
+This retains implementation and acceptance evidence for
+[PR #36](https://github.com/decryptus/auton/pull/36). Version 1.2.0 was published;
+both packages and the site have since advanced to the 1.3 line. The historical
+counts below describe that candidate, not a fresh test run of today's source.
 
 ## Implemented scope
 
@@ -111,15 +112,18 @@ resume after its loss. Redis lease fencing protects history writes but cannot
 prove an already running external command stopped. No stress/saturation or
 long-duration leak-free claim is made by these acceptance tests.
 
-## Publication handoff
+## Completed publication handoff
 
-Version 1.2.0 is selected for these backward-compatible, opt-in capabilities.
+Version 1.2.0 delivered these backward-compatible, opt-in capabilities.
 
 - [x] Select and bump version 1.2.0; captures are regenerated from the final site pin.
-- [ ] Merge and publish packages/images through the existing release gates.
-- [ ] Update the private website's source pin and verify its generated version,
+- [x] Merge and publish packages/images through the existing release gates.
+- [x] Update the private website's source pin and verify its generated version,
   documentation and shared screenshot manifest after deployment.
 
-The live site remains on published 1.1.0. Candidate captures are CI evidence;
-no frozen PNGs are committed and no new screenshots are represented as deployed.
-The contact form remains outside this scope, pending delivery configuration.
+The live site's verified metadata reported published 1.3.2 at the reconciliation
+checkpoint. Its current release metadata and shared capture manifest are the
+delivery record; candidate captures alone do not establish publication. No frozen
+PNGs are committed. See the current [roadmap](https://github.com/decryptus/auton/blob/master/ROADMAP.md)
+and release notes for later changes. The contact form remains outside this scope;
+the existing email link does not require a form delivery service.

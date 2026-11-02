@@ -23,13 +23,13 @@ server is required.
 
 ## Quickstart
 
-This quickstart uses **Auton 1.3.2**, including SQLite authentication, durable
+This quickstart uses **Auton 1.3.3**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.3.2
+git checkout v1.3.3
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -101,7 +101,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.3.2
+python -m pip install auton==1.3.3
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -983,7 +983,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.3.2`, or use the Docker image, which includes the authentication
+`autond[auth]==1.3.3`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
@@ -1195,7 +1195,7 @@ Make the file readable by the daemon account and inaccessible to unrelated users
 do not commit it. Credential files are loaded at startup: restart the daemon after
 rotation or revocation. Bcrypt verification is tested on the supported Linux/Python
 matrix. Historical SHA-1 entries remain readable for migration, but new credentials
-must use bcrypt. Python 3.13 support remains pending dependency/crypt migration.
+must use bcrypt. Python 3.10–3.13 are exercised by the supported CI matrix.
 
 Use HTTPS for remote access, normally through a reverse proxy with the daemon
 bound to loopback or an isolated private interface. Basic authentication does not

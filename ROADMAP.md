@@ -1,7 +1,13 @@
 # Auton Roadmap
 
 Status: active product roadmap  
-Updated: 2026-09-30
+Updated: 2026-11-02
+
+The 1.0–1.3 feature baseline is delivered. Published 1.3.2 includes the bounded
+OIDC exchange fix; maintenance 1.3.3 completes shared terminal primitives and
+corrects executable version identities. Historical milestone descriptions below
+are not a list of features still waiting for implementation. Registry and website
+delivery are checked separately for every release.
 
 Auton is evolving from a remote command helper into a complete distributed remote-execution product while keeping a clear separation between the **auton client** and the **autond daemon**.
 
@@ -238,13 +244,14 @@ configuration; do not introduce a mandatory shared configuration service.
   does not stop independent targets by default.
 - Preserve each step's job ID, exit code, stdout/stderr, timing and state, and
   provide an operation summary that exposes partial failure.
-- Consider explicit per-step `continue_on_error` later; never silently ignore errors.
+- Implemented in 1.2.0: explicit per-step `continue_on_error`; failures remain visible.
 - A transport timeout means an unknown outcome, not proof of execution failure.
   Reconcile the known job before advancing; never automatically replay an ambiguous POST.
 - Stopping a sequence does not roll back completed steps or cancel running jobs.
   Compensation and cancellation require separate explicit designs.
-- Start with a client application service, independent of CLI/TUI. Its continuation
-  depends on a live client; durable unattended sequences need a later lifecycle decision.
+- The client application service is independent of CLI/TUI. Since 1.2.0, detached
+  control-host workers can continue after client departure with durable observation
+  checkpoints. The control host must remain alive; its loss does not imply automatic resume.
 
 A remote script can already group commands into one job, but Auton then sees
 the script's overall result rather than separate step results. This milestone
@@ -413,11 +420,11 @@ bounded retention, execution identity and metadata-only records. Journal write
 errors do not change command outcomes. This does not provide job restoration
 or transactional durability. Real terminal captures are included in the README.
 
-- improve cleanup of expired jobs;
+- Implemented in 1.2.0: periodic idle expiry under the configured result TTL;
 - Implemented: optional local SQLite job snapshots, terminal output restoration,
   explicit interrupted/uncertain recovery without replay, independent of authentication;
-- improve reproducible builds;
-- review Python 3.13+ compatibility when dependencies allow it;
+- Implemented: reproducible wheel checks in the same build environment;
+- Python 3.10–3.13 are covered by CI; newer interpreters need separate qualification;
 - strengthen HTTPS/auth deployment guidance;
 - add integration tests for multi-daemon aggregation;
 - add integration tests for explicit multi-target operations;
@@ -533,24 +540,33 @@ Before a future major stable release:
 
 ## Current priorities
 
-Auton 1.2.0 completes the authorized work below. Live TUI progress and private
-JSON export were introduced in 1.1.0. The 1.0 readiness review is historical evidence.
+The original 1.2.0 scope is complete and published: report reconciliation, guided
+parameters, owner-authorized cancellation, detached workers, explicit error
+continuation, optional Redis history, browser OIDC, mTLS and Python 3.13 support.
+See [the historical acceptance record](docs/next-release-work.md). The 1.3 line
+adds the optional Textual presentation, its product palette and OIDC deadline
+hardening; 1.3.3 reuses DWho terminal helpers without changing execution policy.
 
-The 1.2.0 release is prepared in PR #36. Package/image publication and the final
-website source-pin update are verified separately after merge.
-See [the working checklist](docs/next-release-work.md) for the complete authorized
-scope, verification evidence and publication handoff:
+For this maintenance delivery, finish the existing shared-terminal work in
+[PR #40](https://github.com/decryptus/auton/pull/40), publish matching client/daemon
+packages and the tested image through the release gates, and regenerate the site
+and shared manual captures from the exact accepted source. These are delivery
+steps for the current scope, not another functional milestone.
 
-1. Read-only report reconciliation and replacement-origin monitoring.
-2. Guided endpoint parameters with server-side validation.
-3. Explicit owner-authorized cancellation, separate from stopping observation.
-4. Detached control-host workers with durable observation checkpoints and no replay.
-5. Explicit error continuation, optional DWho-backed Redis history, SSO/OIDC and mTLS.
-6. Python 3.13, reproducible wheels, retention and final interface/documentation review.
+Installed-package, Python matrix, Docker/Compose, real terminal, browser, Redis
+and documentation checks remain mandatory for relevant changes. Recorded bounded
+acceptance is not a production-capacity or long-duration stability guarantee.
 
-Installed-package, Python matrix, Docker/Compose, real terminal, browser, Redis and
-documentation checks remain release gates. Website captures must be regenerated
-from the final pinned release. Development pauses after the authorized work is
-finished and accepted; a working branch is not delivery.
+## Later work — not required for the current maintenance release
 
-The contact form remains outside this set, pending delivery configuration.
+- Qualify sustained load and operating budgets on the actual deployments that
+  need them; retain explicit resource and lifecycle limits.
+- Review additional Python versions and identity-provider integrations when
+  supported dependencies and real integration needs justify them.
+- Design control-host-loss recovery or broader orchestration separately if
+  needed. Detached observation is not automatic cross-host workflow resumption;
+  ambiguous external effects must never be silently replayed.
+- A website contact form remains optional and requires a working delivery
+  service. The existing `mailto:auton@doowan.net` contact remains usable.
+
+No new functional workstream is implied by completing this maintenance release.
