@@ -3,9 +3,9 @@
 Status: active product roadmap  
 Updated: 2026-11-02
 
-The 1.0–1.3 feature baseline is delivered. Published 1.3.2 includes the bounded
-OIDC exchange fix; maintenance 1.3.3 completes shared terminal primitives and
-corrects executable version identities. Historical milestone descriptions below
+The 1.0–1.3 feature baseline is delivered. Published 1.3.3 includes the bounded
+OIDC exchange fix from 1.3.2, shared terminal primitives and corrected executable
+version identities. Historical milestone descriptions below
 are not a list of features still waiting for implementation. Registry and website
 delivery are checked separately for every release.
 
@@ -547,11 +547,22 @@ See [the historical acceptance record](docs/next-release-work.md). The 1.3 line
 adds the optional Textual presentation, its product palette and OIDC deadline
 hardening; 1.3.3 reuses DWho terminal helpers without changing execution policy.
 
-For this maintenance delivery, finish the existing shared-terminal work in
-[PR #40](https://github.com/decryptus/auton/pull/40), publish matching client/daemon
-packages and the tested image through the release gates, and regenerate the site
-and shared manual captures from the exact accepted source. These are delivery
-steps for the current scope, not another functional milestone.
+Maintenance delivery completed on 2026-11-02:
+
+- [PR #40](https://github.com/decryptus/auton/pull/40) is merged and
+  [1.3.3 is released](https://github.com/decryptus/auton/releases/tag/v1.3.3).
+  Both PyPI packages have verified wheel and source distributions. Docker Hub
+  tags `1.3.3` and `v1.3.3` identify the same tested Linux/amd64 image.
+- [auton.run](https://auton.run/) serves the accepted release commit
+  `7534644ccfd486e4753d592d90771bd00364aa57`: bilingual documentation, regenerated
+  recorded demonstration and ten shared manual captures. Deployed pages and
+  capture hashes were verified after publication.
+- [PR #46](https://github.com/decryptus/auton/pull/46) replaces Docker Hub's
+  historical overview and synchronizes future registry documentation from the
+  repository. The published overview matches its validated source.
+
+This closes the current maintenance scope. No existing daemon deployment was
+upgraded automatically; the website demonstration uses disposable local fixtures.
 
 Installed-package, Python matrix, Docker/Compose, real terminal, browser, Redis
 and documentation checks remain mandatory for relevant changes. Recorded bounded
