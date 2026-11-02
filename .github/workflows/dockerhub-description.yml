@@ -1,0 +1,70 @@
+name: Docker Hub description
+on:
+  push:
+    branches: [master]
+    paths: [DOCKERHUB.md, .github/workflows/dockerhub-description.yml]
+  pull_request:
+    paths: [DOCKERHUB.md, .github/workflows/dockerhub-description.yml]
+  workflow_run:
+    workflows: [Docker Hub]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  description:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: auton-dockerhub-description-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Render and validate registry documentation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          version = Path('VERSION').read_text().strip()
+          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version)
+          text = Path('DOCKERHUB.md').read_text().replace('{{version}}', version)
+          assert '{{' not in text and len(text.encode()) <= 25000
+          assert all(url.startswith('https://') for url in re.findall(r'\]\(([^)]+)\)', text))
+          Path('/tmp/auton-dockerhub.md').write_text(text)
+          PY
+      - name: Verify image exists before updating its documentation
+        if: github.event_name != 'pull_request'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, urllib.request
+          version = Path('VERSION').read_text().strip()
+          url = 'https://hub.docker.com/v2/repositories/decryptus/auton/tags/' + version
+          with urllib.request.urlopen(url, timeout=20) as response:
+              metadata = json.loads(response.read(1048576))
+          assert metadata['name'] == version and metadata.get('images')
+          PY
+      - name: Synchronize Docker Hub description
+        if: github.event_name != 'pull_request'
+        uses: peter-evans/dockerhub-description@432a30c9e07499fd01da9f8a49f0faf9e0ca5b77 # v4
+        with:
+          username: decryptus
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: decryptus/auton
+          short-description: Authenticated remote jobs with CLI, terminal and web clients; explicit permissions and history.
+          readme-filepath: /tmp/auton-dockerhub.md
+      - name: Verify published registry text
+        if: github.event_name != 'pull_request'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, urllib.request
+          with urllib.request.urlopen('https://hub.docker.com/v2/repositories/decryptus/auton/', timeout=20) as response:
+              metadata = json.loads(response.read(1048576))
+          assert metadata['full_description'] == Path('/tmp/auton-dockerhub.md').read_text()
+          print('Docker Hub documentation matches the validated source.')
+          PY
