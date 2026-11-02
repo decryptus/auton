@@ -51,6 +51,17 @@ assert version('auton') == version('autond') == sys.argv[1]
 assert auton_client.__version__ == sys.argv[1]
 assert files('auton').joinpath('web/index.html').is_file()
 ''', expected], work, env=clean_env)
+        run([str(candidate / 'bin/python'), '-I', '-c', '''
+from pathlib import Path
+import sys
+from auton.classes import oidc_transport
+installed = Path(oidc_transport.__file__).resolve()
+source = Path(sys.argv[1]).resolve()
+assert installed != source and installed.read_bytes() == source.read_bytes()
+''', str(ROOT / 'auton/classes/oidc_transport.py')], work, env=clean_env)
+        run([str(candidate / 'bin/python'), '-m', 'unittest', 'discover',
+             '-s', str(ROOT / 'tests'), '-p', 'test_oidc_transport.py', '-v'],
+            work, env=clean_env)
         for executable, flag in [('auton', '--help'), ('autond', '-d'), ('autond-auth', '--help')]:
             run([str(candidate / 'bin' / executable), flag], work, env=clean_env, stdout=subprocess.DEVNULL)
         password_file = work / 'passwd'

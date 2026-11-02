@@ -241,18 +241,20 @@ from types import SimpleNamespace
 class Block(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         if (fullname.split('.')[0] in ('curses', '_curses', 'auton', 'httpdis')
-                or fullname in ('auton_client.tui', 'auton_client.preparation')
+                or fullname in ('auton_client.tui', 'auton_client.textual_tui', 'auton_client.preparation')
                 or (fullname.startswith('dwho.') and fullname != 'dwho.cli')):
             raise AssertionError(fullname)
 sys.meta_path.insert(0, Block())
 module = runpy.run_path('bin/auton', run_name='auton_test')
-module['main'](SimpleNamespace(tui=True))
+module['main'](SimpleNamespace(tui=True, tui_ui=sys.argv[1]))
 '''
-        result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
-                                capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 1, result.stderr)
-        self.assertEqual(result.stdout, '')
-        self.assertEqual(result.stderr, 'TUI requires an interactive terminal\n')
+        for renderer in ('curses', 'textual'):
+            with self.subTest(renderer=renderer):
+                result = subprocess.run([sys.executable, '-c', script, renderer], cwd=ROOT,
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(result.stdout, '')
+                self.assertEqual(result.stderr, 'TUI requires an interactive terminal\n')
 
     def test_direct_tui_entry_rejects_either_redirected_stream_before_clients(self):
         from auton_client import tui

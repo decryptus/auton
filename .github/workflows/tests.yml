@@ -5,6 +5,29 @@ on:
 permissions:
   contents: read
 jobs:
+  textual:
+    name: Optional Textual interface
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: AUTON_PACKAGE=auton python -m pip install '.[textual]'
+      - name: Test installed interface outside source checkout
+        run: |
+          cd "$(mktemp -d)"
+          python "$GITHUB_WORKSPACE/.github/scripts/check-test-collection.py" --runner unittest "$GITHUB_WORKSPACE/textual_tests"
+          python -m unittest discover -s "$GITHUB_WORKSPACE/textual_tests" -v
+      - name: Generate synthetic captures from actual interface
+        run: PYTHONPATH=. python scripts/capture_textual.py --output "$RUNNER_TEMP/textual-captures"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: textual-candidate-captures
+          path: ${{ runner.temp }}/textual-captures
+          if-no-files-found: error
+
   tests:
     runs-on: ubuntu-latest
     strategy:

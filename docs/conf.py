@@ -201,7 +201,7 @@ def setup(app):
 #napoleon_numpy_docstring = False
 
 # Keep both documentation audiences explicit on every generated page.
-html_context = {'contributor_index': 'contributors', 'contributor_pages': ['contributors', 'contributing', '1.0-readiness', 'architecture-review-2026-09-27', 'next-release-work']}
+html_context = {'contributor_index': 'contributors', 'contributor_pages': ['textual-review', 'contributors', 'contributing', '1.0-readiness', 'architecture-review-2026-09-27', 'next-release-work']}
 html_sidebars = {'**': ['about.html', 'documentation-tracks.html', 'localtoc.html', 'searchbox.html']}
 
 REPOSITORY_DOCUMENTATION_URL = 'https://github.com/decryptus/auton/blob/master/'

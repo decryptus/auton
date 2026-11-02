@@ -31,10 +31,6 @@ See [the architecture review](docs/architecture-review-2026-09-27.md).
 
 ## Auton boundaries
 
-- Reuse `dwho.cli` for terminal checks/JSON output and `dwho.tui` for shared
-  drawing primitives. Keep Auton-specific navigation, sanitization and job
-  interaction in Auton. Import curses only through explicit TUI entry; reject
-  redirected input/output before importing the interactive interface.
 - Job admission, ownership, capacity, expiry, status and output retention belong
   to a job service, independent of JobModule and HttpReqErrJson.
 - Workers receive job inputs and an authenticated principal, never a retained HTTP
@@ -123,3 +119,13 @@ Current project runner: `unittest` for `tests`. CI helper tests use
   with warnings treated as errors where supported. Review README/package text and
   the deployed manual for accidental maintainer content. Preserve private-project
   visibility and existing review/publication approval requirements.
+
+## Optional Textual presentation
+
+- Reuse `dwho.tui.textual` for shared layout, widgets and visual states. Keep
+  collection, permissions, rules and execution in application/client services.
+- Maintain the separate `textual_tests` unittest discovery root and optional CI
+  job. Base commands must work without Textual/Rich imports.
+- Generate candidate captures with `scripts/capture_textual.py`; keep synthetic
+  fixtures labelled and record source hashes. Publish shared website captures
+  only after the corresponding interface and source revision are accepted.

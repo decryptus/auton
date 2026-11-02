@@ -61,30 +61,6 @@ rejecting a trailing newline.
 
 ## Build verification
 
-### Shared terminal primitives
-
-The client uses DWho 0.3.63 or newer: `dwho.cli.require_terminal` checks
-interactive input/output, `dwho.cli.write_json` writes CLI JSON responses, and
-`dwho.tui.put` handles bounded drawing and terminal resize races. Auton sanitizes
-remote control characters before drawing and owns navigation, refresh, job
-preparation, confirmation and the curses lifecycle. Its asynchronous views must
-continue refreshing while the operator navigates or edits input.
-
-Only explicit `--tui` enters curses. The CLI checks for a terminal before
-importing the TUI or reading its credentials. Ordinary commands remain usable
-from cron and pipes without curses. Authentication, transport and execution
-services remain independent of presentation. DWho is now a declared client
-dependency (including its transitive dependencies); importing its terminal
-helpers does not initialize daemon modules or HTTP services.
-
-The installed-client check permits only `dwho.cli`/`dwho.tui` in presentation
-and continues blocking DWho in the application services. It also blocks Auton's
-daemon package and HTTPdis throughout. Validate changes with the unittest
-collection guard and suite, the client-wheel check and `scripts/capture_tui.py`
-against disposable local daemons.
-
-### Reproducible builds
-
 Auton 1.2.0 supports Python 3.10–3.13. CI compares wheel bytes from two separate
 build directories with the same source, tool versions and `SOURCE_DATE_EPOCH`.
 This checks reproducibility within that environment; it does not claim identical
@@ -93,3 +69,11 @@ artifacts across arbitrary operating systems or dependency versions.
 ## Documentation rules
 
 Keep user instructions and contributor material separate. The repository [engineering requirements](https://github.com/decryptus/auton/blob/master/AGENTS.md) define the review and validation rules. Preserve user-facing compatibility, security and recovery guidance when moving internal explanations.
+## Shared terminal primitives
+
+The curses client uses `dwho.tui.put` for bounded drawing and `dwho.cli` for
+terminal preflight and JSON output. Auton retains remote-text sanitization,
+navigation and execution preparation. Both optional renderers are checked for an
+interactive terminal before importing their implementation or loading credentials.
+Client services remain independent of DWho presentation and daemon modules;
+the installed-wheel check exercises this boundary outside the checkout.

@@ -3,3 +3,6 @@ include requirements*.txt
 include bin/*
 recursive-include etc *
 recursive-include auton/web *.html *.css *.js *.svg
+
+recursive-include textual_tests *.py
+include scripts/capture_textual.py
