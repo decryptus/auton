@@ -31,3 +31,20 @@ python -m unittest discover -s tests -v
 
 These tests use synthetic data and mocked adapters or loopback services. They do
 not establish provider availability or production acceptance.
+
+## Check the planned 2.0 defaults offline
+
+Run `autond --check-migration -c /etc/auton/auton.yml` before changing an
+installation. The command checks a local YAML file and its endpoint catalogues
+for implicit legacy authentication and client-selected environment files.
+Exit status 0 means neither migration item was found, 1 means review the
+reported items, and 2 means the configuration could not be inspected.
+An explicitly selected authentication mode is outside the implicit-default check.
+
+Inline endpoint settings take precedence. When a setting depends on
+`import_config`, the command reports manual review rather than executing a
+component template. Use the 1.3.6 startup and first-use warnings to distinguish
+permission from actual use. Fixed server-side `config.envfiles` remain usable.
+This command does not start the daemon, open its databases, inspect envfile
+contents or validate credentials. It checks the file passed with `-c`;
+for installations using AUTOND_CONFIG, inspect an equivalent local file.

@@ -64,7 +64,10 @@ def argv_parse_check():
                         choices   = ('critical', 'error', 'warning', 'info', 'debug'),
                         help      = ("Emit traces with LOGLEVEL details, must be one of:\t"
                                      "critical, error, warning, info, debug"))
-    parser.add_argument("-d",
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--check-migration", action="store_true",
+                       help="Check a local configuration file for 2.0 migration concerns and exit")
+    modes.add_argument("-d",
                         action    = 'store_true',
                         dest      = 'dontlauchmain',
                         default   = False,
@@ -231,6 +234,20 @@ if __name__ == '__main__':
     def _start():
         "entry point"
         options = argv_parse_check()
-        if not options.dontlauchmain:
+        if options.check_migration:
+            import sys
+            from auton.classes.exceptions import AutonConfigurationError
+            from auton.classes.migration import migration_findings
+            try:
+                findings = migration_findings(options.conffile)
+            except (AutonConfigurationError, OSError, ValueError):
+                print('Unable to check migration: verify the configuration file and endpoint catalogues.',
+                      file=sys.stderr)
+                raise SystemExit(2)
+            if findings:
+                print('\n'.join(findings))
+                raise SystemExit(1)
+            print('No implicit auth_mode or client envfile migration concerns found.')
+        elif not options.dontlauchmain:
             main(options)
     _start()
