@@ -55,14 +55,17 @@ endpoints:
     plugin: subproc
     config:
       prog: ansible-playbook
+      disallow-envfiles: true
       timeout: 3600
   si.corp-terraform:
     plugin: subproc
     config:
       prog: terraform
+      disallow-envfiles: true
       timeout: 3600
   curl:
     plugin: subproc
     config:
       prog: curl
+      disallow-envfiles: true
       timeout: 3600

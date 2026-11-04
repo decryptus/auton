@@ -43,8 +43,13 @@ class AuthenticationTests(unittest.TestCase):
         for address in ('127.0.0.1', '::1'):
             apply_auth_policy({'general': {'auth_mode': 'anonymous', 'listen_addr': address}})
         conf = {'general': {}, 'modules': {'job': {'routes': {'run': {'auth': False}}}}}
-        with self.assertLogs('auton.classes.authentication', level='WARNING'):
+        with self.assertLogs('auton.classes.authentication', level='WARNING') as implicit:
             apply_auth_policy(conf)
+        self.assertIn('AUTON_MIGRATION_AUTH_DEFAULT', implicit.output[0])
+        conf['general']['auth_mode'] = 'legacy'
+        with self.assertLogs('auton.classes.authentication', level='WARNING') as explicit:
+            apply_auth_policy(conf)
+        self.assertNotIn('AUTON_MIGRATION_AUTH_DEFAULT', explicit.output[0])
         self.assertFalse(conf['modules']['job']['routes']['run']['auth'])
         for mode in (None, [], 'typo'):
             with self.assertRaises(AutonConfigurationError):
