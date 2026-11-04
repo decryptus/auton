@@ -68,6 +68,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t auton:test -t auton:local .
+      - name: Verify child groups after a privileged daemon start
+        run: docker run --rm --user root --entrypoint python auton:test -m unittest discover -s tests -p test_regressions.py -k test_child_inherits_only_service_groups
       - run: docker run --rm --entrypoint autond auton:test -d
       - name: Check authenticated Compose quickstart and durable volume
         run: python3 scripts/check_compose_quickstart.py

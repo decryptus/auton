@@ -35,5 +35,6 @@ endpoints:
       args: ['Hello from Auton!\n']
       disallow-args: true
       disallow-argfiles: true
+      disallow-env: true
       disallow-envfiles: true
       timeout: 5

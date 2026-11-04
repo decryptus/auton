@@ -114,6 +114,13 @@ def argv_parse_check():
     return args
 
 
+def set_process_identity(username, uid, gid):
+    if os.geteuid() == 0:
+        os.initgroups(username, gid)
+    os.setgid(gid)
+    os.setuid(uid)
+
+
 def main(options):
     """
     Main function; start the server
@@ -158,8 +165,7 @@ def main(options):
         LOG.info("pidfile ok")
         root_logger.setLevel(options.loglevel)
         os.chown(options.pidfile, uid, gid)
-        os.setgid(gid)
-        os.setuid(uid)
+        set_process_identity(options.username, uid, gid)
         os.umask(0o22)
 
         audit_settings = options.configuration['general'].get('auth_audit')
@@ -196,7 +202,8 @@ def main(options):
     except (KeyboardInterrupt, SystemExit):
         pass
     except Exception:
-        LOG.exception("bad things happen")
+        LOG.exception("daemon failed")
+        raise
     finally:
         try:
             httpdis_json.stop()
