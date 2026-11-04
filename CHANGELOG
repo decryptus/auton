@@ -1,3 +1,12 @@
+auton (1.3.4) stable; urgency=high
+
+  * Reject forbidden client inputs before queueing subprocess jobs.
+  * Apply service groups on privilege drop and enforce anonymous loopback binding.
+  * Return an error on failed daemon startup.
+  * Bound the total HTTP header read time to ten seconds, including native mTLS.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Wed, 04 Nov 2026 13:40:00 +0100
+
 auton (1.3.3) stable; urgency=medium
 
   * Reuse shared DWho terminal drawing, interactive preflight and JSON output.
