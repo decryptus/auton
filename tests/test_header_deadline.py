@@ -1,4 +1,5 @@
-"""Ensure incomplete headers cannot keep all real daemon workers occupied."""
+"""Exercise header and body deadlines on a real daemon with two workers."""
+from http.client import HTTPConnection
 import socket
 import ssl
 import time
@@ -11,13 +12,13 @@ from urllib.parse import urlsplit
 import requests
 import yaml
 
-from auton.classes.http import HEADER_READ_SECONDS
+from auton.classes.http import BODY_GRACE_SECONDS, HEADER_READ_SECONDS
 from tls_fixture import certificates
 from web_fixture import WebDaemon
 
 
 class HeaderDeadlineTests(unittest.TestCase):
-    def check_transport(self, tls):
+    def check_transport(self, tls, body=False):
         with ExitStack() as stack:
             daemon = WebDaemon()
             stack.callback(daemon.close)
@@ -45,7 +46,15 @@ class HeaderDeadlineTests(unittest.TestCase):
 
             self.assertEqual(health(), 200)
             clients = []
-            for prefix in (b'GET /hea', b'GET /health HTTP/1.1\r\nHost: localhost\r\nX-Test: '):
+            prefixes = (b'GET /hea', b'GET /health HTTP/1.1\r\nHost: localhost\r\nX-Test: ')
+            budget = HEADER_READ_SECONDS
+            if body:
+                headers = ('POST /ui/auth/login HTTP/1.1\r\nHost: ' + urlsplit(daemon.uri).netloc +
+                           '\r\nOrigin: ' + daemon.uri +
+                           '\r\nContent-Type: application/json\r\nContent-Length: 4096\r\n\r\n{').encode()
+                prefixes = (headers, headers)
+                budget = BODY_GRACE_SECONDS + 1
+            for prefix in prefixes:
                 sock = socket.create_connection(('127.0.0.1', urlsplit(daemon.uri).port), timeout=2)
                 if tls:
                     sock = context.wrap_socket(sock, server_hostname='localhost')
@@ -57,7 +66,7 @@ class HeaderDeadlineTests(unittest.TestCase):
                 start = time.monotonic()
                 time.sleep(0.3)
                 self.assertFalse(pending.done(), 'both workers should be occupied')
-                while not pending.done() and time.monotonic() - start < HEADER_READ_SECONDS + 3:
+                while not pending.done() and time.monotonic() - start < budget + 3:
                     for sock in clients:
                         try:
                             sock.sendall(b'x')
@@ -67,9 +76,35 @@ class HeaderDeadlineTests(unittest.TestCase):
                 self.assertTrue(pending.done(), 'trickling bytes extended the absolute deadline')
                 self.assertEqual(pending.result(), 200)
             self.assertEqual(health(), 200)
+            if body:
+                for sock in clients:
+                    self.assertIn(b' 408 ', sock.recv(256).split(b'\r\n', 1)[0])
+
+    def test_http_body(self):
+        self.check_transport(False, body=True)
+
+    def test_mtls_body(self):
+        self.check_transport(True, body=True)
 
     def test_http(self):
         self.check_transport(False)
 
     def test_native_mtls(self):
         self.check_transport(True)
+
+    def test_larger_valid_body_can_outlast_the_initial_grace_period(self):
+        daemon = WebDaemon()
+        self.addCleanup(daemon.close)
+        daemon.start()
+        conn = HTTPConnection('127.0.0.1', urlsplit(daemon.uri).port, timeout=5)
+        self.addCleanup(conn.close)
+        body = b'{"args":["-c","pass"]}'.ljust(256 * 1024)
+        conn.putrequest('POST', '/run/diagnostic/upload-test')
+        conn.putheader('Authorization', 'Bearer ' + daemon.token)
+        conn.putheader('Content-Type', 'application/json')
+        conn.putheader('Content-Length', str(len(body)))
+        conn.endheaders()
+        conn.send(body[:1024])
+        time.sleep(BODY_GRACE_SECONDS + 1)
+        conn.send(body[1024:])
+        self.assertEqual(conn.getresponse().status, 200)

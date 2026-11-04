@@ -11,10 +11,13 @@ from httpdis.authentication import AuthenticationDenied
 
 
 HEADER_READ_SECONDS = 10
+BODY_GRACE_SECONDS = 10
+BODY_BYTES_PER_SECOND = 32 * 1024
+BODY_MAX_SECONDS = 120
 
 
 class _DeadlineInput(io.RawIOBase):
-    """Limit each socket read to the time left for this request's headers."""
+    """Limit each socket read to the time left for the current request phase."""
 
     def __init__(self, raw, connection):
         super().__init__()
@@ -30,7 +33,7 @@ class _DeadlineInput(io.RawIOBase):
             return self.raw.readinto(buffer)
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
-            raise TimeoutError('request header deadline exceeded')
+            raise TimeoutError('request read deadline exceeded')
         previous = self.connection.gettimeout()
         self.connection.settimeout(remaining if previous is None else min(remaining, previous))
         try:
@@ -43,6 +46,22 @@ class _DeadlineInput(io.RawIOBase):
             self.raw.close()
         finally:
             super().close()
+
+
+class _RequestReader(io.BufferedReader):
+    """HTTPdis reads an admitted body with read(length), headers with readline()."""
+
+    def read(self, size=-1):
+        if size <= 0:
+            return super().read(size)
+        budget = min(BODY_MAX_SECONDS, BODY_GRACE_SECONDS + size / BODY_BYTES_PER_SECOND)
+        self.raw.deadline = time.monotonic() + budget
+        try:
+            return super().read(size)
+        except TimeoutError:
+            raise HttpReqErrJson(408, 'Request body read deadline exceeded') from None
+        finally:
+            self.raw.deadline = None
 
 
 AUDIT_STATUS_EVENTS = {401: 'auth.denied', 403: 'auth.forbidden'}
@@ -62,7 +81,7 @@ class AutonHttpReqHandler(HttpReqHandler):
     def setup(self):
         super().setup()
         self._input = _DeadlineInput(self.rfile, self.connection)
-        self.rfile = io.BufferedReader(self._input)
+        self.rfile = _RequestReader(self._input)
 
     def handle_one_request(self):
         self._input.deadline = time.monotonic() + HEADER_READ_SECONDS
