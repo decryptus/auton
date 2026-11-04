@@ -1,0 +1,37 @@
+"""Read-only checks for the two planned 2.0 default changes."""
+from pathlib import Path
+
+from auton.classes.authentication import AUTH_MODES
+from auton.classes.configuration_schema import validate_configuration
+from auton.classes.endpoint_imports import load_endpoint_imports, read_mapping
+from auton.classes.exceptions import AutonConfigurationError
+
+
+def migration_findings(filename):
+    path = Path(filename).absolute()
+    conf = validate_configuration(read_mapping(path))
+    conf['_config_directory'] = str(path.parent)
+    conf['endpoints'], _ = load_endpoint_imports(conf)
+    validate_configuration(conf)
+    if not conf['endpoints']:
+        raise AutonConfigurationError('Missing endpoints')
+    findings = []
+    general = conf['general']
+    if 'auth_mode' not in general:
+        findings.append('AUTON_MIGRATION_AUTH_DEFAULT: configure credentials and test auth_mode: required.')
+    elif not isinstance(general['auth_mode'], str) or general['auth_mode'] not in AUTH_MODES:
+        raise AutonConfigurationError('Invalid authentication mode')
+    for name, endpoint in conf['endpoints'].items():
+        if endpoint['plugin'] != 'subproc':
+            continue
+        config = endpoint.get('config', {})
+        flag = 'disallow-envfiles'
+        if flag not in config and endpoint.get('import_config'):
+            findings.append('REVIEW %r: imported component determines client envfile policy. '
+                            'Check the effective startup warnings.' % name)
+        elif flag in config and not isinstance(config[flag], bool):
+            findings.append('REVIEW %r: use a YAML boolean for disallow-envfiles.' % name)
+        elif not config.get(flag):
+            findings.append('AUTON_MIGRATION_ENVFILES_ALLOWED %r: check actual client use in daemon logs '
+                            'before setting disallow-envfiles: true.' % name)
+    return findings
