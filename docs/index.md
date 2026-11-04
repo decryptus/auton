@@ -11,6 +11,7 @@ Installation, configuration, public APIs and troubleshooting.
 
    configuration-validation
    textual
+   release-1.3.7
    release-1.3.6
    release-1.3.5
    release-1.3.4
