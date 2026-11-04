@@ -1,3 +1,10 @@
+auton (1.3.5) stable; urgency=high
+
+  * Bound total HTTP body read time and return 408 for an incomplete slow upload.
+  * Verify worker recovery over HTTP and native mTLS and a successful delayed upload.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Wed, 04 Nov 2026 15:30:00 +0100
+
 auton (1.3.4) stable; urgency=high
 
   * Reject forbidden client inputs before queueing subprocess jobs.
