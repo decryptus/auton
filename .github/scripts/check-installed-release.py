@@ -65,6 +65,8 @@ assert installed != source and installed.read_bytes() == source.read_bytes()
             work, env=clean_env)
         for executable, flag in [('auton', '--help'), ('autond', '-d'), ('autond-auth', '--help')]:
             run([str(candidate / 'bin' / executable), flag], work, env=clean_env, stdout=subprocess.DEVNULL)
+        run([str(candidate / 'bin/autond'), '--check-migration', '-c',
+             str(ROOT / 'etc/auton/docker.yml.example')], work, env=clean_env)
         # Inspect the installed entry points, not the checkout: a matching wheel
         # metadata version must not hide a stale CLI/HTTP server identity.
         for executable in ('auton', 'autond'):
