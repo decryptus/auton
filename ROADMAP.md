@@ -1,9 +1,9 @@
 # Auton Roadmap
 
 Status: active product roadmap  
-Updated: 2026-11-02
+Updated: 2026-11-04
 
-The 1.0–1.3 feature baseline is delivered. Published 1.3.3 includes the bounded
+The 1.0–1.3 feature baseline is delivered. Version 1.3.4 adds [daemon and HTTP hardening](docs/release-1.3.4.md). Version 1.3.3 includes the bounded
 OIDC exchange fix from 1.3.2, shared terminal primitives and corrected executable
 version identities. Historical milestone descriptions below
 are not a list of features still waiting for implementation. Registry and website
