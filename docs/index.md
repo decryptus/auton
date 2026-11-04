@@ -30,3 +30,7 @@ Changing the project? Use the separate :doc:`contributors` guide.
    :caption: For contributors
 
    contributors
+
+### Slow HTTP clients
+
+The daemon allows ten seconds per request to receive the request line and all HTTP headers, including over native mTLS after the handshake. Sending individual bytes does not restart the deadline. On expiry the server closes the connection and the worker can accept another request. Request bodies and job execution are outside this header deadline.
