@@ -21,6 +21,8 @@ The client selects targets and orchestrates scenarios. Each daemon enforces its
 own endpoint permissions, executes jobs and retains their results. No central
 server is required.
 
+Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc1.md) for an isolated installation.
+
 ## Quickstart
 
 This quickstart uses **Auton 1.3.7**, including SQLite authentication, durable
@@ -1215,8 +1217,8 @@ Version 1.0 adds explicit authentication policies. See the
 The anonymous loopback check uses the effective address, including a
 `--listen-addr` override.
 
-Existing configurations without `auth_mode` retain historical per-route behavior
-and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
+In 1.x, configurations without `auth_mode` retain historical per-route behavior.
+Starting with 2.0.0rc1, an omitted mode requires credentials. `auth_mode: legacy` makes this transitional choice explicit;
 `auth_basic_file` alone does not protect routes in legacy mode. Set `auth: true`
 on each protected route until migrating to `required`.
 
@@ -1410,7 +1412,10 @@ endpoints:
         - somedir/bar.env
 ```
 
-Use keyword `disallow-envfiles` to disable environment files from client:
+Starting with 2.0.0rc1, the daemon rejects client-selected environment files by
+default. To let clients select a file, list its exact absolute server path in
+`allow-client-envfiles` on that endpoint. Fixed server-side `envfiles` work in
+either case. The following example explicitly disables client selection:
 ```yaml
 endpoints:
   curl:

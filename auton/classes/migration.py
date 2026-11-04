@@ -1,4 +1,4 @@
-"""Read-only checks for the two planned 2.0 default changes."""
+"""Read-only checks for configurations migrating from 1.x to 2.0."""
 from pathlib import Path
 
 from auton.classes.authentication import AUTH_MODES
@@ -26,12 +26,21 @@ def migration_findings(filename):
             continue
         config = endpoint.get('config', {})
         flag = 'disallow-envfiles'
+        if 'allow-client-envfiles' in config:
+            allowed = config['allow-client-envfiles']
+            if not isinstance(allowed, list) or any(
+                    not isinstance(path, str) or not Path(path).is_absolute() or '\x00' in path
+                    for path in allowed):
+                findings.append('REVIEW %r: allow-client-envfiles requires absolute server paths.' % name)
+            elif allowed and config.get(flag):
+                findings.append('REVIEW %r: conflicting client envfile policies.' % name)
+            continue
         if flag not in config and endpoint.get('import_config'):
             findings.append('REVIEW %r: imported component determines client envfile policy. '
-                            'Check the effective startup warnings.' % name)
+                            'Inspect the imported config for envfiles used by clients.' % name)
         elif flag in config and not isinstance(config[flag], bool):
             findings.append('REVIEW %r: use a YAML boolean for disallow-envfiles.' % name)
         elif not config.get(flag):
             findings.append('AUTON_MIGRATION_ENVFILES_ALLOWED %r: check actual client use in daemon logs '
-                            'before setting disallow-envfiles: true.' % name)
+                            'before migrating from 1.x. Add any required paths to allow-client-envfiles.' % name)
     return findings

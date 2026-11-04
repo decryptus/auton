@@ -24,7 +24,7 @@ class EndpointImportTests(unittest.TestCase):
             (root / 'endpoints/users.yml').write_text('alice: true\nbob: true')
             (root / 'legacy.yml').write_text('timeout: 3')
             main = root / 'main.yml'
-            main.write_text('general: {}\nimport_endpoints: endpoints/catalogue.yml\nendpoints:\n  legacy:\n    plugin: fake\n    import_config: legacy.yml\n')
+            main.write_text('general: {auth_mode: anonymous, listen_addr: 127.0.0.1}\nimport_endpoints: endpoints/catalogue.yml\nendpoints:\n  legacy:\n    plugin: fake\n    import_config: legacy.yml\n')
             factory = Mock(side_effect=lambda name: Mock(name=name))
             with patch.object(config, 'parse_conf', side_effect=lambda value: value), \
                  patch.object(config, 'init_modules'), patch.object(config.signal, 'signal'), \

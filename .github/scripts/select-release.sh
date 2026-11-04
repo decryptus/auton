@@ -15,6 +15,12 @@ if [[ "${GITHUB_EVENT_NAME:-}" == workflow_dispatch ]]; then
   publish=true
 else
   version="$(cat VERSION)"
+  # Candidates may be built in PRs; stable publishing continues to reject them.
+  if [[ "${GITHUB_EVENT_NAME:-}" == pull_request && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+rc[1-9][0-9]*$ ]]; then
+    test "$version" = "$(cat RELEASE)"
+    printf 'tag=v%s\nsha=%s\ncreate=false\npublish=false\n' "$version" "$sha" >> "$GITHUB_OUTPUT"
+    exit 0
+  fi
   [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
   test "$version" = "$(cat RELEASE)"
   tag="v$version"

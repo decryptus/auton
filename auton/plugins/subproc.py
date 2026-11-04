@@ -48,7 +48,7 @@ class AutonSubProcPlugin(AutonPlugBase):
         AutonPlugBase.__init__(self, name)
         self._dirs_to_delete = []
         self._killed = False
-        self._warned_client_envfiles = False
+        self._client_envfiles = frozenset()
 
     def at_stop(self):
         self._killed = True
@@ -255,10 +255,14 @@ class AutonSubProcPlugin(AutonPlugBase):
         if not self.target.config.get('prog'):
             raise AutonConfigurationError("missing prog keyword for target: %r" % self.target.name)
 
-        if not self.target.config.get('disallow-envfiles'):
-            LOG.warning('AUTON_MIGRATION_ENVFILES_ALLOWED: endpoint %r permits client-selected server files. '
-                        'Review callers before setting disallow-envfiles: true; configured envfiles still work.',
-                        self.target.name)
+        allowed = self.target.config.get('allow-client-envfiles', [])
+        if not isinstance(allowed, list) or any(
+                not isinstance(path, str) or not os.path.isabs(path) or '\x00' in path
+                for path in allowed):
+            raise AutonConfigurationError('allow-client-envfiles requires a list of absolute server paths')
+        if allowed and self.target.config.get('disallow-envfiles'):
+            raise AutonConfigurationError('allow-client-envfiles conflicts with disallow-envfiles')
+        self._client_envfiles = frozenset(allowed)
 
     def validate_run_payload(self, payload):
         if payload:
@@ -266,6 +270,11 @@ class AutonSubProcPlugin(AutonPlugBase):
             for field in CLIENT_FIELDS:
                 if payload.get(field) and config.get('disallow-' + field):
                     raise InvalidParameters('endpoint forbids client field: ' + field)
+
+            files = payload.get('envfiles')
+            if files and (not isinstance(files, list) or any(
+                    not isinstance(path, str) or path not in self._client_envfiles for path in files)):
+                raise InvalidParameters('endpoint does not allow the requested client envfiles')
 
     def do_run(self, obj):
         cfg = self.target.config
@@ -281,11 +290,6 @@ class AutonSubProcPlugin(AutonPlugBase):
             raise AutonTargetFailed("invalid argfiles for command on target: %r" % self.target.name)
 
         client_envfiles = payload.get('envfiles') or []
-        if client_envfiles and not self._warned_client_envfiles:
-            self._warned_client_envfiles = True
-            LOG.warning('AUTON_MIGRATION_ENVFILES_USED: a client supplied envfiles for endpoint %r. '
-                        'Before 2.0, move fixed paths into the endpoint configuration or review this dependency.',
-                        self.target.name)
         env = self._mk_env(cfg.get('envfiles'), client_envfiles,
                            cfg.get('env'), payload.get('env') or {}, ovars)
         if not env:

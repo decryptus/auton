@@ -35,6 +35,13 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(result.returncode == 0, success, result.stderr)
         return dict(line.split('=', 1) for line in output.read_text().splitlines()) if output.exists() else {}
 
+    def test_rc_build_is_validation_only(self):
+        self.commit('2.0.0rc1')
+        result = self.select(ref='refs/pull/2/merge', event='pull_request')
+        self.assertEqual((result['create'], result['publish']), ('false', 'false'))
+        self.select(success=False)
+        self.select(ref='refs/tags/v2.0.0rc1', success=False)
+
     def test_new_version(self):
         self.assertEqual(self.select()['create'], 'true')
 

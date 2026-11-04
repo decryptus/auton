@@ -187,35 +187,30 @@ class SubprocessTests(unittest.TestCase):
         self.plugin.do_run(obj)
         return obj
 
-    def test_envfile_migration_warns_only_on_first_client_use(self):
-        logger = 'auton.plugins.subproc'
+    def test_only_listed_client_envfiles_are_accepted_and_fixed_files_still_work(self):
+        from auton.classes.parameters import InvalidParameters
         with tempfile.TemporaryDirectory() as tmp:
-            envfile = Path(tmp) / 'private-file'
-            envfile.write_text('MIGRATION_FIXTURE=private-value\n')
-            config = {'prog': sys.executable, 'envfiles': [str(envfile)], 'disallow-envfiles': True}
+            envfile = Path(tmp) / 'fixture.env'
+            envfile.write_text('RC_FIXTURE=known-value\n')
+            config = {'prog': sys.executable, 'envfiles': [str(envfile)]}
             self.plugin.config = {'config': config}
             self.addCleanup(EPTS_SYNC.pop, 'test', None)
-            args = ['-c', 'import os; print(os.environ["MIGRATION_FIXTURE"])']
-            with self.assertNoLogs(logger, level='WARNING'):
-                self.plugin.safe_init()
-                obj = job(Request({'args': args}))
-                self.plugin.do_run(obj)
-                self.assertEqual(''.join(obj.result).strip(), 'private-value')
-            config.pop('disallow-envfiles')
+            self.plugin.safe_init()
+            args = ['-c', 'import os; print(os.environ["RC_FIXTURE"])']
+            obj = job(Request({'args': args}))
+            self.plugin.do_run(obj)
+            self.assertEqual(''.join(obj.result).strip(), 'known-value')
+            with self.assertRaises(InvalidParameters):
+                self.plugin.validate_run_payload({'envfiles': [str(envfile)]})
             config.pop('envfiles')
-            with self.assertLogs(logger, level='WARNING') as startup:
-                self.plugin.safe_init()
-            self.assertEqual(len(startup.output), 1)
-            self.assertIn('AUTON_MIGRATION_ENVFILES_ALLOWED', startup.output[0])
-            with self.assertLogs(logger, level='WARNING') as use:
-                for _ in range(2):
-                    obj = job(Request({'args': args, 'envfiles': [str(envfile)]}))
-                    self.plugin.do_run(obj)
-                    self.assertEqual(''.join(obj.result).strip(), 'private-value')
-            self.assertEqual(len(use.output), 1)
-            self.assertIn('AUTON_MIGRATION_ENVFILES_USED', use.output[0])
-            self.assertNotIn(str(envfile), use.output[0])
-            self.assertNotIn('private-value', use.output[0])
+            config['allow-client-envfiles'] = [str(envfile)]
+            self.plugin.safe_init()
+            obj = job(Request({'args': args, 'envfiles': [str(envfile)]}))
+            self.plugin.do_run(obj)
+            self.assertEqual(''.join(obj.result).strip(), 'known-value')
+            for files in ([str(envfile), '/other'], str(envfile), [{}]):
+                with self.subTest(files=files), self.assertRaises(InvalidParameters):
+                    self.plugin.validate_run_payload({'envfiles': files})
 
     def test_client_arguments_are_literal_but_config_is_templated(self):
         values = {'_env_': {'SECRET': 'hidden'}, '_uid_': '123'}

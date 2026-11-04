@@ -43,9 +43,13 @@ class AuthenticationTests(unittest.TestCase):
         for address in ('127.0.0.1', '::1'):
             apply_auth_policy({'general': {'auth_mode': 'anonymous', 'listen_addr': address}})
         conf = {'general': {}, 'modules': {'job': {'routes': {'run': {'auth': False}}}}}
-        with self.assertLogs('auton.classes.authentication', level='WARNING') as implicit:
+        with self.assertRaises(AutonConfigurationError):
             apply_auth_policy(conf)
-        self.assertIn('AUTON_MIGRATION_AUTH_DEFAULT', implicit.output[0])
+        conf['general'] = {'auth_basic_file': '/credentials'}
+        apply_auth_policy(conf)
+        self.assertEqual(conf['general']['auth_mode'], 'required')
+        self.assertTrue(conf['modules']['job']['routes']['run']['auth'])
+        conf['modules']['job']['routes']['run']['auth'] = False
         conf['general']['auth_mode'] = 'legacy'
         with self.assertLogs('auton.classes.authentication', level='WARNING') as explicit:
             apply_auth_policy(conf)

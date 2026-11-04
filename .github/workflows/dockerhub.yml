@@ -74,7 +74,7 @@ jobs:
       - name: Verify installed packages and 0.3.2 compatibility
         run: python .github/scripts/check-installed-release.py
       - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || contains(steps.release.outputs.tag, 'rc')
         with:
           name: python-distributions
           path: dist/
