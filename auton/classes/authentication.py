@@ -30,7 +30,13 @@ def apply_auth_policy(conf):
     if not isinstance(mode, str) or mode not in AUTH_MODES:
         raise AutonConfigurationError('auth_mode must be required, anonymous or legacy')
     if mode == 'legacy':
-        LOG.warning('Legacy route-based authentication: routes without auth allow anonymous access. Review route permissions or configure auth_mode: required.')
+        if 'auth_mode' not in general:
+            LOG.warning('AUTON_MIGRATION_AUTH_DEFAULT: auth_mode is unset; 1.x uses legacy route permissions '
+                        'and routes without auth allow anonymous access. Before 2.0, configure credentials '
+                        'and test auth_mode: required.')
+        else:
+            LOG.warning('Legacy route-based authentication: routes without auth allow anonymous access. '
+                        'Review route permissions or configure auth_mode: required.')
         return
     if mode == 'anonymous':
         try:
