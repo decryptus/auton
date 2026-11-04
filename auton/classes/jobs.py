@@ -268,7 +268,11 @@ class JobService(object):
         with self._locked():
             try:
                 self.authorize(endpoint, principal)
-                validate_arguments(getattr(self.endpoints[endpoint], 'discovery', {}).get('parameters'), payload)
+                plugin = self.endpoints[endpoint]
+                validate_payload = getattr(plugin, 'validate_run_payload', None)
+                if method == 'run' and validate_payload:
+                    validate_payload(payload)
+                validate_arguments(getattr(plugin, 'discovery', {}).get('parameters'), payload)
                 if self.persistence_failed:
                     raise JobUnavailable('job storage unavailable; new admissions disabled until restart')
                 with self.availability.admission():

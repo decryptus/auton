@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import runpy
 from pathlib import Path
 import signal
 import subprocess
@@ -129,6 +130,47 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(get.call_args.kwargs['headers']['X-Auton-Output-Offset'], '4')
         missing.close.assert_called_once()
         found.close.assert_called_once()
+
+
+class IdentityTests(unittest.TestCase):
+    @unittest.skipUnless(os.geteuid() == 0, 'requires a real root to service-user transition')
+    def test_child_inherits_only_service_groups(self):
+        code = """
+import os, pwd, runpy, subprocess, sys
+switch = runpy.run_path(sys.argv[1])['set_process_identity']
+account = pwd.getpwnam('nobody')
+expected = set(os.getgrouplist(account.pw_name, account.pw_gid))
+extra = max(expected) + 1
+os.setgroups([extra])
+switch(account.pw_name, account.pw_uid, account.pw_gid)
+child = subprocess.check_output(['id', '-G'], text=True)
+assert set(map(int, child.split())) == expected, child
+"""
+        subprocess.run([sys.executable, '-c', code, str(ROOT / 'bin/autond')], check=True)
+
+    def test_root_sets_service_groups_before_dropping_ids(self):
+        switch = runpy.run_path(str(ROOT / 'bin/autond'))['set_process_identity']
+        with patch('os.geteuid', return_value=0), patch('os.initgroups') as groups, \
+                patch('os.setgid') as gid, patch('os.setuid') as uid:
+            calls = Mock()
+            calls.attach_mock(groups, 'groups')
+            calls.attach_mock(gid, 'gid')
+            calls.attach_mock(uid, 'uid')
+            switch('auton', 123, 456)
+            self.assertEqual([(call[0], call[1]) for call in calls.mock_calls],
+                             [('groups', ('auton', 456)), ('gid', (456,)), ('uid', (123,))])
+            groups.side_effect = PermissionError()
+            with self.assertRaises(PermissionError):
+                switch('auton', 123, 456)
+            gid.assert_called_once()
+            uid.assert_called_once()
+
+    def test_unprivileged_start_keeps_assigned_groups(self):
+        switch = runpy.run_path(str(ROOT / 'bin/autond'))['set_process_identity']
+        with patch('os.geteuid', return_value=123), patch('os.initgroups') as groups, \
+                patch('os.setgid'), patch('os.setuid'):
+            switch('auton', 123, 456)
+            groups.assert_not_called()
 
 
 class SubprocessTests(unittest.TestCase):
@@ -258,6 +300,19 @@ class JobTests(unittest.TestCase):
         self.module.job_run(Request(xid='pending-job'))
         self.assertNotIn('test:test-job', self.module.objs)
         self.assertIn('test:pending-job', self.module.objs)
+
+    def test_disallowed_overrides_are_rejected_before_queueing(self):
+        fields = {'args': ['arg'], 'env': {'NAME': 'value'}, 'envfiles': ['/example'],
+                  'argfiles': [{'arg': '-f', 'filename': 'x', 'content': 'eA=='}]}
+        self.plugin.target = AutonTarget('test', {'disallow-' + key: True for key in fields})
+        for key, value in fields.items():
+            with self.subTest(key=key), self.assertRaises(HttpReqErrJson) as caught:
+                self.module.job_run(Request({key: value}))
+            self.assertEqual(caught.exception.code, 400)
+        self.assertFalse(self.module.objs)
+        self.assertTrue(EPTS_SYNC['test'].queue.empty())
+        self.module.job_run(Request({'args': [], 'env': {}}))
+        self.assertEqual(EPTS_SYNC['test'].queue.qsize(), 1)
 
     def test_capacity_rejects_before_queueing(self):
         self.module.max_jobs = 1

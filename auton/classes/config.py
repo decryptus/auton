@@ -87,6 +87,8 @@ def load_conf(xfile, options = None, envvar = None):
     conf = import_conf_files('modules', conf)
     validate_configuration(conf)
 
+    if getattr(options, 'listen_addr', None) is not None:
+        conf['general']['listen_addr'] = options.listen_addr
     apply_auth_policy(conf)
     from auton.classes.tls import tls_config
     tls = tls_config(conf['general'], conf.get('_config_directory'))

@@ -1212,6 +1212,9 @@ local users or a reverse proxy: do not publish this mode through a proxy.
 
 Version 1.0 adds explicit authentication policies. See the
 [1.0 upgrade guide](docs/release-1.0.md) before replacing a running installation.
+The anonymous loopback check uses the effective address, including a
+`--listen-addr` override.
+
 Existing configurations without `auth_mode` retain historical per-route behavior
 and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
 `auth_basic_file` alone does not protect routes in legacy mode. Set `auth: true`
@@ -1324,6 +1327,9 @@ endpoints:
         - '-s'
         - '-4'
 ```
+
+For subprocess endpoints, nonempty client fields blocked by a `disallow-*` setting
+are rejected with HTTP 400 before queueing. Empty fields remain valid.
 
 Use keyword `disallow-args` to disable arguments from client:
 ```yaml

@@ -10,6 +10,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from auton.classes.authentication import PasswordAuthenticator, apply_auth_policy
 from auton.classes.exceptions import AutonConfigurationError
@@ -47,6 +49,14 @@ class AuthenticationTests(unittest.TestCase):
         for mode in (None, [], 'typo'):
             with self.assertRaises(AutonConfigurationError):
                 apply_auth_policy({'general': {'auth_mode': mode}})
+
+    def test_anonymous_rejects_nonlocal_command_line_override(self):
+        from auton.classes.config import load_conf
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = Path(tmp) / 'auton.yml'
+            conf.write_text('general: {listen_addr: 127.0.0.1, auth_mode: anonymous}\n')
+            with patch('signal.signal'), self.assertRaisesRegex(AutonConfigurationError, 'loopback'):
+                load_conf(str(conf), SimpleNamespace(listen_addr='0.0.0.0'))
 
     def test_bcrypt_and_concurrent_identities(self):
         secret = crypt.crypt('correct', '$2b$12$abcdefghijklmnopqrstuu')

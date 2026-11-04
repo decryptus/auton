@@ -29,10 +29,14 @@ from auton.classes.exceptions import (AutonConfigurationError,
                                       AutonTargetUnauthorized,
                                       AutonTargetFailed,
                                       AutonTargetTimeout, AutonTargetCancelled)
+from auton.classes.parameters import InvalidParameters
 from auton.classes.plugins import AutonPlugBase, PLUGINS
 from auton.classes.availability import Availability, LaunchStopped
 
 LOG = logging.getLogger('auton.plugins.subproc')
+
+
+CLIENT_FIELDS = ('args', 'argfiles', 'envfiles', 'env')
 
 
 class AutonSubProcPlugin(AutonPlugBase):
@@ -250,49 +254,28 @@ class AutonSubProcPlugin(AutonPlugBase):
         if not self.target.config.get('prog'):
             raise AutonConfigurationError("missing prog keyword for target: %r" % self.target.name)
 
+    def validate_run_payload(self, payload):
+        if payload:
+            config = self.target.config
+            for field in CLIENT_FIELDS:
+                if payload.get(field) and config.get('disallow-' + field):
+                    raise InvalidParameters('endpoint forbids client field: ' + field)
+
     def do_run(self, obj):
-        cfg       = self.target.config
-        payload   = obj.get_payload()
-        ovars     = obj.get_vars()
-        pargs     = None
-        pargfiles = None
-        args      = [cfg['prog']]
-        penvfiles = []
-        penv      = {}
-
-        if isinstance(payload, dict) and payload.get('args'):
-            if cfg.get('disallow-args'):
-                LOG.warning("args from payload isn't allowed for target: %r", self.target.name)
-            else:
-                pargs = copy.copy(payload['args'])
-
-        args    = self._mk_args(args, cfg.get('args'), pargs, ovars)
+        cfg = self.target.config
+        payload = obj.get_payload() or {}
+        self.validate_run_payload(payload)
+        ovars = obj.get_vars()
+        args = self._mk_args([cfg['prog']], cfg.get('args'), payload.get('args'), ovars)
         if not args:
             raise AutonTargetFailed("invalid args for command on target: %r" % self.target.name)
 
-        if isinstance(payload, dict) and payload.get('argfiles'):
-            if cfg.get('disallow-argfiles'):
-                LOG.warning("argfiles from payload isn't allowed for target: %r", self.target.name)
-            else:
-                pargfiles = copy.copy(payload['argfiles'])
-
-        args    = self._mk_argfiles(args, cfg.get('argfiles'), pargfiles)
+        args = self._mk_argfiles(args, cfg.get('argfiles'), payload.get('argfiles'))
         if not args:
             raise AutonTargetFailed("invalid argfiles for command on target: %r" % self.target.name)
 
-        if isinstance(payload, dict) and payload.get('envfiles'):
-            if cfg.get('disallow-envfiles'):
-                LOG.warning("envfile from payload isn't allowed for target: %r", self.target.name)
-            else:
-                penvfiles = payload['envfiles']
-
-        if isinstance(payload, dict) and payload.get('env'):
-            if cfg.get('disallow-env'):
-                LOG.warning("env from payload isn't allowed for target: %r", self.target.name)
-            else:
-                penv.update(copy.copy(payload['env']))
-
-        env     = self._mk_env(cfg.get('envfiles'), penvfiles, cfg.get('env'), penv, ovars)
+        env = self._mk_env(cfg.get('envfiles'), payload.get('envfiles') or [],
+                           cfg.get('env'), payload.get('env') or {}, ovars)
         if not env:
             env = {}
 
