@@ -1,10 +1,48 @@
 """Request-local Basic authentication for the httpdis transport."""
+import io
+import time
+
 from httpdis.ext.httpdis_json import HttpReqHandler, HttpReqErrJson, HttpReqError
 from auton.classes.authentication import PasswordAuthenticator
 from auton.classes.exceptions import AutonConfigurationError
 from auton.classes.web import authentication_request, SECURITY_HEADERS, MAX_LOGIN_BYTES
 from httpdis.auth_browser import BrowserAuthProvider
 from httpdis.authentication import AuthenticationDenied
+
+
+HEADER_READ_SECONDS = 10
+
+
+class _DeadlineInput(io.RawIOBase):
+    """Limit each socket read to the time left for this request's headers."""
+
+    def __init__(self, raw, connection):
+        super().__init__()
+        self.raw = raw
+        self.connection = connection
+        self.deadline = None
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        if self.deadline is None:
+            return self.raw.readinto(buffer)
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('request header deadline exceeded')
+        previous = self.connection.gettimeout()
+        self.connection.settimeout(remaining if previous is None else min(remaining, previous))
+        try:
+            return self.raw.readinto(buffer)
+        finally:
+            self.connection.settimeout(previous)
+
+    def close(self):
+        try:
+            self.raw.close()
+        finally:
+            super().close()
 
 
 AUDIT_STATUS_EVENTS = {401: 'auth.denied', 403: 'auth.forbidden'}
@@ -16,6 +54,25 @@ class AutonHttpReqHandler(HttpReqHandler):
     authenticator = PasswordAuthenticator()
     realm = 'Restricted'
     auth_audit = None
+
+    # Request a raw socket stream from StreamRequestHandler.setup, then buffer
+    # above the deadline check so even trickled bytes within one line are bounded.
+    rbufsize = 0
+
+    def setup(self):
+        super().setup()
+        self._input = _DeadlineInput(self.rfile, self.connection)
+        self.rfile = io.BufferedReader(self._input)
+
+    def handle_one_request(self):
+        self._input.deadline = time.monotonic() + HEADER_READ_SECONDS
+        return super().handle_one_request()
+
+    def parse_request(self):
+        try:
+            return super().parse_request()
+        finally:
+            self._input.deadline = None
 
     @classmethod
     def configure_auth(cls, filename=None, realm=None, required=False):
