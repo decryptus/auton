@@ -1,0 +1,39 @@
+name: Publish frozen 2.0.0rc1
+on:
+  push:
+    branches: ['release/2.0']
+    paths: ['.github/workflows/publish-rc1.yml']
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CANDIDATE: 661503c1a72bd59a1526e4d509391fe0f8822e50
+      ARTIFACT_ID: '13354813737'
+      TAG: v2.0.0rc1
+    steps:
+      - name: Verify and publish the tested distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          gh api "repos/$repo/actions/artifacts/$ARTIFACT_ID/zip" > packages.zip
+          echo '64ef4441814185d215a8fce22e0ffa8338ec09ff072a00be3b2e2a795471972e  packages.zip' | sha256sum -c -
+          unzip -q packages.zip -d packages
+          shopt -s nullglob
+          files=(packages/auton/auton-2.0.0rc1*.whl packages/auton/auton-2.0.0rc1.tar.gz packages/autond/autond-2.0.0rc1*.whl packages/autond/autond-2.0.0rc1.tar.gz)
+          test "${#files[@]}" -eq 4
+          cat > notes.md <<'NOTES'
+          Auton 2.0 is feature-frozen. The stable release is targeted for December 3, 2026, subject to migration validation and resolution of release blockers.
+          
+          This candidate requires authentication by default and an explicit per-endpoint allowlist for client-selected environment files. The client and daemon were tested with Atropos 1.0.2 and a migration from Auton 1.3.7.
+          
+          Download the candidate wheels below for isolated testing. See the [migration and testing guide](https://github.com/decryptus/auton/blob/v2.0.0rc1/docs/release-2.0.0rc1.md).
+          NOTES
+          gh release create "$TAG" "${files[@]}" --repo "$repo" --target "$CANDIDATE" --title 'Auton 2.0.0rc1' --notes-file notes.md --prerelease --latest=false
