@@ -135,11 +135,9 @@ regex/choice rules, repeatability and arity, validated envfile snapshots,
 startup/offline migration warnings and the 2.0 default-deny change.
 See [the user migration guide](client-input-policy.md).
 
-Delivery is pending: Sonicprobe PR #24 and cross-version CI, a new immutable
-Sonicprobe registry release, replacement of the exact candidate source dependency
-with that released minimum, transition/2.0 PR review, a refreshed 2.0 candidate
-and migration acceptance. The existing stable release, published Docker images,
-website and demos remain unchanged until those release gates pass. Do not
-publish packages containing the temporary source dependency or treat the earlier
-RC acceptance as validation of these new defaults. No UI or screenshot design
-changes are part of this implementation.
+Delivery sequence: publish Sonicprobe 0.3.64, use the registry requirement in
+Auton 1.4.0 and 2.0.0rc2, then verify both packages, Docker images and immutable
+release notes. The stable website must use the 1.4.0 release source and label
+2.0.0rc2 as a separate prerelease. The stable 2.0 release still requires a new
+migration acceptance. Registry and deployed metadata are the publication record;
+source merges alone are not proof. No UI design changes are part of this work.
