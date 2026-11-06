@@ -1,7 +1,7 @@
 # Auton Roadmap
 
 Status: active product roadmap  
-Updated: 2026-11-04
+Updated: 2026-11-06
 
 The 1.0–1.3 feature baseline is delivered. Version 1.3.7 adds an [offline migration check](docs/release-1.3.7.md). Version 1.3.6 adds [2.0 migration warnings](docs/release-1.3.6.md). Version 1.3.5 adds a [request body read deadline](docs/release-1.3.5.md). Version 1.3.4 adds [daemon and HTTP hardening](docs/release-1.3.4.md). Version 1.3.3 includes the bounded
 OIDC exchange fix from 1.3.2, shared terminal primitives and corrected executable
@@ -539,6 +539,17 @@ Before a future major stable release:
 - keep transport, application logic and presentation separated.
 
 ## Current priorities
+
+Client input policies ship in the 1.4.0 transition and the 2.0.0rc2 candidate,
+using Sonicprobe 0.3.64. They support per-category allow/deny rules, regex/choice
+validation, repeated options, fixed/variable arity and validated envfile
+snapshots. Version 1.4.0 preserves implicit 1.x permissions with startup warnings;
+2.0.0rc2 denies implicit additions. See the [migration guide](docs/client-input-policy.md).
+
+The stable 2.0 release remains targeted for 19 November 2026, conditional on a
+migration acceptance using the new candidate. Earlier RC1 results do not qualify
+the expanded defaults. Package/image publication and website deployment are
+verified independently of source merges.
 
 The original 1.2.0 scope is complete and published: report reconciliation, guided
 parameters, owner-authorized cancellation, detached workers, explicit error

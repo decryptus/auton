@@ -21,17 +21,17 @@ The client selects targets and orchestrates scenarios. Each daemon enforces its
 own endpoint permissions, executes jobs and retains their results. No central
 server is required.
 
-Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc1.md) for an isolated installation.
+Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc2.md) for an isolated installation.
 
 ## Quickstart
 
-This quickstart uses **Auton 1.3.7**, including SQLite authentication, durable
+This quickstart uses **Auton 1.4.0**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.3.7
+git checkout v1.4.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -103,7 +103,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.3.7
+python -m pip install auton==1.4.0
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -985,7 +985,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.3.7`, or use the Docker image, which includes the authentication
+`autond[auth]==1.4.0`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
@@ -1330,6 +1330,13 @@ endpoints:
         - '-4'
 ```
 
+Client additions can be controlled per endpoint with `allow-args`, `allow-env`,
+`allow-argfiles` and `allow-envfiles`. Use `true` to allow a category, a name list
+for selective access, or argument/environment mappings for value rules.
+Explicit `disallow-*` rules take precedence. See the
+[client input policy and migration guide](docs/client-input-policy.md) for
+repeated options, regexes, file semantics and the 1.x / 2.0 default change.
+
 For subprocess endpoints, nonempty client fields blocked by a `disallow-*` setting
 are rejected with HTTP 400 before queueing. Empty fields remain valid.
 
@@ -1414,7 +1421,7 @@ endpoints:
 
 Starting with 2.0.0rc1, the daemon rejects client-selected environment files by
 default. To let clients select a file, list its exact absolute server path in
-`allow-client-envfiles` on that endpoint. Fixed server-side `envfiles` work in
+`allow-envfiles` on that endpoint, and authorize its variables with `allow-env`. Fixed server-side `envfiles` work in
 either case. The following example explicitly disables client selection:
 ```yaml
 endpoints:

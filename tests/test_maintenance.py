@@ -121,7 +121,7 @@ class MaintenanceTests(unittest.TestCase):
 
     def test_process_launch_rechecks_acl_after_maintenance(self):
         plugin = AutonSubProcPlugin('test')
-        plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': 2})
+        plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
         plugin.users = {'alice': True}
         obj = JobObject('test', 'test:queued-job', 'test', 'run', principal='alice')
         obj.availability = Availability(True)

@@ -127,3 +127,17 @@ delivery record; candidate captures alone do not establish publication. No froze
 PNGs are committed. See the current [roadmap](https://github.com/decryptus/auton/blob/master/ROADMAP.md)
 and release notes for later changes. The contact form remains outside this scope;
 the existing email link does not require a form delivery service.
+
+## Client policy candidate (6 November 2026)
+
+Implemented for review: Sonicprobe argpolicy, per-category client permissions,
+regex/choice rules, repeatability and arity, validated envfile snapshots,
+startup/offline migration warnings and the 2.0 default-deny change.
+See [the user migration guide](client-input-policy.md).
+
+Delivery sequence: publish Sonicprobe 0.3.64, use the registry requirement in
+Auton 1.4.0 and 2.0.0rc2, then verify both packages, Docker images and immutable
+release notes. The stable website must use the 1.4.0 release source and label
+2.0.0rc2 as a separate prerelease. The stable 2.0 release still requires a new
+migration acceptance. Registry and deployed metadata are the publication record;
+source merges alone are not proof. No UI design changes are part of this work.

@@ -176,13 +176,13 @@ assert set(map(int, child.split())) == expected, child
 class SubprocessTests(unittest.TestCase):
     def setUp(self):
         self.plugin = AutonSubProcPlugin('test')
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': 2})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
 
     def tearDown(self):
         self.plugin.do_terminate()
 
     def execute(self, code, timeout=2):
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': timeout})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': timeout})
         obj = job(Request({'args': ['-c', code]}))
         self.plugin.do_run(obj)
         return obj
@@ -192,7 +192,7 @@ class SubprocessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             envfile = Path(tmp) / 'fixture.env'
             envfile.write_text('RC_FIXTURE=known-value\n')
-            config = {'prog': sys.executable, 'envfiles': [str(envfile)]}
+            config = {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'envfiles': [str(envfile)]}
             self.plugin.config = {'config': config}
             self.addCleanup(EPTS_SYNC.pop, 'test', None)
             self.plugin.safe_init()
@@ -203,7 +203,8 @@ class SubprocessTests(unittest.TestCase):
             with self.assertRaises(InvalidParameters):
                 self.plugin.validate_run_payload({'envfiles': [str(envfile)]})
             config.pop('envfiles')
-            config['allow-client-envfiles'] = [str(envfile)]
+            config['allow-envfiles'] = [str(envfile)]
+            config['allow-env'] = True
             self.plugin.safe_init()
             obj = job(Request({'args': args, 'envfiles': [str(envfile)]}))
             self.plugin.do_run(obj)
@@ -292,6 +293,7 @@ class JobTests(unittest.TestCase):
         self.module.config = {'general': {'lock_timeout': 1}}
         self.module.safe_init(None)
         self.plugin = AutonSubProcPlugin('test')
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True})
         ENDPOINTS['test'] = self.plugin
         EPTS_SYNC['test'] = AutonEPTSync('test')
 
@@ -379,7 +381,7 @@ class JobTests(unittest.TestCase):
 
     def test_worker_survives_output_limit_and_processes_next_job(self):
         self.module.max_output_bytes = 100
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': 2})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
         self.module.job_run(Request({'args': ['-c', 'print("x" * 10000)']}))
         self.module.job_run(Request({'args': ['-c', 'print("ok")']}, xid='second-job'))
         self.plugin.start()

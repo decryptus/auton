@@ -78,3 +78,13 @@ navigation and execution preparation. Both optional renderers are checked for an
 interactive terminal before importing their implementation or loading credentials.
 Client services remain independent of DWho presentation and daemon modules;
 the installed-wheel check exercises this boundary outside the checkout.
+
+## Candidate publication
+
+After candidate PR checks pass, merging a new `X.Y.ZrcN` version into
+`release/2.0` runs the existing image/package/compatibility gates, creates the
+immutable version tag and publishes both packages plus versioned Docker images.
+GitHub releases are explicitly prereleases and never replace the latest stable
+release. Retry from an existing tag only on the matching release branch. Stable
+versions cannot publish from `release/2.0`; candidates cannot publish from master.
+The 2.0 stable target remains 19 November 2026, conditional on migration acceptance.

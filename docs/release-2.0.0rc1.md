@@ -17,6 +17,12 @@ Copy the 1.x configuration and any supporting files to an isolated instance. Poi
 
 An omitted `general.auth_mode` now selects `required`. Provide an existing Basic password file or configure the SQLite authentication backend and provision an account. A daemon with neither will refuse to start. Check that a protected API request without credentials returns HTTP 401 and that the same request succeeds for an authorized user. Explicit `legacy` retains route-specific authentication. Explicit `anonymous` is for isolated loopback development.
 
+## Client input policies
+
+This development branch extends the earlier RC policy to all client inputs.
+See the [migration guide](client-input-policy.md); existing RC users must review
+arguments, environment variables and uploads as well as envfiles.
+
 ## Environment files
 
 Fixed server-side files remain available to the subprocess on every run. If a client needs to select an additional file, list its exact absolute server path per endpoint.
@@ -29,10 +35,12 @@ endpoints:
       prog: /usr/local/bin/deploy
       envfiles:
         - /etc/auton/base.env
-      allow-client-envfiles:
+      allow-env:
+        OPTIONAL: true
+      allow-envfiles:
         - /etc/auton/staging.env
 ```
 
-With this example, a request without envfiles loads base.env. A request selecting staging.env by its full path loads both. Any unlisted selection returns HTTP 400 before the job is queued. Keep the listed files and their parent directories under administrator control. An empty or omitted allowlist denies all client-selected paths, including when a 1.x configuration sets `disallow-envfiles: false`. A nonempty allowlist conflicts with `disallow-envfiles: true`.
+With this example, a request without envfiles loads base.env. A request selecting staging.env by its full path loads both. Any unlisted selection returns HTTP 400 before the job is queued. Keep the listed files and their parent directories under administrator control. An empty or omitted allowlist denies all client-selected paths, including when a 1.x configuration sets `disallow-envfiles: false`. `disallow-envfiles: true` takes precedence over any allowlist.
 
 After testing, stop the isolated daemon and discard its scratch data. Resume using the stable instance with its original configuration and databases.
