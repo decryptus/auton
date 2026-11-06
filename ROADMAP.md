@@ -540,18 +540,16 @@ Before a future major stable release:
 
 ## Current priorities
 
-Client input policy is implemented for review in [transition PR #56](https://github.com/decryptus/auton/pull/56)
-and [2.0 PR #57](https://github.com/decryptus/auton/pull/57), using
-[Sonicprobe argpolicy PR #24](https://github.com/decryptus/sonicprobe/pull/24).
-It supports per-category allow/deny rules, regex/choice validation, repeated
-options, fixed/variable arity and validated envfile snapshots. The transition
-preserves implicit 1.x permissions with warnings; 2.0 denies implicit additions.
-See the [user migration guide](docs/client-input-policy.md).
+Client input policies ship in the 1.4.0 transition and the 2.0.0rc2 candidate,
+using Sonicprobe 0.3.64. They support per-category allow/deny rules, regex/choice
+validation, repeated options, fixed/variable arity and validated envfile
+snapshots. Version 1.4.0 preserves implicit 1.x permissions with startup warnings;
+2.0.0rc2 denies implicit additions. See the [migration guide](docs/client-input-policy.md).
 
-This work is **not released**. Publication requires a new Sonicprobe package,
-replacement of the candidate source pin, the transition release, a refreshed 2.0
-RC and migration acceptance. The earlier RC does not qualify the new defaults.
-
+The stable 2.0 release remains targeted for 19 November 2026, conditional on a
+migration acceptance using the new candidate. Earlier RC1 results do not qualify
+the expanded defaults. Package/image publication and website deployment are
+verified independently of source merges.
 
 The original 1.2.0 scope is complete and published: report reconciliation, guided
 parameters, owner-authorized cancellation, detached workers, explicit error

@@ -1,7 +1,7 @@
 name: Docker Hub
 on:
   push:
-    branches: [master]
+    branches: [master, release/2.0]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -148,6 +148,10 @@ jobs:
         with:
           ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
       - name: Publish release notes after image and both packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -157,5 +161,8 @@ jobs:
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             exit 0
           fi
-          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+          flags=(--latest)
+          if [[ "$RELEASE_TAG" == *rc* ]]; then flags=(--prerelease --latest=false); fi
+          gh release create "$RELEASE_TAG" dist/auton/* dist/autond/* \
+            --repo "$GITHUB_REPOSITORY" --verify-tag "${flags[@]}" \
             --title "Auton ${RELEASE_TAG#v}" --notes-file "docs/release-${RELEASE_TAG#v}.md"

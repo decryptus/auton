@@ -77,3 +77,30 @@ class ReleaseTests(unittest.TestCase):
         self.git('checkout', 'master')
         self.select(success=False)
         self.select(event='workflow_dispatch', tag='v0.3.0', success=False)
+
+    def test_candidate_branch_publishes_prerelease_only(self):
+        self.commit('2.0.0rc2')
+        self.git('branch', 'release/2.0')
+        result = self.select(ref='refs/heads/release/2.0')
+        self.assertEqual((result['create'], result['publish'], result['prerelease']),
+                         ('true', 'true', 'true'))
+        self.git('tag', 'v2.0.0rc2')
+        self.assertEqual(self.select(ref='refs/tags/v2.0.0rc2')['publish'], 'true')
+        self.assertEqual(self.select(ref='refs/heads/release/2.0', event='workflow_dispatch',
+                                     tag='v2.0.0rc2')['prerelease'], 'true')
+        self.select(event='workflow_dispatch', tag='v2.0.0rc2', success=False)
+        self.git('commit', '--allow-empty', '-m', 'later docs')
+        self.assertEqual(self.select(ref='refs/heads/release/2.0')['publish'], 'false')
+
+    def test_stable_cannot_publish_from_candidate_branch(self):
+        self.commit('2.0.0')
+        self.select(ref='refs/heads/release/2.0', success=False)
+        self.git('tag', 'v2.0.0')
+        self.select(ref='refs/heads/release/2.0', event='workflow_dispatch',
+                    tag='v2.0.0', success=False)
+
+    def test_candidate_tag_outside_frozen_series_is_rejected(self):
+        self.git('branch', 'release/2.0')
+        self.commit('2.0.0rc2')
+        self.git('tag', 'v2.0.0rc2')
+        self.select(ref='refs/tags/v2.0.0rc2', success=False)

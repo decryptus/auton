@@ -1,6 +1,7 @@
 # Client input policy and migration
 
-This feature is implemented on the candidate branch, not yet published in a stable release.
+These policies are introduced in the Auton 1.4.0 transition release. The default
+changes in Auton 2.0, available for isolated testing as 2.0.0rc2.
 
 In the transition release, omitted `allow-*` settings retain the 1.x permissions
 and generate startup warnings for each affected endpoint/category. Warnings do
