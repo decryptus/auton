@@ -39,14 +39,15 @@ class MigrationTests(unittest.TestCase):
             self.assertIn('AUTON_MIGRATION_AUTH_DEFAULT', result.stdout)
             self.assertIn("REVIEW 'work'", result.stdout)
             config['general']['auth_mode'] = 'required'
-            entries['work']['config'] = {'disallow-envfiles': True, 'envfiles': ['private-value']}
+            entries['work']['config'] = {'disallow-envfiles': True, 'envfiles': ['private-value'],
+                                         'allow-args': True, 'allow-env': True, 'allow-argfiles': True}
             catalogue.write_text(yaml.safe_dump(entries))
             self.assertEqual(run().returncode, 0)
             entries['work']['config']['disallow-envfiles'] = False
             catalogue.write_text(yaml.safe_dump(entries))
             result = run()
             self.assertEqual(result.returncode, 1)
-            self.assertIn('AUTON_MIGRATION_ENVFILES_ALLOWED', result.stdout)
+            self.assertIn('AUTON_MIGRATION_CLIENT_POLICY', result.stdout)
             self.assertNotIn('private-value', result.stdout + result.stderr)
             self.assertFalse(marker.exists())
             config['import_endpoints'] = 'missing-private-path'

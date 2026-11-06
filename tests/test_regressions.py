@@ -187,12 +187,13 @@ class SubprocessTests(unittest.TestCase):
         self.plugin.do_run(obj)
         return obj
 
-    def test_envfile_migration_warns_only_on_first_client_use(self):
+    def test_explicit_policy_is_quiet_and_implicit_envfiles_warn_at_startup(self):
         logger = 'auton.plugins.subproc'
         with tempfile.TemporaryDirectory() as tmp:
             envfile = Path(tmp) / 'private-file'
             envfile.write_text('MIGRATION_FIXTURE=private-value\n')
-            config = {'prog': sys.executable, 'envfiles': [str(envfile)], 'disallow-envfiles': True}
+            config = {'prog': sys.executable, 'envfiles': [str(envfile)], 'disallow-envfiles': True,
+                      'allow-args': True, 'allow-env': True, 'allow-argfiles': True}
             self.plugin.config = {'config': config}
             self.addCleanup(EPTS_SYNC.pop, 'test', None)
             args = ['-c', 'import os; print(os.environ["MIGRATION_FIXTURE"])']
@@ -206,16 +207,14 @@ class SubprocessTests(unittest.TestCase):
             with self.assertLogs(logger, level='WARNING') as startup:
                 self.plugin.safe_init()
             self.assertEqual(len(startup.output), 1)
-            self.assertIn('AUTON_MIGRATION_ENVFILES_ALLOWED', startup.output[0])
-            with self.assertLogs(logger, level='WARNING') as use:
+            self.assertIn('AUTON_MIGRATION_CLIENT_POLICY', startup.output[0])
+            with self.assertNoLogs(logger, level='WARNING'):
                 for _ in range(2):
                     obj = job(Request({'args': args, 'envfiles': [str(envfile)]}))
                     self.plugin.do_run(obj)
                     self.assertEqual(''.join(obj.result).strip(), 'private-value')
-            self.assertEqual(len(use.output), 1)
-            self.assertIn('AUTON_MIGRATION_ENVFILES_USED', use.output[0])
-            self.assertNotIn(str(envfile), use.output[0])
-            self.assertNotIn('private-value', use.output[0])
+            self.assertNotIn(str(envfile), startup.output[0])
+            self.assertNotIn('private-value', startup.output[0])
 
     def test_client_arguments_are_literal_but_config_is_templated(self):
         values = {'_env_': {'SECRET': 'hidden'}, '_uid_': '123'}
@@ -297,6 +296,7 @@ class JobTests(unittest.TestCase):
         self.module.config = {'general': {'lock_timeout': 1}}
         self.module.safe_init(None)
         self.plugin = AutonSubProcPlugin('test')
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True})
         ENDPOINTS['test'] = self.plugin
         EPTS_SYNC['test'] = AutonEPTSync('test')
 

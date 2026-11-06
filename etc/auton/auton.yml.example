@@ -55,17 +55,26 @@ endpoints:
     plugin: subproc
     config:
       prog: ansible-playbook
+      allow-args: true
+      allow-env: true
+      allow-argfiles: true
       disallow-envfiles: true
       timeout: 3600
   si.corp-terraform:
     plugin: subproc
     config:
       prog: terraform
+      allow-args: true
+      allow-env: true
+      allow-argfiles: true
       disallow-envfiles: true
       timeout: 3600
   curl:
     plugin: subproc
     config:
       prog: curl
+      allow-args: true
+      allow-env: true
+      allow-argfiles: true
       disallow-envfiles: true
       timeout: 3600

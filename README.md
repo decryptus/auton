@@ -1328,6 +1328,13 @@ endpoints:
         - '-4'
 ```
 
+Client additions can be controlled per endpoint with `allow-args`, `allow-env`,
+`allow-argfiles` and `allow-envfiles`. Use `true` to allow a category, a name list
+for selective access, or argument/environment mappings for value rules.
+Explicit `disallow-*` rules take precedence. See the
+[client input policy and migration guide](docs/client-input-policy.md) for
+repeated options, regexes, file semantics and the 1.x / 2.0 default change.
+
 For subprocess endpoints, nonempty client fields blocked by a `disallow-*` setting
 are rejected with HTTP 400 before queueing. Empty fields remain valid.
 
