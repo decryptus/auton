@@ -1,7 +1,7 @@
 # Client input policy and migration
 
 These policies are introduced in the Auton 1.4.0 transition release. The default
-changes in Auton 2.0, available for isolated testing as 2.0.0rc2.
+changes in Auton 2.0, available for isolated testing as 2.0.0rc3.
 
 In the transition release, omitted `allow-*` settings retain the 1.x permissions
 and generate startup warnings for each affected endpoint/category. Warnings do
@@ -128,5 +128,5 @@ also remain in force.
 
 ## Reusing policy blocks
 
-The next release supports [six terminal YAML block imports](configuration-imports.md),
+Auton 1.5.0 and 2.0.0rc3 support [six terminal YAML block imports](configuration-imports.md),
 including imports inside `import_config`. Imported rules use the same policy syntax.

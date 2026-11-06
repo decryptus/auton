@@ -1,3 +1,9 @@
+auton (2.0.0rc3) prerelease; urgency=medium
+
+  * Add six reusable argument/environment YAML block imports.
+  * Reject recursive configuration imports and imports inside terminal blocks.
+  * Document declaring-file paths, block replacement and startup validation.
+
 auton (2.0.0rc2) prerelease; urgency=medium
 
   * Add explicit client input policies through Sonicprobe argpolicy.

@@ -9,6 +9,7 @@ Installation, configuration, public APIs and troubleshooting.
    :maxdepth: 1
    :caption: User guide and reference
 
+   release-2.0.0rc3
    release-2.0.0rc2
    client-input-policy
    configuration-imports

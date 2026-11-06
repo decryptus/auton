@@ -593,9 +593,11 @@ acceptance is not a production-capacity or long-duration stability guarantee.
 
 No new functional workstream is implied by completing this maintenance release.
 
-## Terminal configuration blocks (next release)
+## Terminal configuration blocks (1.5.0 / 2.0.0rc3)
 
 Implemented: six argument/environment block imports on endpoints or inside one
 imported configuration. Configuration-to-configuration and block-to-anything imports
 are rejected. Inline blocks replace imported blocks; imports are resolved before
-plugin initialization. Validation and registry publication are tracked by the delivery PR.
+plugin initialization. Validated locally and in the implementation PRs (#58 and #59), including real HTTP
+admission/execution. The release PRs verify installed packages and publish the
+versioned artifacts; registry and deployed metadata establish delivery.
