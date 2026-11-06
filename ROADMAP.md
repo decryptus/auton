@@ -592,3 +592,10 @@ acceptance is not a production-capacity or long-duration stability guarantee.
   service. The existing `mailto:auton@doowan.net` contact remains usable.
 
 No new functional workstream is implied by completing this maintenance release.
+
+## Terminal configuration blocks (next release)
+
+Implemented: six argument/environment block imports on endpoints or inside one
+imported configuration. Configuration-to-configuration and block-to-anything imports
+are rejected. Inline blocks replace imported blocks; imports are resolved before
+plugin initialization. Validation and registry publication are tracked by the delivery PR.
