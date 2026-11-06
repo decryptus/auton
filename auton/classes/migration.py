@@ -1,11 +1,11 @@
-"""Read-only checks for configurations migrating from 1.x to 2.0."""
+"""Read-only checks for the two planned 2.0 default changes."""
 from pathlib import Path
 
 from auton.classes.client_policy import ClientPolicy, migration_categories
 
 from auton.classes.authentication import AUTH_MODES
 from auton.classes.configuration_schema import validate_configuration
-from auton.classes.endpoint_imports import load_endpoint_imports, read_mapping
+from auton.classes.endpoint_imports import BLOCK_IMPORTS, load_endpoint_imports, read_mapping
 from auton.classes.exceptions import AutonConfigurationError
 
 
@@ -29,7 +29,8 @@ def migration_findings(filename):
         config = endpoint.get('config', {})
         ClientPolicy(config)  # Compile explicit rules without opening files or running templates.
         categories = migration_categories(config)
-        if categories and endpoint.get('import_config'):
+        if categories and (endpoint.get('import_config') or any(
+                key in endpoint or key in config for key in BLOCK_IMPORTS)):
             findings.append('REVIEW %r: imported component may determine client policies. '
                             'Check the effective startup warnings.' % name)
         for field in categories:

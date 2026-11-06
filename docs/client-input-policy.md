@@ -125,3 +125,8 @@ whole; Auton never silently drops a forbidden option or variable. Policy errors
 identify the option/category without echoing its value. A policy validates
 strings up to 64 KiB without NUL bytes; the normal request size/count limits
 also remain in force.
+
+## Reusing policy blocks
+
+The next release supports [six terminal YAML block imports](configuration-imports.md),
+including imports inside `import_config`. Imported rules use the same policy syntax.

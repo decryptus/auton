@@ -13,7 +13,12 @@ MAX_ENDPOINT_IMPORT_FILES = 32
 MAX_ENDPOINT_IMPORT_BYTES = 1048576
 MAX_IMPORTED_ENDPOINTS = 1024
 COMPONENT_SECTIONS = ('vars', 'config', 'users')
-IMPORT_FIELDS = frozenset(('import_endpoints', 'import_modules', 'import_config', 'import_vars', 'import_users'))
+BLOCK_IMPORTS = {
+    'import_args': 'args', 'import_env': 'env',
+    'import_allow_args': 'allow-args', 'import_disallow_args': 'disallow-args',
+    'import_allow_env': 'allow-env', 'import_disallow_env': 'disallow-env',
+}
+IMPORT_FIELDS = frozenset(('import_endpoints', 'import_modules', 'import_config', 'import_vars', 'import_users')) | frozenset(BLOCK_IMPORTS)
 TEMPLATE_IMPORTS = ('from os import environ as ENV', 'from sonicprobe.helpers import to_yaml as my')
 
 
@@ -40,7 +45,7 @@ def local_path(value, directory):
     return (Path(directory or os.getcwd()) / value).resolve()
 
 
-def read_mapping(path, budget=None, context=None):
+def read_document(path, budget=None, context=None):
     try:
         limit = MAX_ENDPOINT_IMPORT_BYTES if budget is None else budget[0]
         with path.open('rb') as stream:
@@ -55,12 +60,17 @@ def read_mapping(path, budget=None, context=None):
             if len(source.encode('utf-8')) > MAX_ENDPOINT_IMPORT_BYTES:
                 raise ValueError('rendered component exceeds byte limit')
         data = yaml.load(source, Loader=EndpointLoader)
-        if not isinstance(data, dict):
-            raise ValueError('expected a mapping')
         return data
     except Exception:
         # Do not print YAML values or template exceptions: these may contain secrets.
-        raise AutonConfigurationError('unable to load mapping from %s (missing, invalid, duplicate keys or too large)' % path) from None
+        raise AutonConfigurationError('unable to load YAML from %s (missing, invalid, duplicate keys or too large)' % path) from None
+
+
+def read_mapping(path, budget=None, context=None):
+    data = read_document(path, budget, context)
+    if not isinstance(data, dict):
+        raise AutonConfigurationError('expected a mapping in %s' % path)
+    return data
 
 
 def load_endpoint_imports(conf):
@@ -94,7 +104,7 @@ def load_endpoint_imports(conf):
             for section in COMPONENT_SECTIONS:
                 if section in definition and not isinstance(definition[section], dict):
                     raise AutonConfigurationError('invalid %s mapping in %s, endpoint %r' % (section, path, name))
-            if set(definition) & (IMPORT_FIELDS - {'import_config', 'import_vars', 'import_users'}):
+            if set(definition) & (IMPORT_FIELDS - {'import_config', 'import_vars', 'import_users'} - BLOCK_IMPORTS.keys()):
                 raise AutonConfigurationError('nested endpoint/module import in %s, endpoint %r' % (path, name))
             definitions[name] = definition
             sources[name] = str(path)
@@ -103,10 +113,10 @@ def load_endpoint_imports(conf):
     return definitions, sources
 
 
-def load_component(filename, source, context):
+def load_component(filename, source, context, allowed_imports=()):
     """A terminal component relative to the endpoint catalogue declaring it."""
     path = local_path(filename, Path(source).parent)
     data = read_mapping(path, context=context)
-    if set(data) & IMPORT_FIELDS:
+    if set(data) & (IMPORT_FIELDS - set(allowed_imports)):
         raise AutonConfigurationError('component cannot import another section: %s (endpoint catalogue %s)' % (path, source))
     return data

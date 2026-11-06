@@ -29,6 +29,7 @@ from auton.classes.auth_audit import audit_config
 from auton.classes.web import configure_web
 from auton.classes.plugins import ENDPOINTS, PLUGINS
 from auton.classes.endpoint_imports import load_endpoint_imports, load_component, COMPONENT_SECTIONS
+from auton.classes.config_imports import load_config
 
 _TPL_IMPORTS = ('from os import environ as ENV',
                 'from sonicprobe.helpers import to_yaml as my')
@@ -139,6 +140,10 @@ def load_conf(xfile, options = None, envvar = None):
         cfg['auton']['plugin_name'] = ept_cfg['plugin']
 
         for x in COMPONENT_SECTIONS:
+            if x == 'config':
+                declaring_file = source or os.path.join(config_dir or os.getcwd(), 'auton.yml')
+                cfg[x] = load_config(ept_cfg, declaring_file, cfg)
+                continue
             key = 'import_' + x
             if source and key in ept_cfg:
                 cfg[x].update(load_component(ept_cfg[key], source, cfg))

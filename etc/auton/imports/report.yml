@@ -1,0 +1,9 @@
+prog: /opt/scripts/report.sh
+import_args: args.yml
+import_env: env.yml
+import_allow_args: allow-args.yml
+import_disallow_args: disallow-args.yml
+import_allow_env: allow-env.yml
+import_disallow_env: disallow-env.yml
+disallow-argfiles: true
+disallow-envfiles: true
