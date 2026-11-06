@@ -37,6 +37,12 @@ discovery?: %s
 import_config*: !!str
 import_users*: !!str
 import_vars*: !!str
+import_args*: !!str
+import_env*: !!str
+import_allow_args*: !!str
+import_disallow_args*: !!str
+import_allow_env*: !!str
+import_disallow_env*: !!str
 ''' % (MAPPING, MAPPING, MAPPING, MAPPING))
 
 

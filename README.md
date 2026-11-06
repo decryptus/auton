@@ -964,9 +964,10 @@ independently of the working directory. Absolute local paths are also accepted.
 A single filename or a list is accepted by `import_endpoints`.
 
 Endpoint catalogues cannot import other catalogues. Their endpoints may use
-`import_vars`, `import_config` and `import_users`; these component files are
-terminal mappings and cannot declare further imports. Components may be shared by
-several endpoints. Processing order is vars, config, users; values written inline
+`import_vars`, `import_config` and `import_users`. Variables and users are terminal
+mappings. An imported configuration may load the six terminal argument/environment
+blocks described below, but cannot import another configuration. Components may
+be shared by several endpoints. Processing order is vars, config, users; values written inline
 in each component section override that section's imported values, as before.
 
 Catalogues are plain YAML. Components retain Mako templating and access to the
@@ -977,7 +978,7 @@ untrusted clients. Imports do not change daemon authentication or endpoint ACLs.
 Duplicate endpoint names, repeated catalogue files (including symlinks), duplicate
 YAML keys, missing files, malformed mappings and nested imports fail startup.
 New imported files do not support YAML merge keys or custom include tags, or remote
-URLs. Existing inline endpoints retain their historical component import behavior.
+URLs. Configuration imports follow these rules for both inline and imported endpoints.
 Limits: 32 catalogue files, 1 MiB combined catalogue source and 1,024 imported
 endpoints; each component source and rendered output is limited to 1 MiB.
 All endpoint components are prepared before endpoint instances are initialized.
@@ -1947,3 +1948,36 @@ auton --tui --tui-ui textual -c inventory.yml
 
 See the [Textual guide](docs/textual.md) for navigation and supported operations.
 The existing curses interface remains available. Screenshots use synthetic data.
+
+
+### Import argument and environment blocks
+
+The next release adds `import_args`, `import_env`, `import_allow_args`,
+`import_disallow_args`, `import_allow_env` and `import_disallow_env`.
+Declare them on an endpoint, in its `config`, or inside its `import_config` file.
+Several different block imports may coexist. Each accepts one local YAML filename.
+See [the complete guide](docs/configuration-imports.md) and
+[the reusable example](etc/auton/imports/report.yml).
+
+```yaml
+endpoints:
+  report:
+    plugin: subproc
+    import_config: imports/report.yml
+```
+
+```yaml
+# imports/report.yml
+prog: /opt/scripts/report.sh
+import_args: args.yml
+import_env: env.yml
+import_allow_args: allow-args.yml
+import_disallow_args: disallow-args.yml
+import_allow_env: allow-env.yml
+import_disallow_env: disallow-env.yml
+```
+
+Only downward imports are allowed: configuration → terminal blocks. A configuration
+cannot import another configuration, and a block cannot contain another import.
+Paths are relative to the file declaring each import. Inline values replace the
+whole imported block; lists are not concatenated and allowlists are not combined.

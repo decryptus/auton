@@ -11,6 +11,7 @@ Installation, configuration, public APIs and troubleshooting.
 
    release-2.0.0rc2
    client-input-policy
+   configuration-imports
    configuration-validation
    textual
    release-2.0.0rc1
