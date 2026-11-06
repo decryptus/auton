@@ -3,7 +3,7 @@ httpdis>=0.6.39
 pycurl
 python-dotenv
 PyYAML>=3.10
-sonicprobe @ https://github.com/decryptus/sonicprobe/archive/488e5b675122bc9ba133a8585a87d23f6ce5bf4a.tar.gz
+sonicprobe @ https://github.com/decryptus/sonicprobe/archive/20a39b4fb9acdf3f9ca55f46f13a8d7000c284da.tar.gz
 requests>=2.0
 six>=1.13.0
 pyasyncore>=1.0.2; python_version >= '3.12'
