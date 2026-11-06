@@ -28,12 +28,14 @@ commands above obtain the published image.
 
 ## Migrating toward 2.0
 
-Version 1.4.0 adds explicit client input policies and startup migration warnings.
+Version 1.5.0 adds reusable YAML imports for arguments, environment and client policies.
+An imported configuration may load all six blocks; blocks cannot import further files.
+Explicit client policies and startup migration warnings remain available.
 Existing implicit 1.x permissions remain enabled. Declare the required
 `allow-args`, `allow-env`, `allow-argfiles` and `allow-envfiles` before moving to
 2.0, which denies those additions by default. See the
 [migration guide](https://auton.run/docs/client-input-policy.html).
-The 2.0.0rc2 image is a separate prerelease for isolated tests.
+The 2.0.0rc3 image is a separate prerelease for isolated tests.
 
 ## Capabilities
 

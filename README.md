@@ -23,13 +23,13 @@ server is required.
 
 ## Quickstart
 
-This quickstart uses **Auton 1.4.0**, including SQLite authentication, durable
+This quickstart uses **Auton 1.5.0**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.4.0
+git checkout v1.5.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -101,7 +101,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.4.0
+python -m pip install auton==1.5.0
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -984,7 +984,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.4.0`, or use the Docker image, which includes the authentication
+`autond[auth]==1.5.0`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
@@ -1947,7 +1947,7 @@ The existing curses interface remains available. Screenshots use synthetic data.
 
 ### Import argument and environment blocks
 
-The next release adds `import_args`, `import_env`, `import_allow_args`,
+Auton 1.5.0 and 2.0.0rc3 add `import_args`, `import_env`, `import_allow_args`,
 `import_disallow_args`, `import_allow_env` and `import_disallow_env`.
 Declare them on an endpoint, in its `config`, or inside its `import_config` file.
 Several different block imports may coexist. Each accepts one local YAML filename.
