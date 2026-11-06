@@ -23,13 +23,13 @@ server is required.
 
 ## Quickstart
 
-This quickstart uses **Auton 1.3.7**, including SQLite authentication, durable
+This quickstart uses **Auton 1.4.0**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.3.7
+git checkout v1.4.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -101,7 +101,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.3.7
+python -m pip install auton==1.4.0
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -983,7 +983,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.3.7`, or use the Docker image, which includes the authentication
+`autond[auth]==1.4.0`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 
@@ -1327,6 +1327,13 @@ endpoints:
         - '-s'
         - '-4'
 ```
+
+Client additions can be controlled per endpoint with `allow-args`, `allow-env`,
+`allow-argfiles` and `allow-envfiles`. Use `true` to allow a category, a name list
+for selective access, or argument/environment mappings for value rules.
+Explicit `disallow-*` rules take precedence. See the
+[client input policy and migration guide](docs/client-input-policy.md) for
+repeated options, regexes, file semantics and the 1.x / 2.0 default change.
 
 For subprocess endpoints, nonempty client fields blocked by a `disallow-*` setting
 are rejected with HTTP 400 before queueing. Empty fields remain valid.
