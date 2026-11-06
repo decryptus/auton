@@ -9,6 +9,7 @@ Installation, configuration, public APIs and troubleshooting.
    :maxdepth: 1
    :caption: User guide and reference
 
+   client-input-policy
    configuration-validation
    textual
    release-2.0.0rc1

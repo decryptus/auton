@@ -20,10 +20,10 @@ class MigrationHTTPTests(unittest.TestCase):
         fixed.write_text('FIXED=one\n')
         optional.write_text('OPTIONAL=two\n')
         config['endpoints']['diagnostic']['config'] = {
-            'prog': sys.executable,
+            'prog': sys.executable, 'allow-args': True, 'allow-env': True,
             'args': ['-c', 'import os; print(os.environ["FIXED"], os.environ.get("OPTIONAL", "absent"))'],
             'envfiles': [str(fixed)], 'disallow-envfiles': False,
-            'allow-client-envfiles': [str(optional)],
+            'allow-envfiles': [str(optional)],
         }
         config_path.write_text(yaml.safe_dump(config))
         daemon.start()

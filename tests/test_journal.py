@@ -112,7 +112,7 @@ class JournalTests(unittest.TestCase):
                 path = Path(tmp) / 'jobs.jsonl'
                 plugin = AutonSubProcPlugin('journal-test')
                 plugin.users = {'alice': True}
-                plugin.target = AutonTarget(plugin.name, {'prog': sys.executable, 'timeout': 0.2})
+                plugin.target = AutonTarget(plugin.name, {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 0.2})
                 queue = AutonEPTSync(plugin.name)
                 EPTS_SYNC[plugin.name] = queue
                 service = JobService({plugin.name: plugin}, {plugin.name: queue}, journal=JSONLJournal(str(path)))

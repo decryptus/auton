@@ -46,14 +46,14 @@ class HTTPIntegrationTests(unittest.TestCase):
                     config.pop('import_modules', None)
                     config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
                     config['endpoints'] = {'test': {'plugin': 'subproc', 'config': {
-                        'prog': sys.executable, 'timeout': 2}}}
+                        'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2}}}
                     if name == 'two':
                         catalogue = Path(tmp) / 'endpoints'
                         catalogue.mkdir()
                         (catalogue / 'catalogue.yml').write_text(yaml.safe_dump({'test': {
                             'plugin': 'subproc', 'import_config': 'config.yml',
                             'import_vars': 'vars.yml', 'import_users': 'users.yml'}}))
-                        (catalogue / 'config.yml').write_text("prog: ${vars['python']}\ntimeout: 2\n")
+                        (catalogue / 'config.yml').write_text("prog: ${vars['python']}\nallow-args: true\ntimeout: 2\n")
                         (catalogue / 'vars.yml').write_text(yaml.safe_dump({'python': sys.executable}))
                         (catalogue / 'users.yml').write_text('alice: true\nbob: false\n')
                         config.pop('endpoints')
@@ -395,7 +395,7 @@ class HTTPIntegrationTests(unittest.TestCase):
                 auth = ('alice', 'secret')
                 auth_args = ['--auth-user', 'alice', '--auth-passwd', 'secret']
             config['endpoints'] = {'test': {'plugin': 'subproc', 'config': {
-                'prog': sys.executable, 'timeout': 2}}}
+                'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2}}}
             conf = Path(tmp) / 'auton.yml'
             conf.write_text(yaml.safe_dump(config))
             env = dict(os.environ, PYTHONPATH=str(ROOT))

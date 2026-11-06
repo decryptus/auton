@@ -1330,6 +1330,13 @@ endpoints:
         - '-4'
 ```
 
+Client additions can be controlled per endpoint with `allow-args`, `allow-env`,
+`allow-argfiles` and `allow-envfiles`. Use `true` to allow a category, a name list
+for selective access, or argument/environment mappings for value rules.
+Explicit `disallow-*` rules take precedence. See the
+[client input policy and migration guide](docs/client-input-policy.md) for
+repeated options, regexes, file semantics and the 1.x / 2.0 default change.
+
 For subprocess endpoints, nonempty client fields blocked by a `disallow-*` setting
 are rejected with HTTP 400 before queueing. Empty fields remain valid.
 
@@ -1414,7 +1421,7 @@ endpoints:
 
 Starting with 2.0.0rc1, the daemon rejects client-selected environment files by
 default. To let clients select a file, list its exact absolute server path in
-`allow-client-envfiles` on that endpoint. Fixed server-side `envfiles` work in
+`allow-envfiles` on that endpoint, and authorize its variables with `allow-env`. Fixed server-side `envfiles` work in
 either case. The following example explicitly disables client selection:
 ```yaml
 endpoints:

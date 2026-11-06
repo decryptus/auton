@@ -214,7 +214,7 @@ class JobStorageTests(unittest.TestCase):
                 store = SQLiteJobStore(path)
                 plugin = AutonSubProcPlugin('test')
                 plugin.users = {'alice': True}
-                plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': 2})
+                plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
                 queue = AutonEPTSync('test')
                 EPTS_SYNC['test'] = queue
                 service = JobService({'test': plugin}, {'test': queue}, store=store)
@@ -296,7 +296,7 @@ class DurableDaemonTests(unittest.TestCase):
             cfg.pop('import_modules', None)
             cfg['modules'] = yaml.safe_load((root / 'etc/auton/modules/job.yml').read_text())
             cfg['endpoints'] = {'test': {'plugin': 'subproc', 'users': {'alice': True},
-                                       'config': {'prog': sys.executable, 'timeout': 40}}}
+                                       'config': {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 40}}}
             conf = tmp / 'auton.yml'
             conf.write_text(yaml.safe_dump(cfg))
             uri, auth = 'http://127.0.0.1:%s' % port, ('alice', 'secret')

@@ -272,6 +272,9 @@ class JobService(object):
                 validate_payload = getattr(plugin, 'validate_run_payload', None)
                 if method == 'run' and validate_payload:
                     validate_payload(payload)
+                prepare_payload = getattr(plugin, 'prepare_run_payload', None)
+                if method == 'run' and prepare_payload:
+                    payload = prepare_payload(payload)
                 validate_arguments(getattr(plugin, 'discovery', {}).get('parameters'), payload)
                 if self.persistence_failed:
                     raise JobUnavailable('job storage unavailable; new admissions disabled until restart')

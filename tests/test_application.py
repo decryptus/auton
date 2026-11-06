@@ -253,7 +253,7 @@ class CompatibilityTests(unittest.TestCase):
     def test_worker_executes_neutral_object_and_rechecks_acl(self):
         plugin = AutonSubProcPlugin('boundary-test')
         plugin.users = {'alice': True}
-        plugin.target = AutonTarget('boundary-test', {'prog': sys.executable, 'timeout': 2})
+        plugin.target = AutonTarget('boundary-test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
         queue = AutonEPTSync('boundary-test')
         EPTS_SYNC[plugin.name] = queue
         done = threading.Event()

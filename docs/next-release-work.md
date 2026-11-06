@@ -127,3 +127,19 @@ delivery record; candidate captures alone do not establish publication. No froze
 PNGs are committed. See the current [roadmap](https://github.com/decryptus/auton/blob/master/ROADMAP.md)
 and release notes for later changes. The contact form remains outside this scope;
 the existing email link does not require a form delivery service.
+
+## Client policy candidate (6 November 2026)
+
+Implemented for review: Sonicprobe argpolicy, per-category client permissions,
+regex/choice rules, repeatability and arity, validated envfile snapshots,
+startup/offline migration warnings and the 2.0 default-deny change.
+See [the user migration guide](client-input-policy.md).
+
+Delivery is pending: Sonicprobe PR #24 and cross-version CI, a new immutable
+Sonicprobe registry release, replacement of the exact candidate source dependency
+with that released minimum, transition/2.0 PR review, a refreshed 2.0 candidate
+and migration acceptance. The existing stable release, published Docker images,
+website and demos remain unchanged until those release gates pass. Do not
+publish packages containing the temporary source dependency or treat the earlier
+RC acceptance as validation of these new defaults. No UI or screenshot design
+changes are part of this implementation.
