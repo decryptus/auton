@@ -1,7 +1,7 @@
 # Auton Roadmap
 
 Status: active product roadmap  
-Updated: 2026-11-04
+Updated: 2026-11-06
 
 The 1.0–1.3 feature baseline is delivered. Version 1.3.7 adds an [offline migration check](docs/release-1.3.7.md). Version 1.3.6 adds [2.0 migration warnings](docs/release-1.3.6.md). Version 1.3.5 adds a [request body read deadline](docs/release-1.3.5.md). Version 1.3.4 adds [daemon and HTTP hardening](docs/release-1.3.4.md). Version 1.3.3 includes the bounded
 OIDC exchange fix from 1.3.2, shared terminal primitives and corrected executable
@@ -539,6 +539,19 @@ Before a future major stable release:
 - keep transport, application logic and presentation separated.
 
 ## Current priorities
+
+Client input policy is implemented for review in [transition PR #56](https://github.com/decryptus/auton/pull/56)
+and [2.0 PR #57](https://github.com/decryptus/auton/pull/57), using
+[Sonicprobe argpolicy PR #24](https://github.com/decryptus/sonicprobe/pull/24).
+It supports per-category allow/deny rules, regex/choice validation, repeated
+options, fixed/variable arity and validated envfile snapshots. The transition
+preserves implicit 1.x permissions with warnings; 2.0 denies implicit additions.
+See the [user migration guide](docs/client-input-policy.md).
+
+This work is **not released**. Publication requires a new Sonicprobe package,
+replacement of the candidate source pin, the transition release, a refreshed 2.0
+RC and migration acceptance. The earlier RC does not qualify the new defaults.
+
 
 The original 1.2.0 scope is complete and published: report reconciliation, guided
 parameters, owner-authorized cancellation, detached workers, explicit error
