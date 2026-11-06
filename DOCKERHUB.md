@@ -26,6 +26,17 @@ commands above obtain the published image.
 - [Source and versioned examples](https://github.com/decryptus/auton/tree/v{{version}})
 - [Release notes](https://github.com/decryptus/auton/releases/tag/v{{version}})
 
+## Migrating toward 2.0
+
+Version 1.5.0 adds reusable YAML imports for arguments, environment and client policies.
+An imported configuration may load all six blocks; blocks cannot import further files.
+Explicit client policies and startup migration warnings remain available.
+Existing implicit 1.x permissions remain enabled. Declare the required
+`allow-args`, `allow-env`, `allow-argfiles` and `allow-envfiles` before moving to
+2.0, which denies those additions by default. See the
+[migration guide](https://auton.run/docs/client-input-policy.html).
+The 2.0.0rc3 image is a separate prerelease for isolated tests.
+
 ## Capabilities
 
 - Authenticated job execution with endpoint permissions, deadlines and bounded output.

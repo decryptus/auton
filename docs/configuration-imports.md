@@ -1,6 +1,6 @@
 # Reusable argument and environment blocks
 
-Available in the next release; not in 1.4.0 or 2.0.0rc2.
+Available since Auton 1.5.0 and 2.0.0rc3.
 
 An endpoint can declare `import_config` and any combination of these six imports:
 
