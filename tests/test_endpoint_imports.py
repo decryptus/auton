@@ -136,11 +136,14 @@ class Block(importlib.abc.MetaPathFinder):
             raise AssertionError(fullname)
 sys.meta_path.insert(0, Block())
 from auton.classes.endpoint_imports import load_endpoint_imports
+from auton.classes.config_imports import load_config
 with tempfile.TemporaryDirectory() as tmp:
     Path(tmp, 'endpoints.yml').write_text('test: {plugin: subproc}')
     definitions, sources = load_endpoint_imports({'_config_directory': tmp, 'import_endpoints': 'endpoints.yml'})
     assert definitions['test']['plugin'] == 'subproc'
     assert sources['test'] == str(Path(tmp, 'endpoints.yml'))
+    Path(tmp, 'args.yml').write_text('[fixed]')
+    assert load_config({'import_args': 'args.yml'}, Path(tmp, 'main.yml'), {}) == {'args': ['fixed']}
 '''
         result = subprocess.run([sys.executable, '-c', script], cwd=ROOT,
                                 capture_output=True, text=True, timeout=10)

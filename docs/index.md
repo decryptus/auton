@@ -11,6 +11,7 @@ Installation, configuration, public APIs and troubleshooting.
 
    release-1.4.0
    client-input-policy
+   configuration-imports
    configuration-validation
    textual
    release-1.3.7
