@@ -1,6 +1,6 @@
 # Auton
 
-1.5.2 uses HTTPdis 0.7.1 or later for the daemon.
+1.5.3 restricts the example subprocess endpoints to fixed version checks.
 
 
 Auton runs explicitly configured jobs on remote servers through an authenticated

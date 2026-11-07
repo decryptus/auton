@@ -51,30 +51,37 @@ general:
 import_modules:
   - modules/job.yml
 endpoints:
+  # Install your report script before enabling this selective policy.
+  # report:
+  #   plugin: subproc
+  #   import_config: imports/report.yml
   si.corp-ansible:
     plugin: subproc
     config:
       prog: ansible-playbook
-      allow-args: true
-      allow-env: true
-      allow-argfiles: true
+      args: [--version]
+      disallow-args: true
+      disallow-env: true
+      disallow-argfiles: true
       disallow-envfiles: true
-      timeout: 3600
+      timeout: 10
   si.corp-terraform:
     plugin: subproc
     config:
       prog: terraform
-      allow-args: true
-      allow-env: true
-      allow-argfiles: true
+      args: [version]
+      disallow-args: true
+      disallow-env: true
+      disallow-argfiles: true
       disallow-envfiles: true
-      timeout: 3600
+      timeout: 10
   curl:
     plugin: subproc
     config:
       prog: curl
-      allow-args: true
-      allow-env: true
-      allow-argfiles: true
+      args: [--disable, --version]
+      disallow-args: true
+      disallow-env: true
+      disallow-argfiles: true
       disallow-envfiles: true
-      timeout: 3600
+      timeout: 10
