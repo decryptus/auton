@@ -70,7 +70,15 @@ def history_config(general, directory=None):
 
 def snapshot(obj):
     with obj.output_lock:
-        return copy.deepcopy({field: getattr(obj, field) for field in SNAPSHOT_FIELDS})
+        record = {field: getattr(obj, field) for field in SNAPSHOT_FIELDS}
+        if hasattr(obj, 'storage_id'):
+            record['storage_id'] = obj.storage_id
+        return copy.deepcopy(record)
+
+
+def storage_key(record):
+    """Older snapshots use their public UID. New execution UUIDs contain no colon."""
+    return record.get('storage_id', record['uid'])
 
 
 def restore(record, max_output_bytes):
@@ -84,11 +92,14 @@ def restore(record, max_output_bytes):
 
 
 def validate_snapshot(record, max_output_bytes):
-    if not isinstance(record, dict) or set(record) != SNAPSHOT_FIELDS:
+    if not isinstance(record, dict) or set(record) - {'storage_id'} != SNAPSHOT_FIELDS:
         raise ValueError('invalid job snapshot fields')
     for name in ('uid', 'endpoint', 'execution_id'):
         if not isinstance(record[name], str) or not record[name] or len(record[name]) > 1024:
             raise ValueError('invalid job identity')
+    if 'storage_id' in record and (record['storage_id'] != record['execution_id']
+                                   or ':' in record['storage_id']):
+        raise ValueError('invalid job storage identity')
     if not record['uid'].startswith(record['endpoint'] + ':'):
         raise ValueError('inconsistent job identity')
     if record['owner'] is not None and (not isinstance(record['owner'], str) or len(record['owner']) > 1024):
@@ -228,7 +239,7 @@ class SQLiteJobStore:
         with self._transaction() as cursor:
             data = self._encode(record)
             self._query(cursor, 'INSERT OR REPLACE INTO jobs(uid, status, ended_at, record) VALUES (?, ?, ?, ?)',
-                        (record['uid'], record['status'], record['ended_at'], data))
+                        (storage_key(record), record['status'], record['ended_at'], data))
 
     def delete(self, uid):
         with self._transaction() as cursor:
@@ -249,7 +260,7 @@ class SQLiteJobStore:
             for uid, status, ended_at, data in rows:
                 record = json.loads(data)
                 self._validate(record)
-                if (uid, status, ended_at) != (record['uid'], record['status'], record['ended_at']):
+                if (uid, status, ended_at) != (storage_key(record), record['status'], record['ended_at']):
                     raise ValueError('inconsistent stored job')
                 if status != STATUS_COMPLETE:
                     uncertain = status == STATUS_PROCESSING

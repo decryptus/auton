@@ -56,7 +56,7 @@ class CancellationTests(unittest.TestCase):
         self.daemon.auth.provision('other', 'fixture-password-only', ['read', 'run', 'cancel'])
         other = self.daemon.auth.issue_token('other', ['cancel'], 60).secret
         self.assertEqual(self.request('/cancel/diagnostic/private-job', {},
-            {'Authorization': 'Bearer ' + other}).status_code, 403)
+            {'Authorization': 'Bearer ' + other}).status_code, 404)
         self.assertFalse(self.request('/jobs/diagnostic/private-job').json()['cancel_requested'])
 
     def test_running_process_and_child_are_stopped_before_completion(self):

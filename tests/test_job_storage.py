@@ -63,7 +63,7 @@ class JobStorageTests(unittest.TestCase):
         store = self.store()
         service = self.service(store)
         service.submit('test', 'one', {'env': {'SECRET': 'not-stored'}}, 'alice', 0)
-        obj = service.objs['test:one']
+        obj = service.get_object('test', 'one', 'alice')
         with service.availability.launch(obj):
             obj.add_result('first\n')
             obj.add_result('second é\n')
@@ -76,11 +76,11 @@ class JobStorageTests(unittest.TestCase):
         self.assertEqual(detail['stream'], ['second é\n'])
         self.assertEqual(detail['errors'], ['stderr\n'])
         self.assertEqual(detail['return_code'], 0)
-        self.assertEqual(restored.objs['test:one'].execution_id, obj.execution_id)
-        self.assertIsNone(restored.objs['test:one'].payload)
-        self.assertEqual(restored.objs['test:one'].vars, {})
+        self.assertEqual(restored.get_object('test', 'one', 'alice').execution_id, obj.execution_id)
+        self.assertIsNone(restored.get_object('test', 'one', 'alice').payload)
+        self.assertEqual(restored.get_object('test', 'one', 'alice').vars, {})
         self.assertTrue(restored.queues['test'].queue.empty())
-        with self.assertRaises(AccessDenied):
+        with self.assertRaises(UnknownJob):
             restored.detail('test', 'one', 'bob')
         restored.endpoints['test'].users = {'alice': False}
         self.assertEqual(restored.list_jobs('alice'), [])
@@ -90,13 +90,33 @@ class JobStorageTests(unittest.TestCase):
         with self.assertRaises(UnknownEndpoint):
             restored.detail('test', 'one', 'alice')
 
+    def test_same_id_recovers_each_owner_and_legacy_snapshot(self):
+        store = self.store()
+        service = self.service(store)
+        service.submit('test', 'one', {}, 'alice')
+        alice = service.get_object('test', 'one', 'alice')
+        alice.add_result('private')
+        self.complete(alice)
+        # Rewrite one completed row using the pre-upgrade snapshot format.
+        legacy = snapshot(alice)
+        store.delete(legacy.pop('storage_id'))
+        store.save(legacy)
+        store.close()
+        store = self.store()
+        service = self.service(store)
+        service.submit('test', 'one', {}, 'bob')
+        store.close()
+        recovered = self.service(self.store())
+        self.assertEqual(recovered.detail('test', 'one', 'alice')['stream'], ['private'])
+        self.assertEqual(recovered.detail('test', 'one', 'bob')['outcome'], 'job.interrupted')
+
     def test_restart_marks_unfinished_jobs_terminal_and_never_enqueues(self):
         store = self.store()
         service = self.service(store)
         for xid in ('queued', 'running'):
             service.submit('test', xid, {}, 'alice', 0)
-        with service.availability.launch(service.objs['test:running']):
-            service.objs['test:running'].add_result('not checkpointed')
+        with service.availability.launch(service.get_object('test', 'running', 'alice')):
+            service.get_object('test', 'running', 'alice').add_result('not checkpointed')
         store.close()
         store = self.store()
         restored = self.service(store)
@@ -116,22 +136,22 @@ class JobStorageTests(unittest.TestCase):
         store = self.store()
         service = self.service(store, clock=lambda: 100, result_ttl=10, max_jobs=2)
         service.submit('test', 'old', {}, 'alice')
-        self.complete(service.objs['test:old'], 89)
+        self.complete(service.get_object('test', 'old', 'alice'), 89)
         service.submit('test', 'one', {}, 'alice')
-        self.complete(service.objs['test:one'], 95)
+        self.complete(service.get_object('test', 'one', 'alice'), 95)
         service.submit('test', 'two', {}, 'alice')
-        self.complete(service.objs['test:two'], 96)
+        self.complete(service.get_object('test', 'two', 'alice'), 96)
         service.submit('test', 'three', {}, 'alice')
-        self.assertEqual(set(service.objs), {'test:two', 'test:three'})
+        self.assertEqual({obj.uid for obj in service.objs.values()}, {'test:two', 'test:three'})
         store.close()
         restored = self.service(self.store(), clock=lambda: 100, result_ttl=10, max_jobs=1)
-        self.assertEqual(set(restored.objs), {'test:three'})
+        self.assertEqual({obj.uid for obj in restored.objs.values()}, {'test:three'})
 
     def test_delete_waits_for_final_write_and_cannot_resurrect_history(self):
         store = self.store()
         service = self.service(store, clock=lambda: 100, result_ttl=10)
         service.submit('test', 'one', {}, 'alice')
-        obj = service.objs['test:one']
+        obj = service.get_object('test', 'one', 'alice')
         entered, release, deleted = threading.Event(), threading.Event(), threading.Event()
         save = store.save
         def paused(record):
@@ -237,7 +257,7 @@ class JobStorageTests(unittest.TestCase):
                             self.assertTrue(queue.queue.empty())
                         else:
                             service.submit('test', 'one', payload, 'alice', 0)
-                            obj = service.objs['test:one']
+                            obj = service.get_object('test', 'one', 'alice')
                             obj.callback = lambda _: done.set()
                             plugin.start()
                             self.assertTrue(done.wait(3))
@@ -287,7 +307,7 @@ class DurableDaemonTests(unittest.TestCase):
                 sock.bind(('127.0.0.1', 0))
                 port = sock.getsockname()[1]
             passwd = tmp / 'htpasswd'
-            passwd.write_text('alice:{SHA}' + base64.b64encode(hashlib.sha1(b'secret').digest()).decode() + '\n')
+            passwd.write_text('alice:$6$autonfixture$Wpm5.8BMz7jSqok1oQAavF70jbYUx2iPxICzAQAWbeKjQvh2CvJYo1ARap116rl/03d.yhLZY9JZ./RCzidJb1' + '\n')
             cfg = yaml.safe_load((root / 'etc/auton/auton.yml.example').read_text())
             cfg['general'].update(listen_addr='127.0.0.1', listen_port=port,
                                   max_life_time=0, max_requests=0, auth_basic='Test',
