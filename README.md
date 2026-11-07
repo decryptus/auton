@@ -23,13 +23,13 @@ server is required.
 
 ## Quickstart
 
-This quickstart uses **Auton 1.5.0**, including SQLite authentication, durable
+This quickstart uses **Auton 1.5.1**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.5.0
+git checkout v1.5.1
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -101,7 +101,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.5.0
+python -m pip install auton==1.5.1
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -179,8 +179,15 @@ Limits in `general`:
 | Setting | Default | Behavior |
 | --- | --- | --- |
 | `result_ttl` | 3600 seconds | Completed results expire; cleanup occurs on subsequent run/status requests. |
+| `max_jobs_per_user` | Half of `max_jobs`, rounded up | Caps queued and running jobs per principal across endpoints. Anonymous requests share one quota. Excess submissions receive HTTP 429. |
 | `max_jobs` | 128 | Caps queued, running and retained jobs together. Oldest completed results are evicted first; if all jobs are active, new submissions receive 503. |
 | `max_output_bytes` | 1048576 | Combined UTF-8 stdout/stderr budget per job. Exceeding it stops the command with exit code 1. A short diagnostic is retained in addition. |
+
+Job IDs are scoped to the submitting principal and endpoint. Different users may reuse
+the same ID, including with SQLite or Redis history. A duplicate in the same scope
+returns HTTP 409. Invalid argument data returns HTTP 400. Reading or cancelling an
+unknown ID for an authorized endpoint returns HTTP 404. OIDC accepts an issued-at
+timestamp up to 30 seconds ahead while keeping the token expiry deadline strict.
 
 By default, results are in memory and lost on restart. Optional SQLite storage
 preserves retained results; the Docker quickstart enables it. IDs are reserved only while their
@@ -984,7 +991,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.5.0`, or use the Docker image, which includes the authentication
+`autond[auth]==1.5.1`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
 Argon2, token and SQLite implementations.
 

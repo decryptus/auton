@@ -12,7 +12,7 @@ from auton_client import RemoteClient
 EXECUTION_ROUTE = '/%s/%s/%s'
 CANCEL_ROUTE = '/cancel/%s/%s'
 CANCEL_JOB_ID_PATTERN = re.compile(r'[a-z0-9][a-z0-9\-]{7,63}')
-REJECTED_HTTP_CODES = frozenset((400, 401, 403, 404, 405, 415, 422))
+REJECTED_HTTP_CODES = frozenset((400, 401, 403, 404, 405, 409, 415, 422, 429))
 JOB_RESPONSE_CODES = frozenset((200, 400))
 
 

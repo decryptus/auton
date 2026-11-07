@@ -32,7 +32,7 @@ class HTTPIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 passwd = Path(tmp) / 'htpasswd'
-                hashed = '{SHA}' + base64.b64encode(hashlib.sha1(b'secret').digest()).decode()
+                hashed = '$6$autonfixture$Wpm5.8BMz7jSqok1oQAavF70jbYUx2iPxICzAQAWbeKjQvh2CvJYo1ARap116rl/03d.yhLZY9JZ./RCzidJb1'
                 passwd.write_text('alice:' + hashed + '\nbob:' + hashed + '\n')
                 clients = {}
                 for name in ('one', 'two'):
@@ -148,7 +148,8 @@ class HTTPIntegrationTests(unittest.TestCase):
                         self.assertTrue(''.join(target['stderr']).startswith('diagnostic\n'), target)
                         uri = clients[target['target']].uri
                         detail_path = '/jobs/test/' + target['job_id']
-                        self.assertEqual(requests.get(uri + detail_path, auth=('bob', 'secret'), timeout=2).status_code, 403)
+                        self.assertEqual(requests.get(uri + detail_path, auth=('bob', 'secret'), timeout=2).status_code,
+                                         403 if target['target'] == 'two' else 404)
                 denied = subprocess.run([sys.executable, str(ROOT / 'bin/auton'), '--endpoint', 'test',
                                          '--auth-user', 'alice', '--auth-passwd', 'wrong'] + target_args,
                                         env=dict(os.environ, PYTHONPATH=str(ROOT)),
@@ -191,7 +192,8 @@ class HTTPIntegrationTests(unittest.TestCase):
                             uri = clients[target['target']].uri
                             for step in steps:
                                 self.assertEqual(requests.get(uri + '/jobs/test/' + step['job_id'],
-                                    auth=('bob', 'secret'), timeout=2).status_code, 403)
+                                    auth=('bob', 'secret'), timeout=2).status_code,
+                                    403 if target['target'] == 'two' else 404)
                         else:
                             self.assertEqual([step['status'] for step in steps],
                                 ['rejected' if password == 'wrong' else 'failed', 'skipped', 'skipped'])
@@ -389,7 +391,7 @@ class HTTPIntegrationTests(unittest.TestCase):
             auth_args = []
             if authenticated:
                 passwd = Path(tmp) / 'htpasswd'
-                hashed = '{SHA}' + base64.b64encode(hashlib.sha1(b'secret').digest()).decode()
+                hashed = '$6$autonfixture$Wpm5.8BMz7jSqok1oQAavF70jbYUx2iPxICzAQAWbeKjQvh2CvJYo1ARap116rl/03d.yhLZY9JZ./RCzidJb1'
                 passwd.write_text('alice:' + hashed + '\nbob:' + hashed + '\n')
                 config['general'].update(auth_basic='Test', auth_basic_file=str(passwd))
                 auth = ('alice', 'secret')
@@ -467,10 +469,10 @@ class HTTPIntegrationTests(unittest.TestCase):
                             self.assertEqual(inspect(path, ('alice', 'wrong')).status_code, 401)
                         self.assertEqual(inspect('/jobs', ('bob', 'secret')).json()['jobs'], [])
                         self.assertEqual(inspect('/stats', ('bob', 'secret')).json()['stats']['jobs'], 0)
-                        self.assertEqual(inspect('/jobs/test/http-test-job', ('bob', 'secret')).status_code, 403)
+                        self.assertEqual(inspect('/jobs/test/http-test-job', ('bob', 'secret')).status_code, 404)
                         self.assertEqual(requests.get(url, timeout=2).status_code, 401)
                         self.assertEqual(requests.get(url, auth=('alice', 'wrong'), timeout=2).status_code, 401)
-                        self.assertEqual(requests.get(url, auth=('bob', 'secret'), timeout=2).status_code, 403)
+                        self.assertEqual(requests.get(url, auth=('bob', 'secret'), timeout=2).status_code, 404)
                 finally:
                     proc.terminate()
                     try:

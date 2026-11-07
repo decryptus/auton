@@ -33,13 +33,13 @@ class ServiceTests(unittest.TestCase):
         self.queue = AutonEPTSync('test')
         self.endpoint = SimpleNamespace(users={'alice': True})
         self.service = JobService({'test': self.endpoint}, {'test': self.queue},
-                                  clock=lambda: self.now, result_ttl=10, max_jobs=2)
+                                  clock=lambda: self.now, result_ttl=10, max_jobs=2, max_jobs_per_user=2)
 
     def submit(self, xid='one', payload=None, user='alice', offset=0):
         return self.service.submit('test', xid, payload or {}, user, offset)
 
     def finish(self, xid='one', output='done'):
-        obj = self.service.objs['test:' + xid]
+        obj = self.service.get_object('test', xid, 'alice')
         obj.add_result(output)
         obj.set_return_code(0)
         obj.ended_at = self.now
@@ -71,7 +71,7 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(self.queue.queue.qsize(), 0)
         self.submit()
         self.endpoint.users = None
-        with self.assertRaises(AccessDenied):
+        with self.assertRaises(UnknownJob):
             self.service.status('test', 'one', 'bob')
         self.endpoint.users = {'alice': False}
         with self.assertRaises(AccessDenied):
@@ -104,11 +104,11 @@ class ServiceTests(unittest.TestCase):
         self.now += 11
         with self.assertRaises(UnknownJob):
             self.service.status('test', 'one', 'alice')
-        self.assertIn('test:pending', self.service.objs)
+        self.assertIn('test:pending', [obj.uid for obj in self.service.objs.values()])
         self.submit('two')
         self.finish('two')
         self.submit('three')
-        self.assertEqual(set(self.service.objs), {'test:pending', 'test:three'})
+        self.assertEqual({obj.uid for obj in self.service.objs.values()}, {'test:pending', 'test:three'})
 
     def test_duplicate_completed_job_is_not_evicted(self):
         self.service.max_jobs = 1
@@ -116,7 +116,7 @@ class ServiceTests(unittest.TestCase):
         original = self.finish()
         with self.assertRaises(DuplicateJob):
             self.submit()
-        self.assertIs(self.service.objs['test:one'], original)
+        self.assertIs(self.service.get_object('test', 'one', 'alice'), original)
         self.assertEqual(self.queue.queue.qsize(), 1)
 
     def test_concurrent_admission_respects_capacity(self):
@@ -141,7 +141,7 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(self.service.objs, {})
         self.queue.qput = Mock()
         self.submit()
-        self.assertIn('test:one', self.service.objs)
+        self.assertIn('test:one', [obj.uid for obj in self.service.objs.values()])
 
     def test_lock_timeout_queues_nothing(self):
         self.service.lock = Mock()
@@ -150,6 +150,19 @@ class ServiceTests(unittest.TestCase):
             self.submit()
         self.service.lock.release.assert_not_called()
         self.assertEqual(self.queue.queue.qsize(), 0)
+
+    def test_owner_scoped_duplicates_and_quota(self):
+        self.endpoint.users = None
+        self.service.max_jobs_per_user = 1
+        self.submit()
+        with self.assertRaises(DuplicateJob):
+            self.submit()
+        with self.assertRaises(JobUnavailable):
+            self.submit('excess')
+        self.submit(user='bob')
+        self.finish(output='alice only')
+        self.assertEqual(self.service.detail('test', 'one', 'bob')['stream'], [])
+        self.assertEqual(self.service.detail('test', 'one', 'alice')['stream'], ['alice only'])
 
     def test_instances_do_not_share_jobs_or_locks(self):
         other = JobService(self.service.endpoints, self.service.queues)
@@ -241,7 +254,7 @@ class CompatibilityTests(unittest.TestCase):
             del request
             gc.collect()
             self.assertIsNone(reference())
-            obj = module.objs['test:test-job']
+            obj = module.service.get_object('test', 'test-job', 'alice')
             self.assertEqual(obj.get_payload(), {'args': ['x']})
             with self.assertRaises(HttpReqErrJson):
                 module.job_run(Request(user='alice', offset='0\n', xid='other'))

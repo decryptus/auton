@@ -128,7 +128,7 @@ class WebHTTPTests(unittest.TestCase):
                 break
             time.sleep(0.02)
         self.assertEqual(result['stream'], ['<script>window.pwned = true</script>\n'])
-        self.assertEqual(other.get(self.uri + '/jobs/diagnostic/browser-job', timeout=2).status_code, 403)
+        self.assertEqual(other.get(self.uri + '/jobs/diagnostic/browser-job', timeout=2).status_code, 404)
         self.assertEqual(reader.get(self.uri + '/jobs', timeout=2).json()['jobs'], [])
         self.daemon.auth.disable('operator')
         self.assertEqual(operator.get(self.uri + '/health', timeout=2).status_code, 401)
