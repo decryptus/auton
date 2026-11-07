@@ -1,6 +1,6 @@
 # Auton
 
-1.5.1 scopes job IDs and quotas to the submitting principal.
+1.5.2 uses HTTPdis 0.7.1 or later for the daemon.
 
 
 Auton runs explicitly configured jobs on remote servers through an authenticated
