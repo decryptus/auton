@@ -79,7 +79,7 @@ endpoints:
     plugin: subproc
     config:
       prog: curl
-      args: [--version]
+      args: [--disable, --version]
       disallow-args: true
       disallow-env: true
       disallow-argfiles: true
