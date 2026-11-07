@@ -14,7 +14,7 @@ import uuid
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from auton.classes.job_store import (JobStoreUnavailable, MAX_METADATA_BYTES,
-    MAX_STORED_JOBS, MAX_STORED_OUTPUT_BYTES, encode_snapshot, validate_snapshot)
+    MAX_STORED_JOBS, MAX_STORED_OUTPUT_BYTES, encode_snapshot, validate_snapshot, storage_key)
 
 REDIS_NAME = 'auton-job-history'
 NAMESPACE_PATTERN = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
@@ -116,7 +116,7 @@ class RedisJobStore:
 
     def save(self, record):
         data = encode_snapshot(record, self.max_output_bytes, self.max_record_bytes)
-        self._call(SAVE_SCRIPT, record['uid'], data, record['admitted_at'] or time.time(), MAX_STORED_JOBS)
+        self._call(SAVE_SCRIPT, storage_key(record), data, record['admitted_at'] or time.time(), MAX_STORED_JOBS)
 
     def delete(self, uid):
         self._call(DELETE_SCRIPT, uid)
@@ -134,7 +134,7 @@ class RedisJobStore:
             try:
                 record = json.loads(data)
                 validate_snapshot(record, self.max_output_bytes)
-                if record['uid'] != uid:
+                if storage_key(record) != uid:
                     raise ValueError('inconsistent job identity')
                 if record['status'] == 'complete' and record['ended_at'] <= now - ttl:
                     self.delete(uid)

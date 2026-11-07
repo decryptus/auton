@@ -1,5 +1,8 @@
 # Auton
 
+2.0.0rc4 scopes job IDs and quotas to the submitting principal.
+
+
 Auton runs explicitly configured jobs on remote servers through an authenticated
 HTTP API. `auton` is the client; `autond` is the daemon in this image.
 
@@ -35,7 +38,7 @@ Existing implicit 1.x permissions remain enabled. Declare the required
 `allow-args`, `allow-env`, `allow-argfiles` and `allow-envfiles` before moving to
 2.0, which denies those additions by default. See the
 [migration guide](https://auton.run/docs/client-input-policy.html).
-The 2.0.0rc3 image is a separate prerelease for isolated tests.
+The 2.0.0rc4 image is a separate prerelease for isolated tests.
 
 ## Capabilities
 

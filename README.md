@@ -21,7 +21,7 @@ The client selects targets and orchestrates scenarios. Each daemon enforces its
 own endpoint permissions, executes jobs and retains their results. No central
 server is required.
 
-Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc3.md) for an isolated installation.
+Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc4.md) for an isolated installation.
 
 ## Quickstart
 
@@ -181,8 +181,15 @@ Limits in `general`:
 | Setting | Default | Behavior |
 | --- | --- | --- |
 | `result_ttl` | 3600 seconds | Completed results expire; cleanup occurs on subsequent run/status requests. |
+| `max_jobs_per_user` | Half of `max_jobs`, rounded up | Caps queued and running jobs per principal across endpoints. Anonymous requests share one quota. Excess submissions receive HTTP 429. |
 | `max_jobs` | 128 | Caps queued, running and retained jobs together. Oldest completed results are evicted first; if all jobs are active, new submissions receive 503. |
 | `max_output_bytes` | 1048576 | Combined UTF-8 stdout/stderr budget per job. Exceeding it stops the command with exit code 1. A short diagnostic is retained in addition. |
+
+Job IDs are scoped to the submitting principal and endpoint. Different users may reuse
+the same ID, including with SQLite or Redis history. A duplicate in the same scope
+returns HTTP 409. Invalid argument data returns HTTP 400. Reading or cancelling an
+unknown ID for an authorized endpoint returns HTTP 404. OIDC accepts an issued-at
+timestamp up to 30 seconds ahead while keeping the token expiry deadline strict.
 
 By default, results are in memory and lost on restart. Optional SQLite storage
 preserves retained results; the Docker quickstart enables it. IDs are reserved only while their

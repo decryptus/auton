@@ -50,6 +50,10 @@ class JobUnavailable(JobError):
     pass
 
 
+class PrincipalQuotaReached(JobUnavailable):
+    pass
+
+
 class InvalidOffset(JobError):
     pass
 
@@ -111,10 +115,15 @@ class JobService(object):
                  clock=time.time, lock=None, lock_timeout=DEFAULT_LOCK_TIMEOUT,
                  result_ttl=DEFAULT_RESULT_TTL, max_jobs=DEFAULT_MAX_JOBS,
                  max_output_bytes=DEFAULT_MAX_OUTPUT_BYTES, journal=None, availability=None,
-                 maintenance_operators=(), store=None):
+                 maintenance_operators=(), store=None, max_jobs_per_user=None):
         self.endpoints = endpoints
         self.queues = queues
         self.objs = {} if objects is None else objects
+        # Normalize caller-supplied job collections created with legacy UID keys.
+        if self.objs:
+            existing = list(self.objs.values())
+            self.objs.clear()
+            self.objs.update(((obj.owner, obj.endpoint, obj.uid), obj) for obj in existing)
         self.object_factory = object_factory
         self.clock = clock
         self.journal = journal
@@ -129,6 +138,11 @@ class JobService(object):
         self.lock_timeout = lock_timeout
         self.result_ttl = float(result_ttl)
         self.max_jobs = int(max_jobs)
+        if max_jobs_per_user is None:
+            max_jobs_per_user = max(1, (self.max_jobs + 1) // 2)
+        if type(max_jobs_per_user) is not int or not 1 <= max_jobs_per_user <= self.max_jobs:
+            raise ValueError('max_jobs_per_user must be an integer from 1 to max_jobs')
+        self.max_jobs_per_user = max_jobs_per_user
         self.max_output_bytes = int(max_output_bytes)
         if (not math.isfinite(self.result_ttl) or self.result_ttl <= 0
                 or self.max_jobs <= 0 or self.max_output_bytes <= 0):
@@ -140,7 +154,7 @@ class JobService(object):
             try:
                 for record in self.store.recover(self.clock(), self.result_ttl, self.max_jobs):
                     obj = restore(record, self.max_output_bytes)
-                    self.objs[obj.uid] = obj
+                    self.objs[obj.owner, obj.endpoint, obj.uid] = obj
             except JobStoreUnavailable:
                 raise JobUnavailable('cannot recover durable jobs') from None
 
@@ -167,7 +181,7 @@ class JobService(object):
                 if obj.get_status() != STATUS_COMPLETE:
                     raise JobUnavailable('cannot remove an unfinished durable job')
                 try:
-                    self.store.delete(uid)
+                    self.store.delete(getattr(obj, 'storage_id', obj.uid))
                 except Exception:
                     self.persistence_failed = True
                     raise JobUnavailable('job storage unavailable') from None
@@ -209,44 +223,45 @@ class JobService(object):
                      if obj.get_status() == STATUS_COMPLETE]
         if not completed:
             raise JobUnavailable('job capacity reached; retry later')
-        self._delete_job(min(completed)[1])
+        self._delete_job(min(completed, key=lambda item: item[0])[1])
 
     def get_queue(self, endpoint):
         if endpoint not in self.queues:
             raise UnknownEndpoint('unable to find endpoint: %r' % endpoint)
         return self.queues[endpoint]
 
-    def get_object(self, endpoint, xid):
+    def get_object(self, endpoint, xid, principal=None):
         uid = self.uid(endpoint, xid)
-        if uid not in self.objs:
+        key = (principal, endpoint, uid)
+        if key not in self.objs:
             raise UnknownJob('unable to find object with uid: %r' % uid)
-        return self.objs[uid]
+        return self.objs[key]
 
-    def clear_object(self, endpoint, xid):
-        self._delete_job(self.uid(endpoint, xid))
+    def clear_object(self, endpoint, xid, principal=None):
+        self._delete_job((principal, endpoint, self.uid(endpoint, xid)))
 
     def _enqueue(self, endpoint, xid, method, payload, principal):
         queue = self.get_queue(endpoint)
         uid = self.uid(endpoint, xid)
-        if uid in self.objs:
-            raise DuplicateJob('uid already exists: %r' % uid)
+        key = (principal, endpoint, uid)
         obj = self.object_factory(queue.name, uid, endpoint, method,
                                   payload=payload, principal=principal)
         obj.max_output_bytes = self.max_output_bytes
+        obj.storage_id = obj.execution_id
         obj.journal = self.journal
         obj.availability = self.availability
         obj.admitted_at = self.clock()
         if self.store is not None:
             obj.persistence = self._save_job
             self._save_job(obj)
-        self.objs[uid] = obj
+        self.objs[key] = obj
         record_event(self.journal, 'job.admitted', uid=uid, endpoint=endpoint,
                      principal=principal, execution_id=obj.execution_id)
         try:
             queue.qput(obj)
         except Exception:
             if self.store is None:
-                del self.objs[uid]
+                del self.objs[key]
             else:
                 with obj.output_lock:
                     if obj.get_status() == STATUS_NEW:
@@ -280,9 +295,13 @@ class JobService(object):
                     raise JobUnavailable('job storage unavailable; new admissions disabled until restart')
                 with self.availability.admission():
                     self.expire_results()
-                    if self.uid(endpoint, xid) in self.objs:
+                    if (principal, endpoint, self.uid(endpoint, xid)) in self.objs:
                         raise DuplicateJob('uid already exists')
                     self.get_queue(endpoint)
+                    active = sum(obj.owner == principal and obj.get_status() != STATUS_COMPLETE
+                                 for obj in self.objs.values())
+                    if active >= self.max_jobs_per_user:
+                        raise PrincipalQuotaReached('active job quota reached')
                     self.make_capacity()
                     return job_result(self._enqueue(endpoint, xid, method, payload, principal), offset)
             except (AccessDenied, UnknownEndpoint, DuplicateJob, JobUnavailable, MaintenanceActive) as error:
@@ -295,16 +314,16 @@ class JobService(object):
         validate_offset(offset)
         with self._locked():
             self.expire_results()
-            obj = self.get_object(endpoint, xid)
-            self.authorize(endpoint, principal, obj)
+            self.authorize(endpoint, principal)
+            obj = self.get_object(endpoint, xid, principal)
             return job_result(obj, offset)
 
     def cancel(self, endpoint, xid, principal):
         """Request cooperative adapter cancellation; completion follows process cleanup."""
         validate_input({'endpoint': endpoint, 'id': xid})
         with self._locked():
-            obj = self.get_object(endpoint, xid)
-            self.authorize(endpoint, principal, obj)
+            self.authorize(endpoint, principal)
+            obj = self.get_object(endpoint, xid, principal)
             if principal is None:
                 raise AccessDenied('cancellation requires an authenticated job owner')
             with self.availability.condition:
@@ -371,8 +390,8 @@ class JobService(object):
             offset = 0
         with self._locked():
             self.expire_results()
-            obj = self.get_object(endpoint, xid)
-            self.authorize(endpoint, principal, obj)
+            self.authorize(endpoint, principal)
+            obj = self.get_object(endpoint, xid, principal)
             with obj.output_lock:
                 result = job_summary(obj)
                 result.update(job_result(obj, offset))
