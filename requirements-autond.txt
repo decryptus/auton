@@ -1,5 +1,5 @@
 dwho>=0.3.61
-httpdis>=0.6.39
+httpdis>=0.7.1
 pycurl
 python-dotenv
 PyYAML>=3.10
