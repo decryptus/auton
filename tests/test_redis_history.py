@@ -53,6 +53,20 @@ class RedisHistoryTests(unittest.TestCase):
         self.store.delete(rows[0]['uid'])
         self.assertEqual(self.store.recover(time.time(), 3600, 128), [])
 
+    def test_same_public_uid_survives_restart_for_two_owners(self):
+        for principal in ('alice', 'bob'):
+            obj = JobObject('test', 'test:shared', 'test', 'run', principal=principal)
+            obj.admitted_at = time.time()
+            if principal == 'bob':
+                obj.storage_id = obj.execution_id
+            self.store.save(snapshot(obj))
+        self.store.close()
+        self.store = RedisJobStore(REDIS_URL, self.namespace)
+        rows = self.store.recover(time.time(), 3600, 128)
+        self.assertEqual({row['owner'] for row in rows}, {'alice', 'bob'})
+        self.assertTrue(all(row['uid'] == 'test:shared' for row in rows))
+        self.assertTrue(all(row['outcome'] == 'job.interrupted' for row in rows))
+
     def test_lost_lease_fences_writes_and_cannot_release_another_owner(self):
         obj = JobObject('test', 'test:job-1234', 'test', 'run', principal='alice')
         obj.admitted_at = time.time()

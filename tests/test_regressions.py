@@ -314,22 +314,22 @@ class JobTests(unittest.TestCase):
 
     def test_completed_result_is_replayable_with_independent_offsets(self):
         self.module.job_run(Request(offset=0))
-        obj = self.module.objs['test:test-job']
+        obj = self.module.service.get_object('test', 'test-job', None)
         obj.add_result('a'); obj.add_result('b')
         self.complete(obj)
         self.assertEqual(self.module.job_status(Request(offset=0))['stream'], ['a', 'b'])
         self.assertEqual(self.module.job_status(Request(offset=0))['stream'], ['a', 'b'])
         self.assertEqual(self.module.job_status(Request(offset=1))['stream'], ['b'])
-        self.assertIn('test:test-job', self.module.objs)
+        self.assertIn('test:test-job', [obj.uid for obj in self.module.objs.values()])
 
     def test_expired_results_are_removed_but_pending_jobs_remain(self):
         self.module.job_run(Request())
-        obj = self.module.objs['test:test-job']
+        obj = self.module.service.get_object('test', 'test-job', None)
         self.complete(obj)
         obj.ended_at = time.time() - 4000
         self.module.job_run(Request(xid='pending-job'))
-        self.assertNotIn('test:test-job', self.module.objs)
-        self.assertIn('test:pending-job', self.module.objs)
+        self.assertNotIn('test:test-job', [obj.uid for obj in self.module.objs.values()])
+        self.assertIn('test:pending-job', [obj.uid for obj in self.module.objs.values()])
 
     def test_disallowed_overrides_are_rejected_before_queueing(self):
         fields = {'args': ['arg'], 'env': {'NAME': 'value'}, 'envfiles': ['/example'],
@@ -354,10 +354,10 @@ class JobTests(unittest.TestCase):
     def test_completed_cache_eviction_allows_new_jobs(self):
         self.module.max_jobs = 1
         self.module.job_run(Request())
-        self.complete(self.module.objs['test:test-job'])
+        self.complete(self.module.service.get_object('test', 'test-job', None))
         self.module.job_run(Request(xid='second-job'))
-        self.assertNotIn('test:test-job', self.module.objs)
-        self.assertIn('test:second-job', self.module.objs)
+        self.assertNotIn('test:test-job', [obj.uid for obj in self.module.objs.values()])
+        self.assertIn('test:second-job', [obj.uid for obj in self.module.objs.values()])
 
     def test_duplicate_uid_never_queues_twice(self):
         self.module.job_run(Request())
@@ -389,12 +389,12 @@ class JobTests(unittest.TestCase):
         self.module.job_run(Request({'args': ['-c', 'print("ok")']}, xid='second-job'))
         self.plugin.start()
         deadline = time.monotonic() + 4
-        second = self.module.objs['test:second-job']
+        second = self.module.service.get_object('test', 'second-job', None)
         while second.status != STATUS_COMPLETE and time.monotonic() < deadline:
             time.sleep(0.02)
         self.assertEqual(second.status, STATUS_COMPLETE)
         self.assertEqual(''.join(second.result), 'ok\n')
-        self.assertEqual(self.module.objs['test:test-job'].return_code, 1)
+        self.assertEqual(self.module.service.get_object('test', 'test-job', None).return_code, 1)
         self.assertIsNone(second.request)
 
 

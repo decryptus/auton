@@ -120,7 +120,7 @@ class JournalTests(unittest.TestCase):
                 try:
                     service.submit(plugin.name, 'one', {'args': ['-c', code],
                                                         'env': {'SECRET': 'TOP_SECRET_ENV'}}, 'alice', 0)
-                    obj = service.objs[plugin.name + ':one']
+                    obj = service.get_object(plugin.name, 'one', 'alice')
                     obj.callback = lambda _: done.set()
                     if denied:
                         plugin.users = {'alice': False}

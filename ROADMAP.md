@@ -601,3 +601,7 @@ are rejected. Inline blocks replace imported blocks; imports are resolved before
 plugin initialization. Validated locally and in the implementation PRs (#58 and #59), including real HTTP
 admission/execution. The release PRs verify installed packages and publish the
 versioned artifacts; registry and deployed metadata establish delivery.
+
+## Multi-user job admission
+
+Isolate job identifiers and active-job quotas by principal. See the [compatibility and upgrade notes](docs/release-1.5.1.md).

@@ -16,7 +16,7 @@ from auton.classes.plugins import (AutonEPTObject, EPTS_SYNC, ENDPOINTS,
 from auton.classes.job_schema import (RUN_QSCHEMA, RUN_PSCHEMA, validate_input,
                                       InvalidArguments, InvalidArgumentsType)
 from auton.classes.jobs import (JobService, job_result, UnknownEndpoint, UnknownJob,
-                                AccessDenied, DuplicateJob, JobUnavailable, InvalidOffset, InvalidFilter,
+                                AccessDenied, DuplicateJob, JobUnavailable, PrincipalQuotaReached, InvalidOffset, InvalidFilter,
                                 DEFAULT_RESULT_TTL, DEFAULT_MAX_JOBS,
                                 DEFAULT_MAX_OUTPUT_BYTES)
 
@@ -30,8 +30,8 @@ LOG = logging.getLogger('auton.modules.job')
 OUTPUT_OFFSET_PATTERN = re.compile(r'[0-9]{1,12}')
 JOB_FILTER_FIELDS = frozenset(('endpoint', 'status'))
 HTTP_ERROR_CODES = {InvalidParameters: 400, UnknownEndpoint: 404, UnknownJob: 404, AccessDenied: 403,
-                    DuplicateJob: 415, JobUnavailable: 503, InvalidOffset: 400, InvalidFilter: 400,
-                    InvalidArgumentsType: 400, InvalidArguments: 415}
+                    DuplicateJob: 409, PrincipalQuotaReached: 429, JobUnavailable: 503, InvalidOffset: 400, InvalidFilter: 400,
+                    InvalidArgumentsType: 400, InvalidArguments: 400}
 HTTP_ERRORS = tuple(HTTP_ERROR_CODES)
 
 
@@ -39,7 +39,8 @@ def _http_call(func, *args, **kwargs):
     try:
         return func(*args, **kwargs)
     except HTTP_ERRORS as error:
-        raise HttpReqErrJson(HTTP_ERROR_CODES[type(error)], str(error))
+        code = next(HTTP_ERROR_CODES[cls] for cls in type(error).__mro__ if cls in HTTP_ERROR_CODES)
+        raise HttpReqErrJson(code, str(error)) from None
 
 
 def _service_property(name):
@@ -91,6 +92,7 @@ class JobModule(DWhoModuleBase):
                                   maintenance_operators=general.get('maintenance_operators', []),
                                   lock_timeout=general['lock_timeout'],
                                   result_ttl=general.get('result_ttl', DEFAULT_RESULT_TTL),
+                                  max_jobs_per_user=general.get('max_jobs_per_user'),
                                   max_jobs=general.get('max_jobs', DEFAULT_MAX_JOBS),
                                   max_output_bytes=general.get('max_output_bytes', DEFAULT_MAX_OUTPUT_BYTES))
 
@@ -161,18 +163,19 @@ class JobModule(DWhoModuleBase):
 
     _get_uid = staticmethod(JobService.uid)
 
-    def _get_obj(self, endpoint, xid):
-        return _http_call(self.service.get_object, endpoint, xid)
+    def _get_obj(self, endpoint, xid, principal=None):
+        return _http_call(self.service.get_object, endpoint, xid, principal)
 
-    def _clear_obj(self, endpoint, xid):
-        return self.service.clear_object(endpoint, xid)
+    def _clear_obj(self, endpoint, xid, principal=None):
+        return self.service.clear_object(endpoint, xid, principal)
 
     def _push_epts_sync(self, endpoint, xid, method, request):
         # Kept for callers of the historical helper. Admission still checks ACLs,
         # capacity and duplicates through the same service as the HTTP endpoint.
+        principal = self._principal(request, 'run')
         _http_call(self.service.submit, endpoint, xid, request.payload_params() or {},
-                   self._principal(request, 'run'), offset=0, method=method)
-        return self._get_obj(endpoint, xid)
+                   principal, offset=0, method=method)
+        return self._get_obj(endpoint, xid, principal)
 
     @staticmethod
     def _http_result(result):

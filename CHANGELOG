@@ -1,3 +1,8 @@
+auton (1.5.1) stable; urgency=medium
+
+  * Isolate job identifiers and active-job quotas by principal.
+  * Correct HTTP error mapping and allow bounded OIDC issued-at skew.
+
 auton (1.5.0) stable; urgency=medium
 
   * Add six reusable argument/environment YAML block imports.

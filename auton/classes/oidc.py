@@ -26,6 +26,7 @@ MAX_DOCUMENT_BYTES = 65536
 MAX_TOKEN_BYTES = 16384
 MAX_PENDING = 128
 MAX_SESSIONS = 1024
+ISSUED_AT_SKEW = 30
 FLOW_TTL = 300
 SESSION_TTL = 3600
 IDLE_TTL = 900
@@ -179,13 +180,14 @@ class OIDCService:
                 raise AuthenticationDenied()
             claims = self.jwt.decode(token, self.keys[header['kid']], algorithms=['RS256'],
                 audience=self.settings['client_id'], issuer=self.settings['issuer'],
-                options={'require': list(REQUIRED_CLAIMS)})
+                options={'require': list(REQUIRED_CLAIMS), 'verify_iat': False})
+            now = self.clock()
             if (not isinstance(claims['nonce'], str) or not hmac.compare_digest(claims['nonce'], pending['nonce'])
                     or claims.get('azp', self.settings['client_id']) != self.settings['client_id']
                     or (isinstance(claims['aud'], list) and len(claims['aud']) > 1 and 'azp' not in claims)
                     or type(claims['exp']) not in (int, float) or type(claims['iat']) not in (int, float)
                     or not math.isfinite(claims['exp']) or not math.isfinite(claims['iat'])
-                    or claims['exp'] <= self.clock() or claims['iat'] > self.clock() or claims['iat'] < self.clock() - FLOW_TTL):
+                    or claims['exp'] <= now or not now - FLOW_TTL <= claims['iat'] <= now + ISSUED_AT_SKEW):
                 raise AuthenticationDenied()
             principal = self.settings['subjects'].get(claims['sub'])
             if principal is None:

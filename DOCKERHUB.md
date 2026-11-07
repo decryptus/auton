@@ -1,5 +1,8 @@
 # Auton
 
+1.5.1 scopes job IDs and quotas to the submitting principal.
+
+
 Auton runs explicitly configured jobs on remote servers through an authenticated
 HTTP API. `auton` is the client; `autond` is the daemon in this image.
 

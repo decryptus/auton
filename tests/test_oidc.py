@@ -62,6 +62,14 @@ class OIDCTests(unittest.TestCase):
         with self.assertRaises(AuthenticationDenied):
             self.service.authenticate_session(grant.secret)
 
+    def test_small_issued_at_skew_keeps_expiry_strict(self):
+        now = int(time.time())
+        query, binding = self.flow(iat=now + 2)
+        self.assertEqual(self.service.finish(query['state'], binding, 'code').identity.principal, 'reader')
+        query, binding = self.flow(iat=now - 20, exp=now - 1)
+        with self.assertRaises(AuthenticationDenied):
+            self.service.finish(query['state'], binding, 'code')
+
     def test_invalid_claims_and_unknown_subject_are_rejected(self):
         for claims in ({'iss': 'https://foreign.example'}, {'aud': 'other'}, {'sub': 'unmapped'},
                        {'nonce': 'wrong'}, {'exp': 1}, {'iat': int(time.time()) + 300}, {'azp': 'other'},

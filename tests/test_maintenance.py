@@ -24,7 +24,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_refusal_preserves_capacity_and_requires_operator(self):
         service = self.service()
         service.submit('test', 'first', {}, 'alice')
-        obj = service.objs['test:first']
+        obj = service.get_object('test', 'first', 'alice')
         obj.set_status('complete')
         obj.set_ended_at()
         service.max_jobs = 1
@@ -35,7 +35,7 @@ class MaintenanceTests(unittest.TestCase):
         self.assertEqual(service.health()['maintenance'], {'enabled': True, 'reason': 'Upgrade'})
         with self.assertRaises(MaintenanceActive):
             service.submit('test', 'second', {}, 'alice')
-        self.assertEqual(list(service.objs), ['test:first'])
+        self.assertEqual([obj.uid for obj in service.objs.values()], ['test:first'])
         self.assertEqual(len(service.list_jobs('alice')), 1)
         service.set_maintenance('admin', False)
         service.submit('test', 'second', {}, 'alice')
@@ -44,7 +44,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_queued_jobs_remain_new_until_resume_and_running_jobs_continue(self):
         service = self.service()
         service.submit('test', 'first', {}, 'alice')
-        obj = service.objs['test:first']
+        obj = service.get_object('test', 'first', 'alice')
         service.set_maintenance('admin', True)
         launched, finished, release = threading.Event(), threading.Event(), threading.Event()
         def worker():

@@ -4,7 +4,8 @@ from unittest.mock import Mock
 
 from auton.modules.job import JobModule
 from auton.classes.availability import MaintenanceActive
-from auton.classes.jobs import AccessDenied
+from auton.classes.job_schema import InvalidArguments
+from auton.classes.jobs import AccessDenied, DuplicateJob, PrincipalQuotaReached
 from httpdis.ext.httpdis_json import HttpReqErrJson
 
 
@@ -32,6 +33,16 @@ class JobHTTPErrorTests(unittest.TestCase):
                 self.assertNotIn('X-Auton-Admission', error.headers or {})
                 self.assertNotIn('SYNTHETIC-INTERNAL-CREDENTIAL', '\n'.join(logs.output))
                 service.assert_called_once()
+
+    def test_subclass_and_admission_error_codes(self):
+        class DuplicateRequest(DuplicateJob):
+            pass
+        for error, expected in ((DuplicateRequest(), 409), (InvalidArguments(), 400),
+                                (PrincipalQuotaReached(), 429)):
+            self.module.service.submit.side_effect = error
+            with self.assertRaises(HttpReqErrJson) as caught:
+                self.module.job_run(self.request)
+            self.assertEqual(caught.exception.code, expected)
 
     def test_expected_errors_keep_their_contract(self):
         self.module.service.submit.side_effect = AccessDenied('access denied')
