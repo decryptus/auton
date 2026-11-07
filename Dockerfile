@@ -14,6 +14,7 @@ WORKDIR /opt/auton
 COPY . .
 RUN AUTON_PACKAGE=autond pip install --no-cache-dir '.[auth,oidc,redis]'
 COPY docker-run.sh /run.sh
+COPY etc/auton/imports /etc/auton/imports
 COPY etc/auton/modules /etc/auton/modules
 COPY etc/auton/auton.yml.example /etc/auton/auton.yml
 RUN chmod +x /run.sh

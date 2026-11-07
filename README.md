@@ -21,7 +21,7 @@ The client selects targets and orchestrates scenarios. Each daemon enforces its
 own endpoint permissions, executes jobs and retains their results. No central
 server is required.
 
-Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc5.md) for an isolated installation.
+Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc6.md) for an isolated installation.
 
 ## Quickstart
 
@@ -1445,7 +1445,15 @@ endpoints:
 
 ## Auton command-lines
 
-### endpoint curl examples:
+### Running curl
+
+The shipped `curl` endpoint runs `curl --version`. Invoke it without client arguments:
+
+```sh
+auton --endpoint curl --uri http://localhost:8666
+```
+
+The following CLI syntax examples assume an administrator has configured a separate curl endpoint that permits the indicated inputs.
 
 Get URL https://example.com:
 
