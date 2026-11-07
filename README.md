@@ -21,7 +21,7 @@ The client selects targets and orchestrates scenarios. Each daemon enforces its
 own endpoint permissions, executes jobs and retains their results. No central
 server is required.
 
-Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc5.md) for an isolated installation.
+Testing 2.0? Follow the [release candidate migration guide](docs/release-2.0.0rc6.md) for an isolated installation.
 
 ## Quickstart
 

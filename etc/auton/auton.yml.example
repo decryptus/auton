@@ -51,30 +51,40 @@ general:
 import_modules:
   - modules/job.yml
 endpoints:
+  # Selective report example. Install /opt/scripts/report.sh and its imports
+  # before enabling this endpoint. It accepts --month and a restricted LANG.
+  # report:
+  #   plugin: subproc
+  #   import_config: imports/report.yml
+
+  # Fixed diagnostic commands. Configure operational jobs server-side.
   si.corp-ansible:
     plugin: subproc
     config:
       prog: ansible-playbook
-      allow-args: true
-      allow-env: true
-      allow-argfiles: true
+      args: ["--version"]
+      disallow-args: true
+      disallow-env: true
+      disallow-argfiles: true
       disallow-envfiles: true
       timeout: 3600
   si.corp-terraform:
     plugin: subproc
     config:
       prog: terraform
-      allow-args: true
-      allow-env: true
-      allow-argfiles: true
+      args: ["version"]
+      disallow-args: true
+      disallow-env: true
+      disallow-argfiles: true
       disallow-envfiles: true
       timeout: 3600
   curl:
     plugin: subproc
     config:
       prog: curl
-      allow-args: true
-      allow-env: true
-      allow-argfiles: true
+      args: ["--disable", "--version"]
+      disallow-args: true
+      disallow-env: true
+      disallow-argfiles: true
       disallow-envfiles: true
       timeout: 3600
