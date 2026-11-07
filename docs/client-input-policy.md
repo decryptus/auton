@@ -11,6 +11,8 @@ In 2.0, omitted permissions deny client additions. A denial is an explicit HTTP
 400 before admission; the daemon continues serving other requests. Invalid
 policy syntax is a configuration error at startup.
 
+The general example ships three fixed version checks. To expose a custom operation, set its executable and fixed arguments on the server and grant only the client inputs it needs. The optional report example uses [reusable policy blocks](configuration-imports.md).
+
 ## Arguments and environment
 
 ```yaml
