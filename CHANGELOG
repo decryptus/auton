@@ -1,3 +1,7 @@
+auton (2.0.0rc5) prerelease; urgency=medium
+
+  * Require HTTPdis 0.7.1 or later.
+
 auton (2.0.0rc4) prerelease; urgency=medium
 
   * Isolate job identifiers and active-job quotas by principal.
