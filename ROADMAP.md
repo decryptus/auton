@@ -543,9 +543,11 @@ Before a future major stable release:
 Checkpoint, 19 November 2026: **1.5.3 is stable; 2.0.0rc6 is the published
 candidate**. Reproducible installed-package migration from 1.5.3 is now covered
 by the release gate, including copied SQLite authentication/history and rollback.
-An operator outcome using the deployed configuration remains required before
-2.0.0 stable. See the [acceptance record](docs/2.0-migration-acceptance.md).
-The date alone does not establish migration acceptance or publication.
+An operator check on an isolated copy of a retained 1.3.1 installation also passed,
+including its SQLite accounts/history, explicit input rules, restart and rollback.
+The original token was already rejected by 1.3.1; renewal occurred only in the
+test copy. See the [acceptance record and limits](docs/2.0-migration-acceptance.md).
+The migration gate is passed; 2.0.0 stable publication remains separate work.
 
 Client input policies ship in the 1.4.0 transition and the 2.0.0rc2 candidate,
 using Sonicprobe 0.3.64. They support per-category allow/deny rules, regex/choice
@@ -553,10 +555,10 @@ validation, repeated options, fixed/variable arity and validated envfile
 snapshots. Version 1.4.0 preserves implicit 1.x permissions with startup warnings;
 2.0.0rc2 denies implicit additions. See the [migration guide](docs/client-input-policy.md).
 
-The stable 2.0 release remains targeted for 19 November 2026, conditional on a
-migration acceptance using the new candidate. Earlier RC1 results do not qualify
-the expanded defaults. Package/image publication and website deployment are
-verified independently of source merges.
+The 19 November 2026 migration acceptance covers RC6's expanded defaults.
+Prepare stable 2.0 from the frozen series and publish through the master release
+gates. Package/image publication and website deployment must be verified
+independently of source merges; neither is implied by the acceptance outcome.
 
 The original 1.2.0 scope is complete and published: report reconciliation, guided
 parameters, owner-authorized cancellation, detached workers, explicit error
