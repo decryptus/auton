@@ -12,7 +12,7 @@ from auton.classes.exceptions import AutonConfigurationError
 from auton.classes.parameters import InvalidParameters
 
 CLIENT_FIELDS = ('args', 'env', 'argfiles', 'envfiles')
-DEFAULT_CLIENT_ALLOW = True
+DEFAULT_CLIENT_ALLOW = False
 MAX_ENVFILE_BYTES = 1048576
 SNAPSHOT_KEY = '_prepared_envfiles'
 

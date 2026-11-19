@@ -9,6 +9,7 @@ Installation, configuration, public APIs and troubleshooting.
    :maxdepth: 1
    :caption: User guide and reference
 
+   release-2.0.0
    release-1.5.3
    release-1.5.2
    release-1.5.1
@@ -29,6 +30,12 @@ Installation, configuration, public APIs and troubleshooting.
    release-1.2.0
    release-1.2.1
    release-1.0
+   release-2.0.0rc6
+   release-2.0.0rc5
+   release-2.0.0rc4
+   release-2.0.0rc3
+   release-2.0.0rc2
+   release-2.0.0rc1
 
 
 Contributor documentation

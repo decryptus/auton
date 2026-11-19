@@ -36,11 +36,11 @@ class WebDaemon:
         conf.pop('import_modules', None)
         conf['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
         conf['endpoints'] = {name: {'plugin': 'subproc', 'users': {'operator': True, 'reader': True, 'other': True},
-                                  'config': {'prog': sys.executable, 'timeout': 10}}
+                                  'config': {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 10}}
                              for name in ('diagnostic', 'health-check', 'deployment-check')}
         conf['endpoints']['diagnostic']['discovery'] = {'description': '<script>discovery()</script> Diagnostic checks'}
         conf['endpoints']['private'] = {'plugin': 'subproc', 'users': {'other': True},
-                                       'config': {'prog': sys.executable, 'timeout': 2}}
+                                       'config': {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2}}
         (self.path / 'auton.yml').write_text(yaml.safe_dump(conf))
 
     def start(self):

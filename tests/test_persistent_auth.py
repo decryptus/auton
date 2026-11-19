@@ -175,7 +175,7 @@ class PersistentDaemonTests(unittest.TestCase):
             config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
             config['modules']['job']['routes']['stats']['auth'] = ['alice']
             config['endpoints'] = {'test': {'plugin': 'subproc', 'users': {'alice': True},
-                'config': {'prog': sys.executable, 'timeout': 2}}}
+                'config': {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2}}}
             conf = path / 'auton.yml'
             conf.write_text(yaml.safe_dump(config))
             token_file = path / 'token'
