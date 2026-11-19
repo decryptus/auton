@@ -540,8 +540,7 @@ Before a future major stable release:
 
 ## Current priorities
 
-Release checkpoint, 19 November 2026: **2.0.0 is prepared from the validated
-RC6 series**. Reproducible installed-package migration from 1.5.3 is covered by
+Release checkpoint, 19 November 2026: **2.0.0 promotes the validated RC6 series**. Reproducible installed-package migration from 1.5.3 is covered by
 the release gate, including copied SQLite authentication/history and rollback.
 The operator check on a copy of retained 1.3.1 state also passed; the original
 token required renewal only in the test copy. See the
@@ -562,7 +561,7 @@ snapshots. Version 1.4.0 preserves implicit 1.x permissions with startup warning
 2.0.0rc2 denies implicit additions. See the [migration guide](docs/client-input-policy.md).
 
 The 19 November 2026 migration acceptance covers RC6's expanded defaults.
-Prepare stable 2.0 from the frozen series and publish through the master release
+Stable 2.0 releases use the frozen series and publish through the master release
 gates. Package/image publication and website deployment must be verified
 independently of source merges; neither is implied by the acceptance outcome.
 
