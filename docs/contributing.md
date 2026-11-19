@@ -88,3 +88,6 @@ GitHub releases are explicitly prereleases and never replace the latest stable
 release. Retry from an existing tag only on the matching release branch. Stable
 versions cannot publish from `release/2.0`; candidates cannot publish from master.
 The 2.0 stable target remains 19 November 2026, conditional on migration acceptance.
+
+See the [2.0 migration acceptance checkpoint](2.0-migration-acceptance.md)
+for the reproducible installed-package check and the remaining operator gate.

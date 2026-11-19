@@ -67,6 +67,14 @@ assert installed != source and installed.read_bytes() == source.read_bytes()
             run([str(candidate / 'bin' / executable), flag], work, env=clean_env, stdout=subprocess.DEVNULL)
         run([str(candidate / 'bin/autond'), '--check-migration', '-c',
              str(ROOT / 'etc/auton/docker.yml.example')], work, env=clean_env)
+        if expected.startswith('2.0.'):
+            previous = work / 'previous-stable'
+            venv.create(previous, with_pip=True)
+            run([str(previous / 'bin/python'), '-m', 'pip', 'install',
+                 'auton==1.5.3', 'autond[auth]==1.5.3'], work, env=clean_env)
+            run([str(candidate / 'bin/python'), str(ROOT / '.github/scripts/check-2.0-migration.py'),
+                 '--previous-python', str(previous / 'bin/python'),
+                 '--candidate-python', str(candidate / 'bin/python')], work, env=clean_env)
         # Inspect the installed entry points, not the checkout: a matching wheel
         # metadata version must not hide a stale CLI/HTTP server identity.
         for executable in ('auton', 'autond'):

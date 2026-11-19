@@ -12,4 +12,5 @@ For installation and operation, return to :doc:`/index`.
    1.0-readiness
    architecture-review-2026-09-27
    next-release-work
+   2.0-migration-acceptance
    textual-review

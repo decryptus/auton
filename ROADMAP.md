@@ -540,6 +540,13 @@ Before a future major stable release:
 
 ## Current priorities
 
+Checkpoint, 19 November 2026: **1.5.3 is stable; 2.0.0rc6 is the published
+candidate**. Reproducible installed-package migration from 1.5.3 is now covered
+by the release gate, including copied SQLite authentication/history and rollback.
+An operator outcome using the deployed configuration remains required before
+2.0.0 stable. See the [acceptance record](docs/2.0-migration-acceptance.md).
+The date alone does not establish migration acceptance or publication.
+
 Client input policies ship in the 1.4.0 transition and the 2.0.0rc2 candidate,
 using Sonicprobe 0.3.64. They support per-category allow/deny rules, regex/choice
 validation, repeated options, fixed/variable arity and validated envfile
