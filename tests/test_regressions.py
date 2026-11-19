@@ -176,45 +176,42 @@ assert set(map(int, child.split())) == expected, child
 class SubprocessTests(unittest.TestCase):
     def setUp(self):
         self.plugin = AutonSubProcPlugin('test')
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': 2})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
 
     def tearDown(self):
         self.plugin.do_terminate()
 
     def execute(self, code, timeout=2):
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': timeout})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': timeout})
         obj = job(Request({'args': ['-c', code]}))
         self.plugin.do_run(obj)
         return obj
 
-    def test_explicit_policy_is_quiet_and_implicit_envfiles_warn_at_startup(self):
-        logger = 'auton.plugins.subproc'
+    def test_only_listed_client_envfiles_are_accepted_and_fixed_files_still_work(self):
+        from auton.classes.parameters import InvalidParameters
         with tempfile.TemporaryDirectory() as tmp:
-            envfile = Path(tmp) / 'private-file'
-            envfile.write_text('MIGRATION_FIXTURE=private-value\n')
-            config = {'prog': sys.executable, 'envfiles': [str(envfile)], 'disallow-envfiles': True,
-                      'allow-args': True, 'allow-env': True, 'allow-argfiles': True}
+            envfile = Path(tmp) / 'fixture.env'
+            envfile.write_text('RC_FIXTURE=known-value\n')
+            config = {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'envfiles': [str(envfile)]}
             self.plugin.config = {'config': config}
             self.addCleanup(EPTS_SYNC.pop, 'test', None)
-            args = ['-c', 'import os; print(os.environ["MIGRATION_FIXTURE"])']
-            with self.assertNoLogs(logger, level='WARNING'):
-                self.plugin.safe_init()
-                obj = job(Request({'args': args}))
-                self.plugin.do_run(obj)
-                self.assertEqual(''.join(obj.result).strip(), 'private-value')
-            config.pop('disallow-envfiles')
+            self.plugin.safe_init()
+            args = ['-c', 'import os; print(os.environ["RC_FIXTURE"])']
+            obj = job(Request({'args': args}))
+            self.plugin.do_run(obj)
+            self.assertEqual(''.join(obj.result).strip(), 'known-value')
+            with self.assertRaises(InvalidParameters):
+                self.plugin.validate_run_payload({'envfiles': [str(envfile)]})
             config.pop('envfiles')
-            with self.assertLogs(logger, level='WARNING') as startup:
-                self.plugin.safe_init()
-            self.assertEqual(len(startup.output), 1)
-            self.assertIn('AUTON_MIGRATION_CLIENT_POLICY', startup.output[0])
-            with self.assertNoLogs(logger, level='WARNING'):
-                for _ in range(2):
-                    obj = job(Request({'args': args, 'envfiles': [str(envfile)]}))
-                    self.plugin.do_run(obj)
-                    self.assertEqual(''.join(obj.result).strip(), 'private-value')
-            self.assertNotIn(str(envfile), startup.output[0])
-            self.assertNotIn('private-value', startup.output[0])
+            config['allow-envfiles'] = [str(envfile)]
+            config['allow-env'] = True
+            self.plugin.safe_init()
+            obj = job(Request({'args': args, 'envfiles': [str(envfile)]}))
+            self.plugin.do_run(obj)
+            self.assertEqual(''.join(obj.result).strip(), 'known-value')
+            for files in ([str(envfile), '/other'], str(envfile), [{}]):
+                with self.subTest(files=files), self.assertRaises(InvalidParameters):
+                    self.plugin.validate_run_payload({'envfiles': files})
 
     def test_client_arguments_are_literal_but_config_is_templated(self):
         values = {'_env_': {'SECRET': 'hidden'}, '_uid_': '123'}
@@ -296,7 +293,7 @@ class JobTests(unittest.TestCase):
         self.module.config = {'general': {'lock_timeout': 1}}
         self.module.safe_init(None)
         self.plugin = AutonSubProcPlugin('test')
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True})
         ENDPOINTS['test'] = self.plugin
         EPTS_SYNC['test'] = AutonEPTSync('test')
 
@@ -384,7 +381,7 @@ class JobTests(unittest.TestCase):
 
     def test_worker_survives_output_limit_and_processes_next_job(self):
         self.module.max_output_bytes = 100
-        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'timeout': 2})
+        self.plugin.target = AutonTarget('test', {'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 2})
         self.module.job_run(Request({'args': ['-c', 'print("x" * 10000)']}))
         self.module.job_run(Request({'args': ['-c', 'print("ok")']}, xid='second-job'))
         self.plugin.start()

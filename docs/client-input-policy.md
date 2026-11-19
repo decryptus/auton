@@ -1,7 +1,7 @@
 # Client input policy and migration
 
 These policies are introduced in the Auton 1.4.0 transition release. The default
-changes in Auton 2.0, available for isolated testing as 2.0.0rc3.
+changes in Auton 2.0. See the [stable migration guide](release-2.0.0.md).
 
 In the transition release, omitted `allow-*` settings retain the 1.x permissions
 and generate startup warnings for each affected endpoint/category. Warnings do

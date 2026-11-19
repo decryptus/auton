@@ -23,20 +23,15 @@ LOG = logging.getLogger(__name__)
 def apply_auth_policy(conf):
     from auton.classes.auth_store import authentication_config
     general = conf['general']
+    mode = general.setdefault('auth_mode', 'required')
     settings = authentication_config(general, conf.get('_config_directory'))
     if settings is not None:
         general['authentication'] = settings
-    mode = general.get('auth_mode', 'legacy')
     if not isinstance(mode, str) or mode not in AUTH_MODES:
         raise AutonConfigurationError('auth_mode must be required, anonymous or legacy')
     if mode == 'legacy':
-        if 'auth_mode' not in general:
-            LOG.warning('AUTON_MIGRATION_AUTH_DEFAULT: auth_mode is unset; 1.x uses legacy route permissions '
-                        'and routes without auth allow anonymous access. Before 2.0, configure credentials '
-                        'and test auth_mode: required.')
-        else:
-            LOG.warning('Legacy route-based authentication: routes without auth allow anonymous access. '
-                        'Review route permissions or configure auth_mode: required.')
+        LOG.warning('Legacy route-based authentication: routes without auth allow anonymous access. '
+                    'Review route permissions or configure auth_mode: required.')
         return
     if mode == 'anonymous':
         try:
@@ -48,7 +43,7 @@ def apply_auth_policy(conf):
         LOG.warning('Explicit anonymous local mode: local callers share access and job ownership')
         return
     if not general.get('auth_basic_file') and settings is None:
-        raise AutonConfigurationError('required authentication needs auth_basic_file; use anonymous only for local development')
+        raise AutonConfigurationError('required authentication needs auth_basic_file or a configured authentication backend; use anonymous only for local development')
     # Preserve explicit route user allowlists while protecting every declared route.
     for module in conf.get('modules', {}).values():
         for route in module.get('routes', {}).values():

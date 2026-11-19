@@ -92,7 +92,7 @@ def main():
                 config['modules'] = yaml.safe_load((ROOT / 'etc/auton/modules/job.yml').read_text())
                 config['endpoints'] = {'diagnostics': {'plugin': 'subproc', 'discovery': {'parameters':
                     {'version': 1, 'args': [{'name': 'mode', 'choices': ['-c']}, {'name': 'script'}]}}, 'config': {
-                    'prog': sys.executable, 'timeout': 15}}}
+                    'prog': sys.executable, 'allow-args': True, 'allow-env': True, 'timeout': 15}}}
                 path = Path(directory) / (name + '.yml')
                 path.write_text(yaml.safe_dump(config))
                 process = subprocess.Popen([sys.executable, str(ROOT / 'bin/autond'), '-f',

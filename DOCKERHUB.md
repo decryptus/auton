@@ -1,6 +1,6 @@
 # Auton
 
-1.5.3 restricts the example subprocess endpoints to fixed version checks.
+Auton 2.0 requires authentication and explicit client-input permissions by default.
 
 
 Auton runs explicitly configured jobs on remote servers through an authenticated
@@ -29,16 +29,14 @@ commands above obtain the published image.
 - [Source and versioned examples](https://github.com/decryptus/auton/tree/v{{version}})
 - [Release notes](https://github.com/decryptus/auton/releases/tag/v{{version}})
 
-## Migrating toward 2.0
+## Migrating from 1.x
 
-Version 1.5.0 adds reusable YAML imports for arguments, environment and client policies.
-An imported configuration may load all six blocks; blocks cannot import further files.
-Explicit client policies and startup migration warnings remain available.
-Existing implicit 1.x permissions remain enabled. Declare the required
-`allow-args`, `allow-env`, `allow-argfiles` and `allow-envfiles` before moving to
-2.0, which denies those additions by default. See the
-[migration guide](https://auton.run/docs/client-input-policy.html).
-The 2.0.0rc3 image is a separate prerelease for isolated tests.
+An omitted `auth_mode` now requires credentials. Client arguments, environment,
+uploads and selected envfiles require explicit endpoint permissions; fixed server
+inputs remain usable. Review the 1.5.3 migration warnings and test a copy of the
+configuration and databases before upgrading. Preserve the original backup for
+rollback. See the [2.0 migration guide](https://auton.run/docs/release-2.0.0.html)
+and [input policy reference](https://auton.run/docs/client-input-policy.html).
 
 ## Capabilities
 

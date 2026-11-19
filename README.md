@@ -21,15 +21,18 @@ The client selects targets and orchestrates scenarios. Each daemon enforces its
 own endpoint permissions, executes jobs and retains their results. No central
 server is required.
 
+**Auton 2.0 requires authentication and explicit client-input permissions by default.**
+Before upgrading a 1.x installation, follow the [2.0 migration guide](docs/release-2.0.0.md).
+
 ## Quickstart
 
-This quickstart uses **Auton 1.5.3**, including SQLite authentication, durable
+This quickstart uses **Auton 2.0.0**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v1.5.3
+git checkout v2.0.0
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -101,7 +104,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==1.5.3
+python -m pip install auton==2.0.0
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -991,8 +994,8 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==1.5.3`, or use the Docker image, which includes the authentication
-extra. HTTPdis >= 0.6.31 and Sonicprobe >= 0.3.55 provide the shared
+`autond[auth]==2.0.0`, or use the Docker image, which includes the authentication
+extra. HTTPdis >= 0.7.1 and Sonicprobe >= 0.3.64 provide the shared
 Argon2, token and SQLite implementations.
 
 ```yaml
@@ -1223,8 +1226,8 @@ Version 1.0 adds explicit authentication policies. See the
 The anonymous loopback check uses the effective address, including a
 `--listen-addr` override.
 
-Existing configurations without `auth_mode` retain historical per-route behavior
-and log a warning. `auth_mode: legacy` makes this transitional choice explicit;
+In 1.x, configurations without `auth_mode` retain historical per-route behavior.
+In 2.0, an omitted mode requires credentials. `auth_mode: legacy` makes this transitional choice explicit;
 `auth_basic_file` alone does not protect routes in legacy mode. Set `auth: true`
 on each protected route until migrating to `required`.
 
@@ -1425,7 +1428,10 @@ endpoints:
         - somedir/bar.env
 ```
 
-Use keyword `disallow-envfiles` to disable environment files from client:
+In 2.0, the daemon rejects client-selected environment files by
+default. To let clients select a file, list its exact absolute server path in
+`allow-envfiles` on that endpoint, and authorize its variables with `allow-env`. Fixed server-side `envfiles` work in
+either case. The following example explicitly disables client selection:
 ```yaml
 endpoints:
   curl:
@@ -1962,7 +1968,7 @@ The existing curses interface remains available. Screenshots use synthetic data.
 
 ### Import argument and environment blocks
 
-Auton 1.5.0 and 2.0.0rc3 add `import_args`, `import_env`, `import_allow_args`,
+Auton 1.5.0 and 2.0.0rc3 added `import_args`, `import_env`, `import_allow_args`,
 `import_disallow_args`, `import_allow_env` and `import_disallow_env`.
 Declare them on an endpoint, in its `config`, or inside its `import_config` file.
 Several different block imports may coexist. Each accepts one local YAML filename.

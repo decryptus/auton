@@ -28,9 +28,12 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
+          import os, re
           version = Path('VERSION').read_text().strip()
-          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version)
+          pattern = r'[0-9]+\.[0-9]+\.[0-9]+'
+          if os.environ['GITHUB_EVENT_NAME'] == 'pull_request':
+              pattern += r'(?:rc[1-9][0-9]*)?'
+          assert re.fullmatch(pattern, version)
           text = Path('DOCKERHUB.md').read_text().replace('{{version}}', version)
           assert '{{' not in text and len(text.encode()) <= 25000
           assert all(url.startswith('https://') for url in re.findall(r'\]\(([^)]+)\)', text))

@@ -1,3 +1,47 @@
+auton (2.0.0) stable; urgency=medium
+
+  * Require authentication and explicit permissions for client inputs by default.
+  * Preserve fixed server inputs and support selective argument/environment rules.
+  * Include terminal configuration imports and per-principal job isolation/quotas.
+  * Record isolated migration acceptance and installed-package rollback checks.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Thu, 19 Nov 2026 07:00:00 +0100
+
+auton (2.0.0rc6) prerelease; urgency=medium
+
+  * Restrict caller input in the shipped subprocess examples.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 07 Nov 2026 09:41:00 +0100
+
+auton (2.0.0rc5) prerelease; urgency=medium
+
+  * Require HTTPdis 0.7.1 or later.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 7 Nov 2026 09:18:27 +0100
+
+auton (2.0.0rc4) prerelease; urgency=medium
+
+  * Isolate job identifiers and active-job quotas by principal.
+  * Correct HTTP error mapping and allow bounded OIDC issued-at skew.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 7 Nov 2026 06:54:31 +0100
+
+auton (2.0.0rc3) prerelease; urgency=medium
+
+  * Add six reusable argument/environment YAML block imports.
+  * Reject recursive configuration imports and imports inside terminal blocks.
+  * Document declaring-file paths, block replacement and startup validation.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Fri, 6 Nov 2026 08:13:19 +0100
+
+auton (2.0.0rc2) prerelease; urgency=medium
+
+  * Add explicit client input policies through Sonicprobe argpolicy.
+  * Validate regexes, choices, repeated options, value counts and envfile snapshots.
+  * Require explicit client permissions by default; preserve server inputs.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Fri, 6 Nov 2026 06:45:46 +0100
+
 auton (1.5.3) stable; urgency=medium
 
   * Restrict caller input in the shipped subprocess examples.

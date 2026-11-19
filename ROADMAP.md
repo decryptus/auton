@@ -540,16 +540,30 @@ Before a future major stable release:
 
 ## Current priorities
 
+Release checkpoint, 19 November 2026: **2.0.0 promotes the validated RC6 series**. Reproducible installed-package migration from 1.5.3 is covered by
+the release gate, including copied SQLite authentication/history and rollback.
+The operator check on a copy of retained 1.3.1 state also passed; the original
+token required renewal only in the test copy. See the
+[acceptance record and limits](docs/2.0-migration-acceptance.md).
+
+The release includes required authentication and explicit client-input permissions
+by default, terminal YAML imports, per-principal job identities and active-job
+quotas. The 1.x release notes and immutable candidate tags remain available.
+Publication of both packages, versioned images and the GitHub release, followed
+by the bilingual website and regenerated captures, is verified independently
+of this source change. The stopped reference installations remain retained;
+this release does not reactivate their diagnostics or replace their state.
+
 Client input policies ship in the 1.4.0 transition and the 2.0.0rc2 candidate,
 using Sonicprobe 0.3.64. They support per-category allow/deny rules, regex/choice
 validation, repeated options, fixed/variable arity and validated envfile
 snapshots. Version 1.4.0 preserves implicit 1.x permissions with startup warnings;
 2.0.0rc2 denies implicit additions. See the [migration guide](docs/client-input-policy.md).
 
-The stable 2.0 release remains targeted for 19 November 2026, conditional on a
-migration acceptance using the new candidate. Earlier RC1 results do not qualify
-the expanded defaults. Package/image publication and website deployment are
-verified independently of source merges.
+The 19 November 2026 migration acceptance covers RC6's expanded defaults.
+Stable 2.0 releases use the frozen series and publish through the master release
+gates. Package/image publication and website deployment must be verified
+independently of source merges; neither is implied by the acceptance outcome.
 
 The original 1.2.0 scope is complete and published: report reconciliation, guided
 parameters, owner-authorized cancellation, detached workers, explicit error
@@ -604,4 +618,4 @@ versioned artifacts; registry and deployed metadata establish delivery.
 
 ## Multi-user job admission
 
-Isolate job identifiers and active-job quotas by principal. See the [compatibility and upgrade notes](docs/release-1.5.1.md).
+Isolate job identifiers and active-job quotas by principal. See the [compatibility and upgrade notes](docs/release-2.0.0rc4.md).
