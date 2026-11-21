@@ -1,3 +1,16 @@
+auton (2.0.1) unstable; urgency=medium
+
+  * Require Sonicprobe 0.3.66 for outgoing mail headers.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 21 Nov 2026 21:35:00 +0100
+
+auton (2.0.1) stable; urgency=medium
+
+  * Require Sonicprobe 0.3.66 for missing outgoing Date and Message-ID headers.
+  * Align dependency constraints and compatibility checks with the published library.
+
+ -- Adrien Delle Cave <pypi@doowan.net>  Sat, 21 Nov 2026 21:35:00 +0100
+
 auton (2.0.0) stable; urgency=medium
 
   * Require authentication and explicit permissions for client inputs by default.
