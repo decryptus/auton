@@ -35,7 +35,7 @@ An omitted `auth_mode` now requires credentials. Client arguments, environment,
 uploads and selected envfiles require explicit endpoint permissions; fixed server
 inputs remain usable. Review the 1.5.3 migration warnings and test a copy of the
 configuration and databases before upgrading. Preserve the original backup for
-rollback. See the [2.0 migration guide](https://auton.run/docs/release-2.0.0.html)
+rollback. See the [2.0 migration guide](https://auton.run/docs/release-2.0.1.html)
 and [input policy reference](https://auton.run/docs/client-input-policy.html).
 
 ## Capabilities
