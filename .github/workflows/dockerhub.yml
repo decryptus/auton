@@ -61,7 +61,7 @@ jobs:
           docker run --rm --entrypoint python -v "$PWD/.github/scripts:/collection:ro" auton:tests /collection/check-test-collection.py --runner unittest tests
           docker run --rm --entrypoint python auton:tests -m unittest discover -s tests -v
           docker run --rm --entrypoint python -e EXPECTED_VERSION="$(cat VERSION)" auton:test -c 'import os; from importlib.metadata import version; assert version("autond") == os.environ["EXPECTED_VERSION"]; assert os.getuid() != 0'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - name: Build and validate Python distributions
