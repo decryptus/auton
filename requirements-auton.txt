@@ -1,7 +1,7 @@
 dwho>=0.3.63
 python-dotenv
 sonicprobe>=0.3.66
-requests>=2.0
+requests>=2.34.2
 six>=1.13.0
 PyYAML
 regex

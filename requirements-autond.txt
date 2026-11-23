@@ -4,6 +4,6 @@ pycurl
 python-dotenv
 PyYAML>=3.10
 sonicprobe>=0.3.66
-requests>=2.0
+requests>=2.34.2
 six>=1.13.0
 pyasyncore>=1.0.2; python_version >= '3.12'
