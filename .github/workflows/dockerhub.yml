@@ -28,7 +28,7 @@ jobs:
       group: auton-release-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -61,7 +61,7 @@ jobs:
           docker run --rm --entrypoint python -v "$PWD/.github/scripts:/collection:ro" auton:tests /collection/check-test-collection.py --runner unittest tests
           docker run --rm --entrypoint python auton:tests -m unittest discover -s tests -v
           docker run --rm --entrypoint python -e EXPECTED_VERSION="$(cat VERSION)" auton:test -c 'import os; from importlib.metadata import version; assert version("autond") == os.environ["EXPECTED_VERSION"]; assert os.getuid() != 0'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - name: Build and validate Python distributions
@@ -73,7 +73,7 @@ jobs:
           python .github/scripts/check-distributions.py auton autond
       - name: Verify installed packages and 0.3.2 compatibility
         run: python .github/scripts/check-installed-release.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request' || contains(steps.release.outputs.tag, 'rc')
         with:
           name: python-distributions
@@ -123,7 +123,7 @@ jobs:
       matrix:
         package: [auton, autond]
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: python-distributions
           path: dist/
@@ -144,11 +144,11 @@ jobs:
       group: auton-github-release
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release.outputs.sha }}
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: python-distributions
           path: dist/
