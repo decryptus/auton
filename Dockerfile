@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.15-slim-bookworm AS runtime
 
 LABEL maintainer="docker@doowan.net"
 
