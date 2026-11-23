@@ -21,7 +21,7 @@ jobs:
       group: auton-dockerhub-description-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Render and validate registry documentation
