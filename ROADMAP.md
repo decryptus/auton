@@ -1,9 +1,9 @@
 # Auton Roadmap
 
 Status: active product roadmap  
-Updated: 2026-11-06
+Updated: 2026-11-23
 
-The 1.0–1.3 feature baseline is delivered. Version 1.3.7 adds an [offline migration check](docs/release-1.3.7.md). Version 1.3.6 adds [2.0 migration warnings](docs/release-1.3.6.md). Version 1.3.5 adds a [request body read deadline](docs/release-1.3.5.md). Version 1.3.4 adds [daemon and HTTP hardening](docs/release-1.3.4.md). Version 1.3.3 includes the bounded
+The 1.0–1.5 feature baseline is delivered. Version 2.0.1 requires [Sonicprobe 0.3.66 for outgoing mail headers](docs/release-2.0.1.md). Version 2.0.0 [requires authentication and explicit client-input permissions by default](docs/release-2.0.0.md). Version 1.3.7 adds an [offline migration check](docs/release-1.3.7.md). Version 1.3.6 adds [2.0 migration warnings](docs/release-1.3.6.md). Version 1.3.5 adds a [request body read deadline](docs/release-1.3.5.md). Version 1.3.4 adds [daemon and HTTP hardening](docs/release-1.3.4.md). Version 1.3.3 includes the bounded
 OIDC exchange fix from 1.3.2, shared terminal primitives and corrected executable
 version identities. Historical milestone descriptions below
 are not a list of features still waiting for implementation. Registry and website
@@ -539,6 +539,10 @@ Before a future major stable release:
 - keep transport, application logic and presentation separated.
 
 ## Current priorities
+
+Maintenance checkpoint, 21 November 2026: **2.0.1 is published** (PyPI `auton`/`autond`,
+GitHub release `v2.0.1`); it only raises the Sonicprobe floor to 0.3.66. See the
+[2.0.1 release notes](docs/release-2.0.1.md).
 
 Release checkpoint, 19 November 2026: **2.0.0 promotes the validated RC6 series**. Reproducible installed-package migration from 1.5.3 is covered by
 the release gate, including copied SQLite authentication/history and rollback.
