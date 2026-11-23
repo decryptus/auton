@@ -1,4 +1,4 @@
-dwho>=0.3.63
+dwho>=0.3.69
 python-dotenv
 sonicprobe>=0.3.66
 requests>=2.0
