@@ -4,5 +4,12 @@ include bin/*
 recursive-include etc *
 recursive-include auton/web *.html *.css *.js *.svg
 
-recursive-include textual_tests *.py
-include scripts/capture_textual.py
+# Repository and maintainer material never ships in the source distribution.
+prune tests
+prune textual_tests
+prune docs
+prune scripts
+prune .github
+prune debian
+prune docker
+global-exclude __pycache__ *.py[cod]
