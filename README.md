@@ -26,13 +26,13 @@ Before upgrading a 1.x installation, follow the [2.0 migration guide](docs/relea
 
 ## Quickstart
 
-This quickstart uses **Auton 2.0.1**, including SQLite authentication, durable
+This quickstart uses **Auton 2.0.2**, including SQLite authentication, durable
 jobs and the web console. Check out the release and use Docker Compose:
 
 ```sh
 git clone https://github.com/decryptus/auton.git
 cd auton
-git checkout v2.0.1
+git checkout v2.0.2
 docker compose build
 docker compose run --rm --no-deps --entrypoint autond-auth auton \
   -c /etc/auton/auton.yml user set -u operator -s read -s run -s maintenance
@@ -104,7 +104,7 @@ another greeting using that same token:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install auton==2.0.1
+python -m pip install auton==2.0.2
 auton --uri http://127.0.0.1:8666 -k ./quickstart.token --endpoint hello
 ```
 
@@ -994,7 +994,7 @@ All endpoint components are prepared before endpoint instances are initialized.
 ### Authentication
 
 New installations can use persistent SQLite authentication. Install
-`autond[auth]==2.0.1`, or use the Docker image, which includes the authentication
+`autond[auth]==2.0.2`, or use the Docker image, which includes the authentication
 extra. HTTPdis >= 0.7.1 and Sonicprobe >= 0.3.66 provide the shared
 Argon2, token and SQLite implementations.
 

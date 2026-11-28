@@ -21,7 +21,7 @@ jobs:
       group: auton-dockerhub-description-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Render and validate registry documentation
@@ -53,7 +53,7 @@ jobs:
           PY
       - name: Synchronize Docker Hub description
         if: github.event_name != 'pull_request'
-        uses: peter-evans/dockerhub-description@432a30c9e07499fd01da9f8a49f0faf9e0ca5b77 # v4
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: decryptus
           password: ${{ secrets.DOCKERHUB_TOKEN }}
