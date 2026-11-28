@@ -95,6 +95,9 @@ html_theme = 'alabaster'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# Project favicon from the shared brand assets.
+html_favicon = '../assets/brand/favicon/favicon.ico'
+
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
 #
@@ -189,6 +192,10 @@ def copy_screenshot_links(app, exception):
             source = Path(app.srcdir) / directory
             if source.is_dir():
                 shutil.copytree(source, Path(app.outdir) / directory, dirs_exist_ok=True)
+        # The included README references its logo as assets/brand/svg/...
+        brand = Path(app.srcdir).parent / 'assets' / 'brand' / 'svg'
+        if brand.is_dir():
+            shutil.copytree(brand, Path(app.outdir) / 'assets' / 'brand' / 'svg', dirs_exist_ok=True)
 
 
 def setup(app):
